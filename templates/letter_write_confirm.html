@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Letter created</h1>
+
+<p>A physical letter instance has been created.</p>
+<p>Letter code: <strong>{{ letter.code }}</strong></p>
+
+<p>
+  <a href="{% url 'letter_print' letter.code %}">Open printable view (envelope + letter)</a>
+</p>
+<p>Public story page: <code>/letters/l/{{ letter.code }}/</code></p>
+{% endblock %}

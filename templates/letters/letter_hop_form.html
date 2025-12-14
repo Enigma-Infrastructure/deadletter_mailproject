@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Confirm Print Location</h2>
+  <form method="post">
+    {% csrf_token %}
+    <input name="print_city" placeholder="City" required>
+    <input name="print_venue" placeholder="Venue">
+    <button>Confirm Printed</button>
+  </form>
+</div>
+{% endblock %}

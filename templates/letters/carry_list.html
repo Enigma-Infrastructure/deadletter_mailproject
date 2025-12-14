@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Carry ({{ letters.count }})</h2>
+  {% for letter in letters %}
+    <div>{{ letter.code }} - {{ letter.hops.first.city }}</div>
+  {% empty %}
+    <p>No letters waiting</p>
+  {% endfor %}
+</div>
+{% endblock %}

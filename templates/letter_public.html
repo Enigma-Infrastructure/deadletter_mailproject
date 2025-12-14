@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% load letter_markdown %}
+{% block content %}
+<div class="card">
+  <h1>Letter {{ letter.code }}</h1>
+
+  <p>This letter is part of the Pirate Mail / Deadletter project.</p>
+
+  {% if letter.concept %}
+    <h2>About this letter</h2>
+    {% if letter.concept.title %}
+      <p><strong>{{ letter.concept.title }}</strong></p>
+    {% endif %}
+    {% if letter.concept.description %}
+      <p>{{ letter.concept.description }}</p>
+    {% endif %}
+  {% endif %}
+
+  {% if letter.recipient %}
+    <h2>Recipient</h2>
+    {% if user.is_authenticated and user.is_collaborator %}
+      <p>
+        Nickname: {{ letter.recipient.nickname }}<br>
+        City/Region/State: {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}<br>
+        {% if letter.recipient.real_name %}Real name: {{ letter.recipient.real_name }}<br>{% endif %}
+        {% if letter.recipient.email %}Email: {{ letter.recipient.email }}<br>{% endif %}
+        {% if letter.recipient.has_opt_in_postal %}
+          Postal (private): {{ letter.recipient.postal_address_line1 }}
+          {{ letter.recipient.postal_city }} {{ letter.recipient.postal_state }} {{ letter.recipient.postal_postcode }}
+        {% endif %}
+      </p>
+    {% else %}
+      <p>
+        For: {{ letter.recipient.nickname }}<br>
+        City/Region/State: {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}
+      </p>
+    {% endif %}
+  {% endif %}
+
+  <h2>Letter body</h2>
+  <div class="letter-body">
+    {{ letter.body_text|render_markdown|safe }}
+  </div>
+</div>
+{% endblock %}

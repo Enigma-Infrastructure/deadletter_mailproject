@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Letters to write</h1>
+
+  {% if concepts %}
+    <ul>
+      {% for concept in concepts %}
+        <li>
+          <a href="{% url 'letter_write_claim' concept.pk %}">
+            {{ concept.title|default:"Letter" }}
+          </a>
+          {% if concept.created_for %}
+            – for {{ concept.created_for.nickname }}
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No letters waiting to be written.</p>
+  {% endif %}
+</div>
+{% endblock %}

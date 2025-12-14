@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Deadletter Admin Hub</h1>
+
+{% for section in sections %}
+  <h2>{{ section.title }}</h2>
+  <ul>
+    {% for link in section.links %}
+      <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+    {% endfor %}
+  </ul>
+{% endfor %}
+{% endblock %}

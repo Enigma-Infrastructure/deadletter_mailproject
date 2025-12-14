@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% load qr_code %}
+{% block content %}
+<div class="card">
+  <h2>Batch {{ batch_id }}</h2>
+  {% for letter in letters %}
+    <div><a href="{% url 'letter_print' letter.code %}" target="_blank">Print {{ letter.code }}</a></div>
+  {% endfor %}
+  <div>
+    <p>THEN print/scan this:</p>
+    {% qr_from_text batch_qr_url size=10 %}
+  </div>
+</div>
+{% endblock %}

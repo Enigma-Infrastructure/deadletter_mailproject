@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% load letter_markdown %}
+{% block content %}
+
+<div class="card">
+  <h1>Read letters</h1>
+
+  <form method="get" style="margin-bottom: 1rem;">
+    <p>
+      <label for="q">Search</label>
+      <input type="text" name="q" id="q" value="{{ q }}">
+    </p>
+    <p>
+      <label for="topic">Topic</label>
+      <select name="topic" id="topic">
+        <option value="">All topics</option>
+        {% for topic in topics %}
+          <option value="{{ topic.id }}" {% if topic.id|stringformat:"s" == selected_topic %}selected{% endif %}>
+            {{ topic.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </p>
+    <button type="submit">Filter</button>
+  </form>
+</div>
+
+{% for letter in letters %}
+  <div class="card">
+    <h2>
+      {% if letter.concept %}
+        {{ letter.concept.title|default:"Letter" }}
+      {% else %}
+        Letter
+      {% endif %}
+    </h2>
+
+    {% if letter.recipient %}
+      <p style="margin-top: 0; font-size: 0.9rem; color: #666;">
+        For {{ letter.recipient.nickname }}
+        · {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}
+      </p>
+    {% endif %}
+
+    <div style="font-size: 0.9rem; margin-bottom: 0.75rem;">
+      {{ letter.body_text|render_markdown|safe }}
+    </div>
+
+    {# Click-through: link to the public page for this letter #}
+    <p style="margin: 0;">
+      <a href="{% url 'letter_public' letter.code %}">Open this letter</a>
+    </p>
+  </div>
+{% empty %}
+  <div class="card">
+    <p>No letters found.</p>
+  </div>
+{% endfor %}
+
+{% endblock %}

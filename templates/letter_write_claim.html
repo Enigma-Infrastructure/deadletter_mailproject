@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h1>Write this letter</h1>
+
+  {% if person %}
+    <p><strong>{{ person.nickname }}</strong>
+       ({{ person.city }} {{ person.region }} {{ person.state }})</p>
+  {% endif %}
+
+  {% if concept.write_prompt %}
+    <h2>Prompt</h2>
+    <p>{{ concept.write_prompt }}</p>
+  {% endif %}
+
+  <h2>Your letter</h2>
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/easymde/dist/easymde.min.js"></script>
+
+  <form method="post">
+    {% csrf_token %}
+    {% if form.errors %}
+      <ul class="errorlist">
+        {% for field in form %}
+          {% for error in field.errors %}
+            <li>{{ field.label }}: {{ error }}</li>
+          {% endfor %}
+        {% endfor %}
+        {% for error in form.non_field_errors %}
+          <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {{ form.as_p }}
+    <button type="submit">Save letter</button>
+  </form>
+
+  <script>
+    const textarea = document.getElementById("id_body_text");
+    if (textarea) {
+      const easyMDE = new EasyMDE({
+        element: textarea,
+        spellChecker: false,
+        toolbar: [
+          "bold", "italic", "heading", "|",
+          "quote", "unordered-list", "ordered-list", "|",
+          "link", "|", "preview"
+        ],
+        forceSync: true
+      });
+    }
+  </script>
+</div>
+{% endblock %}

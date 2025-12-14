@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load qr_code letter_markdown %}
+{% block content %}
+
+<style>
+  @media print {
+    header, nav, button { display: none; }
+    body { margin: 0; }
+  }
+  .envelope,
+  .letter-body {
+    border: 1px solid #000;
+    margin-bottom: 1rem;
+    padding: 1rem;
+    background: #fff;
+    color: #000;
+  }
+  .envelope {
+    width: 600px;
+    height: 300px;
+    position: relative;
+  }
+  .envelope-qr {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+  }
+</style>
+
+<div class="card">
+  <h1>Print letter {{ letter.code }}</h1>
+
+  <div class="envelope">
+    <h2>Envelope front</h2>
+    {% if letter.recipient %}
+      <p>To: {{ letter.recipient.nickname }}</p>
+      <p>{{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}</p>
+    {% endif %}
+    <p>Letter code: {{ letter.code }}</p>
+
+    <div class="envelope-qr">
+      {% qr_from_text public_url size=10 %}
+    </div>
+  </div>
+
+  <div class="letter-body">
+    <h2>Letter body</h2>
+    <div>
+      {{ letter.body_text|render_markdown|safe }}
+    </div>
+  </div>
+
+  <button type="button" onclick="window.print()">Print this page</button>
+</div>
+
+{% endblock %}

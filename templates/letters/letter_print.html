@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load qr_code letter_markdown %}
+{% block content %}
+<style>
+@media print {
+  header, nav, button { 
+    display: none !important; 
+  }
+  body { 
+    margin: 0; 
+    font-family: serif; 
+  }
+}
+/* Keep envelope + letter-body always visible */
+.envelope, .letter-body {
+  border: 2px solid #000; 
+  margin: 20px 0; 
+  padding: 20px; 
+  page-break-inside: avoid;
+}
+.envelope { 
+  width: 4in; height: 2in; 
+  display: flex; 
+  align-items: center; 
+  justify-content: space-between;
+  font-size: 14px;
+}
+.letter-body { max-width: 6in; }
+.qr { width: 1.2in; height: 1.2in; }
+</style>
+
+
+<div class="envelope">
+  <div>
+    <strong>To: {{ letter.recipient.nickname }}</strong><br>
+    {{ letter.recipient.city }}, {{ letter.recipient.region }}<br>
+    Letter {{ letter.code }}
+  </div>
+  <div class="qr">
+    {% qr_from_text public_url size=6 %}
+  </div>
+</div>
+
+<div class="letter-body">
+  {{ letter.body_textrender_markdownsafe }}
+</div>
+
+<button onclick="window.print()" style="margin: 20px 0;">🖨️ Print Envelope + Letter</button>
+{% endblock %}

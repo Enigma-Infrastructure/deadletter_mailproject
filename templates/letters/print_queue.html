@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card">
+  <h2>Print Queue ({{ letters.count }})</h2>
+  <form method="post" action="{% url 'print_batch' %}">
+    {% csrf_token %}
+    {% for letter in letters %}
+      <label><input type="checkbox" name="letters" value="{{ letter.pk }}"> {{ letter.code }} for {{ letter.recipient.nickname }}</label><br>
+    {% endfor %}
+    <button>Print Batch</button>
+  </form>
+</div>
+{% endblock %}

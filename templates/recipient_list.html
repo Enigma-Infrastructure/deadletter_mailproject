@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Recipients (collaborators)</h1>
+<ul>
+  {% for person in people %}
+    <li>
+      {{ person.nickname }}
+      {% if person.social_place_name %}
+        – at {{ person.social_place_name }}
+      {% endif %}
+      ({{ person.city }} {{ person.region }} {{ person.state }})
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

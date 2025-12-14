@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Carry / Track letters</h1>
+
+<h2>Find letters near you</h2>
+<form method="get">
+  {{ form.as_p }}
+  <button type="submit">Search</button>
+</form>
+
+{% if letters %}
+  <h2>Letters in this area</h2>
+  <ul>
+    {% for letter in letters %}
+      <li>
+        Code: <strong>{{ letter.code }}</strong>
+        {% if letter.concept %}
+          – {{ letter.concept.title|default:"Letter" }}
+        {% endif %}
+        {% if letter.recipient %}
+          – For: {{ letter.recipient.nickname }}
+        {% endif %}
+        – Status: {{ letter.status }}
+        – Current location: {{ letter.current_city }} {{ letter.current_region }} {{ letter.current_state }}
+        – <a href="{% url 'letter_public' letter.code %}">Journey / QR page</a>
+      </li>
+    {% endfor %}
+  </ul>
+{% elif form.is_bound %}
+  <p>No letters found for that area yet.</p>
+{% endif %}
+{% endblock %}

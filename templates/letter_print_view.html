@@ -1,0 +1,6 @@
+from django.urls import reverse
+
+url = request.build_absolute_uri(
+    reverse("letter_public", args=[letter.code])
+)
+return render(request, "letter_print.html", {"letter": letter, "public_url": url})
