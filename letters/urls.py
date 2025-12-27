@@ -24,4 +24,12 @@ urlpatterns = [
     path("carry/", views.carry_list, name="carry_list"),
     path("l/<str:code>/hop/", views.letter_hop_create, name="letter_hop_create"),
     path("batch/<str:batch_id>/confirm/", views.letter_hop_create, name="batch_confirm"),
+
+    # Writing Desk
+    path("desk/", views.write_read_home, name="write_read_home"),
+    path("desk/start/", views.quick_write_start, name="quick_write_start"),
+    path("desk/write/<int:pk>/", views.quick_write_letter, name="quick_write_letter"),
+    path("desk/read/", views.desk_read_list, name="desk_read_list"),
+
+
 ]

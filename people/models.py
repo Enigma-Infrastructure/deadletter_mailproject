@@ -33,6 +33,9 @@ class Person(models.Model):
         related_name="people_created",
     )
 
+    email = models.EmailField(blank=True)  # <-- ADD THIS
+
+
     is_active = models.BooleanField(default=True)
 
     class Meta:

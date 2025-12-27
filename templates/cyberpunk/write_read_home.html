@@ -1,0 +1,48 @@
+{% extends "cyberpunk/desk_base.html" %}
+{% block content %}
+<div class="card" style="max-width: 640px; margin: 0 auto; text-align: center;">
+  <h1>Write & Read Letters</h1>
+  <p>Pick a topic, write a letter, or read what others have written.</p>
+
+  <hr>
+
+  <h2>✍️ Start a new letter</h2>
+  <form method="get" action="{% url 'quick_write_start' %}" style="margin-top: 1rem;">
+    <label for="topic_choice" style="display:block; margin-bottom:0.5rem;">
+      Topic for this letter
+    </label>
+
+    <select id="topic_choice" name="topic" 
+            onchange="if(this.value === 'custom') { document.getElementById('topic_custom').focus(); }"
+            style="padding:0.4rem; min-width:60%;">
+      <option value="">(Choose a topic…)</option>
+      <option value="A Hope">A Hope</option>
+      <option value="A Memory">A Memory</option>
+      <option value="A Warning">A Warning</option>
+      <option value="A Reminder">A Reminder</option>
+      <option value="A Spark for Someone You'll Never Meet">
+        A Spark for Someone You'll Never Meet
+      </option>
+      <option value="custom">Custom topic…</option>
+    </select>
+
+    <div style="margin-top:0.5rem;">
+      <input id="topic_custom" name="topic_custom" type="text"
+             placeholder="Or type your own topic"
+             style="padding:0.4rem; min-width:60%;">
+    </div>
+
+    <button type="submit" class="btn" style="margin-top:1rem;">
+      Continue to write this letter
+    </button>
+  </form>
+
+  <hr style="margin:2rem 0;">
+
+  <h2>📖 Read letters</h2>
+  <p>Browse letters others have written.</p>
+  <a href="{% url 'desk_read_list' %}" class="btn-secondary" style="padding:0.7rem 1.4rem;">
+    Go to reading desk
+  </a>
+</div>
+{% endblock %}

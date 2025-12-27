@@ -1,0 +1,301 @@
+/* ============ Root + Globals ============ */
+:root {
+    --accent: #64ffda;
+    --accent-purple: #7c4dff;
+    --text: #f5f5ff;
+    --text-muted: #8e99f3;
+    --bg: #050511;
+    --bg-card: rgba(7, 9, 30, 0.96);
+    --border: rgba(100, 255, 218, 0.35);
+  }
+  
+  * {
+    box-sizing: border-box;
+  }
+  
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  body {
+    margin: 0;
+    padding: 0;
+    min-height: 100vh;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background:
+      radial-gradient(circle at 20% -20%, #1a2a4f 0, rgba(0, 0, 0, 0) 45%),
+      radial-gradient(circle at 120% 120%, #3f0b4f 0, rgba(0, 0, 0, 0) 50%),
+      var(--bg);
+    color: var(--text);
+  }
+  
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #050509;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: linear-gradient(var(--accent), var(--accent-purple));
+    border-radius: 4px;
+  }
+  
+  /* ============ Layout ============ */
+  
+  .desk-shell {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 1.5rem;
+  }
+  
+  .desk-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+  
+  .desk-title {
+    font-size: 1.8rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+    text-shadow:
+      0 0 4px rgba(255, 255, 255, 0.4),
+      0 0 10px var(--accent),
+      0 0 18px rgba(100, 255, 218, 0.5);
+    margin: 0 0 0.5rem;
+  }
+  
+  .desk-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+    margin: 0;
+    letter-spacing: 0.12em;
+  }
+  
+  .desk-main {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    width: 100%;
+  }
+  
+  .desk-footer {
+    text-align: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 1.5rem;
+    border-top: 1px solid rgba(100, 255, 218, 0.25);
+    padding-top: 0.5rem;
+  }
+  
+  /* ============ Cards ============ */
+  
+  .card {
+    background: linear-gradient(135deg, var(--bg-card), rgba(10, 10, 28, 0.96));
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    box-shadow:
+      0 0 20px rgba(0, 0, 0, 0.7),
+      0 0 26px rgba(100, 255, 218, 0.22);
+    padding: 1.5rem 2rem;
+    backdrop-filter: blur(12px);
+    max-width: 720px;
+    width: 100%;
+  }
+  
+  /* ============ Typography ============ */
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin: 0 0 0.75rem;
+  }
+  
+  h1 {
+    font-size: 1.5rem;
+    color: var(--accent);
+    text-shadow: 0 0 10px rgba(100, 255, 218, 0.5);
+  }
+  
+  h2 {
+    font-size: 1.1rem;
+    color: #f9f9ff;
+  }
+  
+  p {
+    margin: 0 0 0.75rem;
+    line-height: 1.5;
+  }
+  
+  p:last-child {
+    margin-bottom: 0;
+  }
+  
+  /* ============ Buttons ============ */
+  
+  .btn,
+  .btn-secondary,
+  button[type="submit"],
+  button[type="button"] {
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    background: linear-gradient(135deg, #1a2a3f, #0f1928);
+    color: #e9ffff;
+    text-decoration: none;
+    display: inline-block;
+    cursor: pointer;
+    padding: 0.6rem 1.4rem;
+    font-size: 0.95rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    position: relative;
+    overflow: hidden;
+    transition:
+      transform 0.1s ease,
+      box-shadow 0.12s ease,
+      border-color 0.12s ease;
+    box-shadow:
+      0 0 12px rgba(100, 255, 218, 0.4),
+      0 0 2px rgba(0, 0, 0, 0.8);
+  }
+  
+  .btn-secondary,
+  button[type="reset"] {
+    border-color: var(--accent-purple);
+    background: linear-gradient(135deg, #241a40, #140b27);
+    box-shadow: 0 0 12px rgba(124, 77, 255, 0.4);
+  }
+  
+  .btn:hover,
+  .btn-secondary:hover,
+  button:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 18px rgba(100, 255, 218, 0.6),
+      0 0 4px rgba(0, 0, 0, 0.9);
+  }
+  
+  .btn:active,
+  .btn-secondary:active,
+  button:active {
+    transform: translateY(0);
+  }
+  
+  /* ============ Forms ============ */
+  
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  textarea,
+  select {
+    background: rgba(5, 8, 25, 0.95);
+    border-radius: 7px;
+    border: 1px solid rgba(100, 255, 218, 0.5);
+    color: var(--text);
+    padding: 0.5rem 0.7rem;
+    font-size: 0.95rem;
+    font-family: inherit;
+    width: 100%;
+    max-width: 100%;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  
+  input[type="text"]:focus,
+  input[type="email"]:focus,
+  input[type="password"]:focus,
+  textarea:focus,
+  select:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(100, 255, 218, 0.5);
+  }
+  
+  input::placeholder,
+  textarea::placeholder {
+    color: #7e8ae6;
+  }
+  
+  textarea {
+    min-height: 12rem;
+    resize: vertical;
+  }
+  
+  select {
+    cursor: pointer;
+  }
+  
+  /* Form groups */
+  .form-group {
+    margin-bottom: 1.25rem;
+  }
+  
+  label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text);
+  }
+  
+  /* ============ Utilities ============ */
+  
+  .text-muted {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 1.5rem 0;
+  }
+  
+  /* ============ Responsive ============ */
+  
+  @media (max-width: 768px) {
+    .desk-shell {
+      padding: 1rem;
+    }
+  
+    .desk-title {
+      font-size: 1.4rem;
+    }
+  
+    .card {
+      padding: 1.2rem 1.2rem;
+    }
+  }
+  
+  @media (max-width: 480px) {
+    .desk-shell {
+      padding: 0.75rem;
+    }
+  
+    .desk-title {
+      font-size: 1.2rem;
+    }
+  
+    .card {
+      padding: 1rem 1rem;
+    }
+  
+    .btn,
+    .btn-secondary,
+    button {
+      width: 100%;
+      text-align: center;
+    }
+  
+    input[type="text"],
+    textarea,
+    select {
+      font-size: 16px; /* Prevents zoom on iOS */
+    }
+  }
+  

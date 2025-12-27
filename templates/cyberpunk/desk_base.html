@@ -1,0 +1,30 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Deadletter Mail Desk</title>
+  <link rel="stylesheet" href="{% static 'css/desk.css' %}">
+</head>
+<body class="desk-body">
+  <div class="desk-shell">
+    <header class="desk-header">
+      <h1 class="desk-title">DEADLETTER MAIL // TRANSMISSION PROTOCOL</h1>
+      <p class="desk-subtitle"><i>No one fights alone.</i></p>
+    </header>
+
+    <main class="desk-main">
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="desk-footer">
+      <i>
+        <span>Echojacks don't hoard information.<br></span>
+        <span>They move it — across wires, across cities, across people who might otherwise feel alone.<br></span>
+        <span>Every transmission here is a lifeline thrown into the dark for someone else to catch.</span>
+      </i>
+    </footer>
+  </div>
+</body>
+</html>
