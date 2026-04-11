@@ -29,3 +29,32 @@ def is_collaborator(user):
 def recipient_list(request):
     people = Person.objects.order_by("-created_at")[:200]
     return render(request, "recipient_list.html", {"people": people})
+
+
+def request_a_letter(request):
+    """
+    Public intake form — no login required.
+    Anyone can submit themselves to receive a Pirate Mail letter.
+    """
+    if request.method == "POST":
+        nickname     = (request.POST.get("nickname") or "").strip() or "A Stranger"
+        pirate_addr  = (request.POST.get("pirate_address") or "").strip()
+        city         = (request.POST.get("city") or "").strip()
+        state        = (request.POST.get("state") or "").strip()
+        region       = (request.POST.get("region") or "").strip()
+        write_about  = (request.POST.get("write_about") or "").strip()
+        social_place = (request.POST.get("social_place_name") or "").strip()
+        email        = (request.POST.get("email") or "").strip()
+
+        Person.objects.create(
+            nickname=nickname,
+            social_place_name=pirate_addr,
+            city=city,
+            state=state,
+            region=region,
+            write_about=write_about,
+            email=email,
+        )
+        return render(request, "people/request_thanks.html", {"nickname": nickname})
+
+    return render(request, "people/request_a_letter.html")

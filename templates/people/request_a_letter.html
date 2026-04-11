@@ -1,0 +1,92 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Get a Letter — Deadletter Mail</title>
+  <link rel="stylesheet" href="{% static 'css/desk.css' %}">
+</head>
+<body class="desk-body">
+<div class="desk-shell">
+  <header class="desk-header">
+    <h1 class="desk-title">DEADLETTER MAIL // INCOMING REQUEST</h1>
+    <p class="desk-subtitle"><i>Tell us who you are. A letter will find you.</i></p>
+  </header>
+  <main class="desk-main">
+    <div class="card" style="max-width:640px; margin:0 auto;">
+      <h2>Request a Letter</h2>
+      <p style="margin-bottom:1.5rem; color:#aaa;">
+        No postal address needed. Tell us who you are and where letters might find you
+        — a bar, a camp, a neighborhood. Someone out there will write to you.
+      </p>
+      <form method="post">
+        {% csrf_token %}
+
+        <div class="form-group">
+          <label for="nickname">Name or Alias <span style="color:#e05c5c;">*</span></label>
+          <input type="text" id="nickname" name="nickname" required
+                 placeholder="What should we call you?">
+        </div>
+
+        <div class="form-group">
+          <label for="pirate_address">Pirate Mail Address</label>
+          <input type="text" id="pirate_address" name="pirate_address"
+                 placeholder="@handle, 'the corner booth at Murphy&#39;s', etc.">
+          <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
+            How a letter might reach you — a social handle or a social location. No postal addresses.
+          </p>
+        </div>
+
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
+          <div class="form-group">
+            <label for="city">City</label>
+            <input type="text" id="city" name="city" placeholder="Portland">
+          </div>
+          <div class="form-group">
+            <label for="state">State / Country</label>
+            <input type="text" id="state" name="state" placeholder="OR">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="region">Region / Neighborhood</label>
+          <input type="text" id="region" name="region"
+                 placeholder="Pacific Northwest, Southeast PDX…">
+        </div>
+
+        <div class="form-group">
+          <label for="social_place_name">Venue / Hangout</label>
+          <input type="text" id="social_place_name" name="social_place_name"
+                 placeholder="Bar, camp, event space, record shop…">
+        </div>
+
+        <div class="form-group">
+          <label for="write_about">What should someone write to you about?</label>
+          <textarea id="write_about" name="write_about" rows="3"
+                    placeholder="A memory. A hope. Something weird that happened. Anything."></textarea>
+        </div>
+
+        <hr style="margin:1.5rem 0; border-color:#333;">
+
+        <div class="form-group">
+          <label for="email">Continued Interest — optional email</label>
+          <input type="email" id="email" name="email"
+                 placeholder="you@example.org — organizers only, never shown publicly">
+          <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
+            Leave this if you'd like us to reach out when your letter is on its way.
+          </p>
+        </div>
+
+        <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
+          Send my request into the network
+        </button>
+      </form>
+    </div>
+  </main>
+  <footer class="desk-footer">
+    <i>Every letter starts with someone willing to be found.</i>
+  </footer>
+</div>
+</body>
+</html>

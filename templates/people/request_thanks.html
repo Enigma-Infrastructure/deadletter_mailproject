@@ -1,0 +1,35 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Request Received — Deadletter Mail</title>
+  <link rel="stylesheet" href="{% static 'css/desk.css' %}">
+</head>
+<body class="desk-body">
+<div class="desk-shell">
+  <header class="desk-header">
+    <h1 class="desk-title">DEADLETTER MAIL // TRANSMISSION RECEIVED</h1>
+  </header>
+  <main class="desk-main">
+    <div class="card" style="max-width:580px; margin:0 auto; text-align:center;">
+      <h2>You're in the network, {{ nickname }}.</h2>
+      <p style="margin:1rem 0 1.5rem; color:#aaa; line-height:1.7;">
+        Your request has been added to the pool.<br>
+        Somewhere, someone will pick up a pen for you.<br>
+        Keep an eye on the places you named.
+      </p>
+      <a href="{% url 'request_a_letter' %}" class="btn-secondary"
+         style="padding:0.7rem 1.4rem;">Submit another request</a>
+      &nbsp;
+      <a href="{% url 'write_read_home' %}" class="btn"
+         style="padding:0.7rem 1.4rem;">Go to the writing desk</a>
+    </div>
+  </main>
+  <footer class="desk-footer">
+    <i>The letter is already on its way. It just doesn't know it yet.</i>
+  </footer>
+</div>
+</body>
+</html>

@@ -9,38 +9,35 @@
     {% csrf_token %}
 
     <div class="form-group">
-      <label for="name_alias">Name / Alias</label>
-      <input
-        type="text"
-        id="name_alias"
-        name="name_alias"
-        placeholder="Someone out there"
-        value="Someone out there"
-      >
+      <label for="name_alias">Who is this for? (Name / Alias)</label>
+      <input type="text" id="name_alias" name="name_alias"
+             placeholder="Someone out there" value="Someone out there">
     </div>
+
+    {% if concept.write_prompt and concept.write_prompt != concept.title %}
+      <div class="card" style="background:#1a1a2e; border:1px solid #333; padding:0.9rem 1.1rem; margin-bottom:1rem;">
+        <p class="text-muted" style="font-size:0.8rem; margin:0 0 0.3rem;">They asked for:</p>
+        <p style="margin:0; font-style:italic; color:#c8c8ff;">{{ concept.write_prompt }}</p>
+      </div>
+    {% endif %}
 
     <div class="form-group">
       <label for="id_body_text">Your message</label>
       {{ form.body_text }}
     </div>
 
-    <hr>
+    <hr style="margin:1.5rem 0; border-color:#333;">
 
     <div class="form-group">
-      <label for="continued_email">Continued interest (optional email)</label>
-      <input
-        type="email"
-        id="continued_email"
-        name="continued_email"
-        placeholder="you@example.org (optional)"
-      >
-      <p class="text-muted">
-        This email is only for organizers to reach out later; it will not
-        appear on the public reading page.
+      <label for="continued_email">Continued interest — optional email</label>
+      <input type="email" id="continued_email" name="continued_email"
+             placeholder="you@example.org (optional)">
+      <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
+        For organizers only. Never shown on the reading page.
       </p>
     </div>
 
-    <button type="submit" class="btn">Save</button>
+    <button type="submit" class="btn" style="width:100%;">Send this letter</button>
   </form>
 </div>
 {% endblock %}
