@@ -13,25 +13,30 @@
     <header>
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
         <div>
-          <div style="font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.9rem;">
-            deadletter
-          </div>
-          <div style="font-size: 0.8rem; color: #666a75;">
-            pirate mail for wandering letters
-          </div>
+          <a href="/" style="text-decoration:none; color:inherit;">
+            <div style="font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.9rem;">
+              deadletter
+            </div>
+            <div style="font-size: 0.8rem; color: #666a75;">
+              pirate mail for wandering letters
+            </div>
+          </a>
         </div>
 
         <nav style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end;">
-          <!-- Reader / public-side -->
-          <a class="btn" href="/letters/read/">Read letters</a>
+          <!-- Primary: Read first -->
+          <a class="btn btn-primary" href="/letters/read/">Read Letters</a>
 
-          <!-- Writer flows -->
-          <a class="btn" href="/letters/write/queue/">Write: queue</a>
+          <!-- Secondary: Get a letter -->
+          <a class="btn" href="/write/request/">Get a Letter</a>
+
+          <!-- Tertiary: Write -->
+          <a class="btn" href="/letters/write/queue/">Write a Letter</a>
 
           <!-- Carry flow -->
           <a class="btn" href="/carry/">Carry</a>
 
-          <!-- Print helper: list / recent (adjust URL when you have it) -->
+          <!-- Print helper -->
           <a class="btn" href="/letters/print/queue/">Print</a>
 
           <!-- Admin -->

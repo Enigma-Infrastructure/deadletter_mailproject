@@ -55,6 +55,13 @@ def request_a_letter(request):
             write_about=write_about,
             email=email,
         )
-        return render(request, "people/request_thanks.html", {"nickname": nickname})
+        return redirect("request_letter_thanks")
 
     return render(request, "people/request_a_letter.html")
+
+
+def request_letter_thanks(request):
+    """
+    Standalone thank-you page after a letter request is submitted.
+    """
+    return render(request, "people/request_thanks.html")

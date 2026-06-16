@@ -2,10 +2,17 @@
 
 from django.contrib.admin.views.decorators import staff_member_required
 from django.shortcuts import render
+from letters.models import LetterInstance
 
 
 def home(request):
-    return render(request, "base.html")
+    recent_letters = (
+        LetterInstance.objects
+        .filter(is_public=True, body_text__gt="")
+        .select_related("concept", "recipient")
+        .order_by("-created_at")[:6]
+    )
+    return render(request, "home.html", {"recent_letters": recent_letters})
 
 
 @staff_member_required
@@ -20,6 +27,8 @@ def admin_hub(request):
         {
             "title": "Public entry points",
             "links": [
+                {"label": "Read Letters", "url": "/letters/read/"},
+                {"label": "Get a Letter", "url": "/write/request/"},
                 {"label": "Write & Read desk", "url": "/letters/desk/"},
                 {"label": "Carry / Track", "url": "/letters/carry/"},
             ],
@@ -37,15 +46,3 @@ def admin_hub(request):
         },
     ]
     return render(request, "admin_hub.html", {"sections": sections})
-
-def desk_read_list(request):
-    """
-    Desk-only reading view: show recent public letters
-    using the cyberpunk desk skin.
-    """
-    letters = (
-        LetterInstance.objects.filter(is_public=True, body_text__gt="")
-        .select_related("concept", "recipient")
-        .order_by("-created_at")[:50]
-    )
-    return render(request, "cyberpunk/desk_read_list.html", {"letters": letters})
