@@ -18,8 +18,8 @@ from .models import LetterConcept, LetterInstance, LetterHop
 # --------------------------------------------------
 
 def home(request):
-    """Very simple project home; usually base shell."""
-    return render(request, "base.html")
+    """Redirects to main site home — kept for any legacy references."""
+    return redirect("home")
 
 
 @staff_member_required
@@ -35,7 +35,9 @@ def admin_hub(request):
         {
             "title": "Public entry points",
             "links": [
-                {"label": "Write & Read desk", "url": "/letters/desk/"},
+                {"label": "Read Letters", "url": "/letters/read/"},
+                {"label": "Get a Letter", "url": "/write/request/"},
+                {"label": "Write a Letter", "url": "/letters/write/queue/"},
                 {"label": "Carry / Track", "url": "/letters/carry/"},
             ],
         },
@@ -55,27 +57,31 @@ def admin_hub(request):
 
 
 # --------------------------------------------------
-# Public write & read desk (cyberpunk subsite)
+# Cyberpunk desk — DEPRECATED
+# These views are kept so existing URLs don't 404,
+# but they now redirect to the main site equivalents.
 # --------------------------------------------------
 
 def write_read_home(request):
-    """
-    Public landing page used at events/parties:
-    - choose a topic and start a letter
-    - or go to the read/browse view
-    """
-    return render(request, "cyberpunk/write_read_home.html")
+    """Deprecated desk landing — redirect to main home."""
+    return redirect("home")
+
+
+def desk_read_list(request):
+    """Deprecated desk read list — redirect to main letter_read_list."""
+    return redirect("letter_read_list")
 
 
 def quick_write_start(request):
     """
     Take a chosen topic and create a one-off LetterConcept,
     then redirect straight into the quick-write letter view.
+    Still functional — used by write queue flow.
     """
     topic = request.GET.get("topic_custom") or request.GET.get("topic") or ""
     topic = (topic or "").strip()
     if not topic:
-        return redirect("write_read_home")
+        return redirect("letter_write_queue")
 
     concept = LetterConcept.objects.create(
         title=topic,
@@ -87,9 +93,8 @@ def quick_write_start(request):
 
 def quick_write_letter(request, pk: int):
     """
-    Write a letter directly for a one-off concept, with:
-    - name/alias mapped to Person.nickname
-    - optional email for continued interest (stored on Person, not shown publicly)
+    Write a letter directly for a one-off concept.
+    Uses the main site base template, not cyberpunk skin.
     """
     concept = get_object_or_404(LetterConcept, pk=pk)
 
@@ -99,7 +104,6 @@ def quick_write_letter(request, pk: int):
         email = (request.POST.get("continued_email", "") or "").strip()
 
         if form.is_valid():
-            # Create/get the Person by nickname; update email if provided
             recipient, created = Person.objects.get_or_create(
                 nickname=name,
                 defaults={"city": "", "region": ""},
@@ -119,7 +123,7 @@ def quick_write_letter(request, pk: int):
                 status="waiting",
                 created_by=request.user if request.user.is_authenticated else None,
             )
-            return redirect("desk_read_list")
+            return redirect("letter_read_list")
     else:
         form = LetterBodyForm()
 
@@ -130,15 +134,13 @@ def quick_write_letter(request, pk: int):
     )
 
 
-
 # --------------------------------------------------
 # Original writer flows (concept → instance)
 # --------------------------------------------------
 
 def letter_write_queue(request):
     """
-    Concepts that don’t yet have any instances = letters to be written.
-    This remains public for the demo; collaborators can still use it.
+    Concepts that don't yet have any instances = letters to be written.
     """
     topic_hint = request.GET.get("topic_custom") or request.GET.get("topic") or ""
 
@@ -225,9 +227,8 @@ def print_queue(request):
 
 def print_batch(request):
     """
-    Create a batch from selected letters and show a page with:
-    - per-letter print links
-    - a final batch QR for first-hop confirmation.
+    Create a batch from selected letters and show a page with
+    per-letter print links and a final batch QR for first-hop confirmation.
     """
     if request.method == "POST":
         ids = request.POST.getlist("letters")
@@ -258,7 +259,6 @@ def print_batch(request):
 def carry_list(request):
     """
     Letters whose latest hop is 'waiting', optionally filtered by city.
-    Used as the carrier-facing list.
     """
     city_filter = request.GET.get("city", "")
 
@@ -277,9 +277,7 @@ def carry_list(request):
 
 def letter_hop_create(request, code=None, batch_id=None):
     """
-    Create a new hop:
-    - single-letter mode: /letters/l/<code>/hop/
-    - batch-confirm mode: /letters/batch/<batch_id>/confirm/
+    Create a new hop (single-letter or batch mode).
     """
     letter = None
     batch_letters = []
@@ -366,15 +364,3 @@ def letter_read_list(request):
             "q": q,
         },
     )
-
-def desk_read_list(request):
-    """
-    Desk-only reading view: show recent public letters
-    using the cyberpunk desk skin.
-    """
-    letters = (
-        LetterInstance.objects.filter(is_public=True, body_text__gt="")
-        .select_related("concept", "recipient")
-        .order_by("-created_at")[:50]
-    )
-    return render(request, "cyberpunk/desk_read_list.html", {"letters": letters})

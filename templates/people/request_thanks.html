@@ -1,35 +1,17 @@
-{% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Request Received — Deadletter Mail</title>
-  <link rel="stylesheet" href="{% static 'css/desk.css' %}">
-</head>
-<body class="desk-body">
-<div class="desk-shell">
-  <header class="desk-header">
-    <h1 class="desk-title">DEADLETTER MAIL // TRANSMISSION RECEIVED</h1>
-  </header>
-  <main class="desk-main">
-    <div class="card" style="max-width:580px; margin:0 auto; text-align:center;">
-      <h2>You're in the network, {{ nickname }}.</h2>
-      <p style="margin:1rem 0 1.5rem; color:#aaa; line-height:1.7;">
-        Your request has been added to the pool.<br>
-        Somewhere, someone will pick up a pen for you.<br>
-        Keep an eye on the places you named.
-      </p>
-      <a href="{% url 'request_a_letter' %}" class="btn-secondary"
-         style="padding:0.7rem 1.4rem;">Submit another request</a>
-      &nbsp;
-      <a href="{% url 'write_read_home' %}" class="btn"
-         style="padding:0.7rem 1.4rem;">Go to the writing desk</a>
-    </div>
-  </main>
-  <footer class="desk-footer">
-    <i>The letter is already on its way. It just doesn't know it yet.</i>
-  </footer>
+{% extends "base.html" %}
+
+{% block title %}You're in the network — Deadletter Mail{% endblock %}
+
+{% block content %}
+<div style="max-width:560px; margin:3rem auto; text-align:center;">
+  <h1 style="margin-bottom:1rem;">You're in the network.</h1>
+  <p style="color: var(--color-text-muted, #666a75); margin-bottom:2rem;">
+    A letter is out there waiting to find you. Someone will write it.
+    A traveler will carry it. It may arrive in ways you don't expect.
+  </p>
+  <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+    <a href="/letters/read/" class="btn btn-primary">Read Letters</a>
+    <a href="/" class="btn">Back to Home</a>
+  </div>
 </div>
-</body>
-</html>
+{% endblock %}

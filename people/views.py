@@ -35,20 +35,20 @@ def request_a_letter(request):
     """
     Public intake form — no login required.
     Anyone can submit themselves to receive a Pirate Mail letter.
+    'pirate_address' is the single soft-address field (social handle OR venue).
     """
     if request.method == "POST":
-        nickname     = (request.POST.get("nickname") or "").strip() or "A Stranger"
-        pirate_addr  = (request.POST.get("pirate_address") or "").strip()
-        city         = (request.POST.get("city") or "").strip()
-        state        = (request.POST.get("state") or "").strip()
-        region       = (request.POST.get("region") or "").strip()
-        write_about  = (request.POST.get("write_about") or "").strip()
-        social_place = (request.POST.get("social_place_name") or "").strip()
-        email        = (request.POST.get("email") or "").strip()
+        nickname      = (request.POST.get("nickname") or "").strip() or "A Stranger"
+        pirate_addr   = (request.POST.get("pirate_address") or "").strip()
+        city          = (request.POST.get("city") or "").strip()
+        state         = (request.POST.get("state") or "").strip()
+        region        = (request.POST.get("region") or "").strip()
+        write_about   = (request.POST.get("write_about") or "").strip()
+        email         = (request.POST.get("email") or "").strip()
 
         Person.objects.create(
             nickname=nickname,
-            social_place_name=pirate_addr,
+            social_place_name=pirate_addr,   # single merged field
             city=city,
             state=state,
             region=region,
