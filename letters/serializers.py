@@ -1,59 +1,49 @@
 # letters/serializers.py
 from rest_framework import serializers
 
-from people.models import Person
-from .models import LetterConcept, LetterInstance
+from people.models import LetterRequest
+from .models import LetterInstance
 
 
-class PersonPublicSerializer(serializers.ModelSerializer):
+class LetterRequestPublicSerializer(serializers.ModelSerializer):
     class Meta:
-        model = Person
+        model = LetterRequest
         fields = [
             "id",
             "nickname",
-            "social_place_name",
+            "pirate_address",
             "city",
-            "region",
             "state",
+            "region",
             "write_about",
         ]
 
 
-class LetterConceptSerializer(serializers.ModelSerializer):
-    created_for = PersonPublicSerializer(read_only=True)
-
-    class Meta:
-        model = LetterConcept
-        fields = [
-            "id",
-            "title",
-            "description",
-            "write_prompt",
-            "destination_social_place_name",
-            "destination_city",
-            "destination_region",
-            "destination_state",
-            "created_for",
-            "created_at",
-        ]
-
-
 class LetterInstanceSerializer(serializers.ModelSerializer):
-    concept = LetterConceptSerializer(read_only=True)
+    request = LetterRequestPublicSerializer(read_only=True)
+
+    # Derive current location from the most recent hop
+    current_city   = serializers.SerializerMethodField()
+    current_region = serializers.SerializerMethodField()
 
     class Meta:
         model = LetterInstance
         fields = [
             "id",
             "code",
-            "status",
             "is_public",
-            "current_social_place_name",
+            "body_text",
+            "request",
             "current_city",
             "current_region",
-            "current_state",
-            "body_text",
-            "concept",
             "created_at",
         ]
         read_only_fields = ["created_at"]
+
+    def get_current_city(self, obj):
+        hop = obj.hops.order_by("-created_at").first()
+        return hop.city if hop else ""
+
+    def get_current_region(self, obj):
+        hop = obj.hops.order_by("-created_at").first()
+        return hop.region if hop else ""
