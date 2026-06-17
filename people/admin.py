@@ -1,27 +1,35 @@
-# people/admin.py
 from django.contrib import admin
-from .models import Person
+from .models import LetterRequest
 
 
-@admin.register(Person)
-class PersonAdmin(admin.ModelAdmin):
-    list_display = (
-        "nickname",
-        "social_place_name",
-        "city",
-        "region",
-        "state",
-        "created_at",
+@admin.register(LetterRequest)
+class LetterRequestAdmin(admin.ModelAdmin):
+    list_display  = (
+        "nickname", "pirate_address", "city", "state",
+        "region", "status", "is_active", "created_at",
     )
-    search_fields = (
-        "nickname",
-        "social_place_name",
-        "city",
-        "region",
-        "state",
-    )
-    list_filter = (
-        "city",
-        "state",
-        "region",
+    list_filter   = ("status", "is_active", "city", "state")
+    search_fields = ("nickname", "pirate_address", "city", "write_about")
+    readonly_fields = ("created_at",)
+    fieldsets = (
+        ("Identity", {
+            "fields": ("nickname", "pirate_address"),
+        }),
+        ("Location", {
+            "fields": ("city", "state", "region"),
+        }),
+        ("Prompt", {
+            "fields": ("write_about",),
+        }),
+        ("Status", {
+            "fields": ("status", "is_active"),
+        }),
+        ("Private / Organizer", {
+            "fields": ("email",),
+            "classes": ("collapse",),
+        }),
+        ("Meta", {
+            "fields": ("created_at",),
+            "classes": ("collapse",),
+        }),
     )

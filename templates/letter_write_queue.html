@@ -1,23 +1,31 @@
 {% extends "base.html" %}
+{% block title %}Write a Letter — Deadletter Mail{% endblock %}
 {% block content %}
 <div class="card">
-  <h1>Letters to write</h1>
+  <h1>Letters waiting to be written</h1>
+  <p style="color: var(--color-text-muted, #666);">Each person below submitted a request. Pick one and write to them.</p>
 
-  {% if concepts %}
-    <ul>
-      {% for concept in concepts %}
-        <li>
-          <a href="{% url 'letter_write_claim' concept.pk %}">
-            {{ concept.title|default:"Letter" }}
+  {% if requests %}
+    <ul style="list-style:none; padding:0; margin:0;">
+      {% for req in requests %}
+        <li style="padding: 0.75rem 0; border-bottom: 1px solid #2a2a2a;">
+          <a href="{% url 'letter_write_claim' req.pk %}" style="font-weight:600;">
+            {{ req.nickname }}
           </a>
-          {% if concept.created_for %}
-            – for {{ concept.created_for.nickname }}
+          {% if req.city or req.state %}
+            <span style="color:#888; font-size:0.85rem;">
+              — {{ req.city }}{% if req.city and req.state %}, {% endif %}{{ req.state }}
+            </span>
+          {% endif %}
+          {% if req.write_about %}
+            <p style="margin: 0.25rem 0 0; color: #aaa; font-size:0.9rem;">{{ req.write_about }}</p>
           {% endif %}
         </li>
       {% endfor %}
     </ul>
   {% else %}
-    <p>No letters waiting to be written.</p>
+    <p>No letters waiting to be written right now. Check back soon — or
+       <a href="{% url 'request_a_letter' %}">add yourself to the pool</a>.</p>
   {% endif %}
 </div>
 {% endblock %}

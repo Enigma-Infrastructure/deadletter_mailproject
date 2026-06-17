@@ -1,43 +1,35 @@
 {% extends "base.html" %}
 {% load letter_markdown %}
+{% block title %}Letter {{ letter.code }} — Deadletter Mail{% endblock %}
 {% block content %}
 <div class="card">
   <h1>Letter {{ letter.code }}</h1>
+  <p style="color:#888;">This letter is part of the Pirate Mail / Deadletter project.</p>
 
-  <p>This letter is part of the Pirate Mail / Deadletter project.</p>
-
-  {% if letter.concept %}
-    <h2>About this letter</h2>
-    {% if letter.concept.title %}
-      <p><strong>{{ letter.concept.title }}</strong></p>
-    {% endif %}
-    {% if letter.concept.description %}
-      <p>{{ letter.concept.description }}</p>
-    {% endif %}
-  {% endif %}
-
-  {% if letter.recipient %}
+  {% if letter.request %}
     <h2>Recipient</h2>
-    {% if user.is_authenticated and user.is_collaborator %}
+    {% if user.is_authenticated and user.is_staff %}
       <p>
-        Nickname: {{ letter.recipient.nickname }}<br>
-        City/Region/State: {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}<br>
-        {% if letter.recipient.real_name %}Real name: {{ letter.recipient.real_name }}<br>{% endif %}
-        {% if letter.recipient.email %}Email: {{ letter.recipient.email }}<br>{% endif %}
-        {% if letter.recipient.has_opt_in_postal %}
-          Postal (private): {{ letter.recipient.postal_address_line1 }}
-          {{ letter.recipient.postal_city }} {{ letter.recipient.postal_state }} {{ letter.recipient.postal_postcode }}
-        {% endif %}
+        Nickname: {{ letter.request.nickname }}<br>
+        Location: {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
+        {% if letter.request.region %} ({{ letter.request.region }}){% endif %}<br>
+        Pirate address: {{ letter.request.pirate_address|default:"—" }}<br>
+        {% if letter.request.email %}Email (private): {{ letter.request.email }}<br>{% endif %}
       </p>
     {% else %}
       <p>
-        For: {{ letter.recipient.nickname }}<br>
-        City/Region/State: {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}
+        For: {{ letter.request.nickname }}<br>
+        {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
+        {% if letter.request.pirate_address %}&nbsp;·&nbsp; {{ letter.request.pirate_address }}{% endif %}
       </p>
+    {% endif %}
+
+    {% if letter.request.write_about %}
+      <p style="color:#888; font-style:italic;">Topic: {{ letter.request.write_about }}</p>
     {% endif %}
   {% endif %}
 
-  <h2>Letter body</h2>
+  <h2>The Letter</h2>
   <div class="letter-body">
     {{ letter.body_text|render_markdown|safe }}
   </div>

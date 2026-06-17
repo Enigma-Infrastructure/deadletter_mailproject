@@ -1,16 +1,21 @@
 {% extends "base.html" %}
+{% block title %}Write to {{ letter_request.nickname }} — Deadletter Mail{% endblock %}
 {% block content %}
 <div class="card">
-  <h1>Write this letter</h1>
+  <h1>Write to {{ letter_request.nickname }}</h1>
 
-  {% if person %}
-    <p><strong>{{ person.nickname }}</strong>
-       ({{ person.city }} {{ person.region }} {{ person.state }})</p>
-  {% endif %}
+  <p style="color:#aaa; font-size:0.9rem;">
+    {{ letter_request.city }}{% if letter_request.city and letter_request.state %}, {% endif %}{{ letter_request.state }}
+    {% if letter_request.pirate_address %}
+      &nbsp;·&nbsp; {{ letter_request.pirate_address }}
+    {% endif %}
+  </p>
 
-  {% if concept.write_prompt %}
-    <h2>Prompt</h2>
-    <p>{{ concept.write_prompt }}</p>
+  {% if letter_request.write_about %}
+    <div style="background:#1a1a1a; border-left:3px solid #555; padding:0.75rem 1rem; margin:1rem 0; border-radius:4px;">
+      <strong>They want to hear about:</strong><br>
+      {{ letter_request.write_about }}
+    </div>
   {% endif %}
 
   <h2>Your letter</h2>
@@ -22,32 +27,23 @@
     {% csrf_token %}
     {% if form.errors %}
       <ul class="errorlist">
-        {% for field in form %}
-          {% for error in field.errors %}
-            <li>{{ field.label }}: {{ error }}</li>
-          {% endfor %}
-        {% endfor %}
-        {% for error in form.non_field_errors %}
-          <li>{{ error }}</li>
-        {% endfor %}
+        {% for field in form %}{% for error in field.errors %}<li>{{ field.label }}: {{ error }}</li>{% endfor %}{% endfor %}
+        {% for error in form.non_field_errors %}<li>{{ error }}</li>{% endfor %}
       </ul>
     {% endif %}
     {{ form.as_p }}
-    <button type="submit">Save letter</button>
+    <div style="display:flex; gap:1rem; margin-top:1rem;">
+      <button type="submit" class="btn btn-primary">Save letter</button>
+      <a href="{% url 'letter_write_queue' %}" class="btn">Back to queue</a>
+    </div>
   </form>
 
   <script>
     const textarea = document.getElementById("id_body_text");
     if (textarea) {
-      const easyMDE = new EasyMDE({
-        element: textarea,
-        spellChecker: false,
-        toolbar: [
-          "bold", "italic", "heading", "|",
-          "quote", "unordered-list", "ordered-list", "|",
-          "link", "|", "preview"
-        ],
-        forceSync: true
+      new EasyMDE({
+        element: textarea, spellChecker: false, forceSync: true,
+        toolbar: ["bold","italic","heading","|","quote","unordered-list","|","link","|","preview"]
       });
     }
   </script>

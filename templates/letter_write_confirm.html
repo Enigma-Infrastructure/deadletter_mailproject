@@ -1,12 +1,17 @@
 {% extends "base.html" %}
+{% block title %}Letter saved — Deadletter Mail{% endblock %}
 {% block content %}
-<h1>Letter created</h1>
-
-<p>A physical letter instance has been created.</p>
-<p>Letter code: <strong>{{ letter.code }}</strong></p>
-
-<p>
-  <a href="{% url 'letter_print' letter.code %}">Open printable view (envelope + letter)</a>
-</p>
-<p>Public story page: <code>/letters/l/{{ letter.code }}/</code></p>
+<div class="card" style="text-align:center;">
+  <h1>Letter saved ✓</h1>
+  <p style="color:#aaa;">Code: <strong>{{ letter.code }}</strong></p>
+  {% if letter.request %}
+    <p>Written for <strong>{{ letter.request.nickname }}</strong>
+    {% if letter.request.city %} in {{ letter.request.city }}{% endif %}.</p>
+  {% endif %}
+  <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap; margin-top:1.5rem;">
+    <a href="{% url 'letter_write_queue' %}" class="btn btn-primary">Write another</a>
+    <a href="{% url 'letter_read_list' %}" class="btn">Read letters</a>
+    <a href="{% url 'letter_public' letter.code %}" class="btn">View this letter</a>
+  </div>
+</div>
 {% endblock %}

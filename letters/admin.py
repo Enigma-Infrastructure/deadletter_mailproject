@@ -1,36 +1,38 @@
-# letters/admin.py
 from django.contrib import admin
-from .models import LetterConcept, LetterInstance
+from .models import LetterInstance, LetterHop
 
 
-@admin.register(LetterConcept)
-class LetterConceptAdmin(admin.ModelAdmin):
-    list_display = (
-        "title",
-        "created_for",
-        "destination_social_place_name",
-        "destination_city",
-        "destination_region",
-        "destination_state",
-        "created_at",
-    )
-    search_fields = ("title", "description", "write_prompt")
-    list_filter = ("destination_city", "destination_state")
+class LetterHopInline(admin.TabularInline):
+    model  = LetterHop
+    extra  = 0
+    fields = ('status', 'city', 'venue_hint', 'notes', 'created_at', 'updated_by')
+    readonly_fields = ('created_at',)
 
 
 @admin.register(LetterInstance)
 class LetterInstanceAdmin(admin.ModelAdmin):
-    list_display = (
-        "code",
-        "concept",
-        "recipient",
-        "status",
-        "current_social_place_name",
-        "current_city",
-        "current_region",
-        "current_state",
-        "is_public",
-        "created_at",
+    list_display  = ('code', 'request', 'is_public', 'created_at')
+    list_filter   = ('is_public',)
+    search_fields = ('code', 'request__nickname', 'body_text')
+    readonly_fields = ('code', 'created_at')
+    inlines = [LetterHopInline]
+    fieldsets = (
+        ('Letter', {
+            'fields': ('code', 'request', 'body_text'),
+        }),
+        ('Visibility', {
+            'fields': ('is_public', 'written_by'),
+        }),
+        ('Meta', {
+            'fields': ('created_at',),
+            'classes': ('collapse',),
+        }),
     )
-    search_fields = ("code",)
-    list_filter = ("status", "current_city", "current_state", "is_public")
+
+
+@admin.register(LetterHop)
+class LetterHopAdmin(admin.ModelAdmin):
+    list_display  = ('letter', 'status', 'city', 'venue_hint', 'created_at', 'updated_by')
+    list_filter   = ('status', 'city')
+    search_fields = ('letter__code', 'city', 'venue_hint', 'notes')
+    readonly_fields = ('created_at',)

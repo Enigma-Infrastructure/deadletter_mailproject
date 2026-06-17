@@ -2,44 +2,52 @@ from django.conf import settings
 from django.db import models
 
 
-class Person(models.Model):
-    # Public, art-facing identity
-    nickname = models.CharField(max_length=255)
+class LetterRequest(models.Model):
+    """
+    Someone who wants to receive a Pirate Mail letter.
+    One row per request — no automatic deduplication.
+    Two people named 'Wizard' with different addresses are two separate rows.
+    """
 
-    # Social geography (soft address)
-    city = models.CharField(max_length=255, blank=True)
-    region = models.CharField(max_length=255, blank=True)
-    state = models.CharField(max_length=255, blank=True)
+    STATUS_CHOICES = [
+        ('pending',    'Pending — waiting to be written'),
+        ('written',    'Written — letter exists, not yet printed'),
+        ('in_transit', 'In Transit — physically moving'),
+        ('delivered',  'Delivered'),
+        ('archived',   'Archived'),
+    ]
 
-    # Social address: where to aim the letter
-    social_place_name = models.CharField(
+    # Who wants the letter
+    nickname       = models.CharField(max_length=255)
+    pirate_address = models.CharField(
         max_length=255,
         blank=True,
-        help_text="Bar, camp, venue, event space, etc.",
+        help_text="Social handle, venue, bar, camp, regular haunt — NOT a postal address.",
     )
 
-    # Topic / “what to write about”
+    # Where they are
+    city   = models.CharField(max_length=255, blank=True)
+    state  = models.CharField(max_length=255, blank=True)
+    region = models.CharField(max_length=255, blank=True)
+
+    # What to write about — this IS the letter prompt
     write_about = models.TextField(
         blank=True,
-        help_text="Short topic or prompt for this person.",
+        help_text="What the writer should address. Becomes the prompt in the write queue.",
     )
+
+    # Lifecycle
+    status    = models.CharField(max_length=32, choices=STATUS_CHOICES, default='pending')
+    is_active = models.BooleanField(default=True)
+
+    # Private — organizer use only, never shown publicly
+    email = models.EmailField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        null=True,
-        blank=True,
-        on_delete=models.SET_NULL,
-        related_name="people_created",
-    )
-
-    email = models.EmailField(blank=True)  # <-- ADD THIS
-
-
-    is_active = models.BooleanField(default=True)
 
     class Meta:
         ordering = ["-created_at"]
 
-    def __str__(self) -> str:
-        return self.nickname or f"Person {self.pk}"
+    def __str__(self):
+        location = ", ".join(filter(None, [self.city, self.state]))
+        return f"{self.nickname}" + (f" ({location})" if location else "")

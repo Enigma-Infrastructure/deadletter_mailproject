@@ -1,56 +1,40 @@
 {% extends "base.html" %}
-{% load static %}
-
-{% block title %}Deadletter — Pirate Mail{% endblock %}
-
+{% block title %}Deadletter Mail — Pirate Mail Project{% endblock %}
 {% block content %}
-<div class="home-hero">
-  <h1 class="home-title">Pirate Mail</h1>
-  <p class="home-subtitle">
-    Letters written by strangers. Carried by travelers. Delivered person to person.
-  </p>
 
-  <div class="home-actions">
-    <a class="btn btn-primary" href="{% url 'letter_read_list' %}">Read Letters</a>
-    <a class="btn" href="{% url 'request_a_letter' %}">Get a Letter</a>
-    <a class="btn" href="{% url 'letter_write_queue' %}">Write a Letter</a>
+<div class="card" style="text-align:center; padding: 2rem;">
+  <h1 style="font-size:2rem; margin-bottom:0.5rem;">Deadletter Mail</h1>
+  <p style="color:#aaa; max-width:480px; margin:0 auto 1.5rem;">Letters written by strangers, carried by travelers, delivered person-to-person.
+  No postal address required.</p>
+  <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+    <a href="{% url 'letter_read_list' %}" class="btn btn-primary">Read Letters</a>
+    <a href="{% url 'request_a_letter' %}" class="btn">Get a Letter</a>
+    <a href="{% url 'letter_write_queue' %}" class="btn">Write a Letter</a>
   </div>
-
-  <p class="home-hint">
-    Browse first. Get a letter sent to you when you're ready.
-    Sit down and write one when you're willing.
-  </p>
 </div>
 
 {% if recent_letters %}
-<section class="recent-letters">
-  <h2 class="section-heading">Letters in the Archive</h2>
-  <div class="letter-grid">
-    {% for letter in recent_letters %}
-    <a class="letter-card" href="{% url 'letter_public' letter.code %}">
-      <div class="letter-card-to">
-        To: {{ letter.recipient.nickname|default:"A Stranger" }}
-        {% if letter.concept.destination_city %}
-          <span class="letter-card-city">— {{ letter.concept.destination_city }}</span>
-        {% endif %}
-      </div>
-      {% if letter.concept.title %}
-      <div class="letter-card-topic">{{ letter.concept.title }}</div>
+<div style="margin-top:2rem;">
+  <h2 style="margin-bottom:1rem;">Recent Letters</h2>
+  {% for letter in recent_letters %}
+    <div class="card" style="margin-bottom:1rem;">
+      <h3 style="margin-bottom:0.25rem;">
+        {% if letter.request %}For {{ letter.request.nickname }}{% else %}A Letter{% endif %}
+      </h3>
+      {% if letter.request %}
+        <p style="margin:0 0 0.5rem; font-size:0.85rem; color:#888;">
+          {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
+        </p>
       {% endif %}
-      <div class="letter-card-status">{{ letter.get_status_display }}</div>
-    </a>
-    {% endfor %}
-  </div>
-  <div class="home-read-more">
-    <a href="{% url 'letter_read_list' %}">See all letters &rarr;</a>
-  </div>
-</section>
+      <p style="font-size:0.9rem; color:#ccc;">{{ letter.body_text|truncatewords:30 }}</p>
+      <a href="{% url 'letter_public' letter.code %}">Read full letter →</a>
+    </div>
+  {% endfor %}
+</div>
 {% else %}
-<section class="recent-letters">
-  <div class="home-empty">
-    <p>The archive is quiet for now. The first letter is waiting to be written.</p>
-    <a class="btn" href="{% url 'letter_write_queue' %}">Write the first one</a>
-  </div>
-</section>
+<div class="card" style="margin-top:2rem; text-align:center; color:#888;">
+  <p>No letters yet — be the first to <a href="{% url 'request_a_letter' %}">request one</a> or <a href="{% url 'letter_write_queue' %}">write one</a>.</p>
+</div>
 {% endif %}
+
 {% endblock %}

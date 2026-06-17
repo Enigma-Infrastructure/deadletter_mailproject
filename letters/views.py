@@ -1,55 +1,43 @@
 # letters/views.py
 
-import uuid
-
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+
+from people.models import LetterRequest
+from .forms import LetterBodyForm
+from .models import LetterInstance, LetterHop
+import uuid
 from django.utils import timezone
 
-from people.models import Person
-from topics.models import Topic
-from .forms import LetterBodyForm
-from .models import LetterConcept, LetterInstance, LetterHop
-
 
 # --------------------------------------------------
-# Project home / admin hub
+# Admin hub
 # --------------------------------------------------
-
-def home(request):
-    """Redirects to main site home — kept for any legacy references."""
-    return redirect("home")
-
 
 @staff_member_required
 def admin_hub(request):
-    """Central place to link to admin and project areas."""
     sections = [
         {
             "title": "Django Admin",
-            "links": [
-                {"label": "Site admin", "url": "/admin/"},
-            ],
+            "links": [{"label": "Site admin", "url": "/admin/"}],
         },
         {
             "title": "Public entry points",
             "links": [
-                {"label": "Read Letters", "url": "/letters/read/"},
-                {"label": "Get a Letter", "url": "/write/request/"},
+                {"label": "Read Letters",   "url": "/letters/read/"},
+                {"label": "Get a Letter",   "url": "/write/request/"},
                 {"label": "Write a Letter", "url": "/letters/write/queue/"},
-                {"label": "Carry / Track", "url": "/letters/carry/"},
+                {"label": "Carry / Track",  "url": "/letters/carry/"},
             ],
         },
         {
             "title": "Domain admin",
             "links": [
-                {"label": "People (recipients)", "url": "/admin/people/person/"},
-                {"label": "Letter concepts", "url": "/admin/letters/letterconcept/"},
-                {"label": "Letter instances", "url": "/admin/letters/letterinstance/"},
-                {"label": "Letter hops", "url": "/admin/letters/letterhop/"},
-                {"label": "Topics", "url": "/admin/topics/topic/"},
-                {"label": "Media items", "url": "/admin/media_app/mediaitem/"},
+                {"label": "Letter requests",   "url": "/admin/people/letterrequest/"},
+                {"label": "Letter instances",  "url": "/admin/letters/letterinstance/"},
+                {"label": "Letter hops",       "url": "/admin/letters/letterhop/"},
+                {"label": "Media items",       "url": "/admin/media_app/mediaitem/"},
             ],
         },
     ]
@@ -57,123 +45,58 @@ def admin_hub(request):
 
 
 # --------------------------------------------------
-# Cyberpunk desk — DEPRECATED
-# These views are kept so existing URLs don't 404,
-# but they now redirect to the main site equivalents.
+# Deprecated desk routes — safe redirects
 # --------------------------------------------------
 
 def write_read_home(request):
-    """Deprecated desk landing — redirect to main home."""
     return redirect("home")
 
-
 def desk_read_list(request):
-    """Deprecated desk read list — redirect to main letter_read_list."""
     return redirect("letter_read_list")
 
-
 def quick_write_start(request):
-    """
-    Take a chosen topic and create a one-off LetterConcept,
-    then redirect straight into the quick-write letter view.
-    Still functional — used by write queue flow.
-    """
-    topic = request.GET.get("topic_custom") or request.GET.get("topic") or ""
-    topic = (topic or "").strip()
-    if not topic:
-        return redirect("letter_write_queue")
+    return redirect("letter_write_queue")
 
-    concept = LetterConcept.objects.create(
-        title=topic,
-        write_prompt=topic,
-        created_for=None,
-    )
-    return redirect("quick_write_letter", pk=concept.pk)
-
-
-def quick_write_letter(request, pk: int):
-    """
-    Write a letter directly for a one-off concept.
-    Uses the main site base template, not cyberpunk skin.
-    """
-    concept = get_object_or_404(LetterConcept, pk=pk)
-
-    if request.method == "POST":
-        form = LetterBodyForm(request.POST)
-        name = (request.POST.get("name_alias", "") or "").strip() or "Someone out there"
-        email = (request.POST.get("continued_email", "") or "").strip()
-
-        if form.is_valid():
-            recipient, created = Person.objects.get_or_create(
-                nickname=name,
-                defaults={"city": "", "region": ""},
-            )
-            if email:
-                recipient.email = email
-                recipient.save(update_fields=["email"])
-
-            LetterInstance.objects.create(
-                concept=concept,
-                recipient=recipient,
-                body_text=form.cleaned_data["body_text"],
-                current_city="",
-                current_region="",
-                current_state="",
-                current_social_place_name="",
-                status="waiting",
-                created_by=request.user if request.user.is_authenticated else None,
-            )
-            return redirect("letter_read_list")
-    else:
-        form = LetterBodyForm()
-
-    return render(
-        request,
-        "cyberpunk/quick_write_letter.html",
-        {"concept": concept, "form": form},
-    )
+def quick_write_letter(request, pk):
+    return redirect("letter_write_queue")
 
 
 # --------------------------------------------------
-# Original writer flows (concept → instance)
+# Write queue — pick a pending request and write to it
 # --------------------------------------------------
 
 def letter_write_queue(request):
     """
-    Concepts that don't yet have any instances = letters to be written.
+    Shows all pending LetterRequests that haven't been written yet.
+    Writer picks one and claims it.
     """
-    topic_hint = request.GET.get("topic_custom") or request.GET.get("topic") or ""
-
-    concepts = (
-        LetterConcept.objects.filter(instances__isnull=True)
-        .select_related("created_for")
-        .order_by("-created_at")
+    requests = (
+        LetterRequest.objects
+        .filter(status='pending', is_active=True)
+        .order_by('-created_at')
     )
-    return render(
-        request,
-        "letter_write_queue.html",
-        {"concepts": concepts, "topic_hint": topic_hint},
-    )
+    return render(request, "letter_write_queue.html", {"requests": requests})
 
 
 def letter_write_claim(request, pk: int):
-    concept = get_object_or_404(LetterConcept, pk=pk)
-    person = concept.created_for
+    """
+    Writer writes the letter for a specific LetterRequest.
+    On save: creates LetterInstance, marks request as 'written'.
+    """
+    letter_request = get_object_or_404(LetterRequest, pk=pk, is_active=True)
 
     if request.method == "POST":
         form = LetterBodyForm(request.POST)
         if form.is_valid():
             instance = LetterInstance.objects.create(
-                concept=concept,
-                recipient=person,
+                request=letter_request,
                 body_text=form.cleaned_data["body_text"],
-                current_city=concept.destination_city or (person.city if person else ""),
-                current_region=concept.destination_region or (person.region if person else ""),
-                current_state=concept.destination_state or (person.state if person else ""),
-                current_social_place_name=concept.destination_social_place_name,
-                status="waiting",
-                created_by=request.user if request.user.is_authenticated else None,
+                is_public=True,
+                written_by=request.user if request.user.is_authenticated else None,
             )
+            # Advance the request status
+            letter_request.status = 'written'
+            letter_request.save(update_fields=['status'])
             return redirect("letter_write_confirm", code=instance.code)
     else:
         form = LetterBodyForm()
@@ -181,55 +104,45 @@ def letter_write_claim(request, pk: int):
     return render(
         request,
         "letter_write_claim.html",
-        {"concept": concept, "person": person, "form": form},
+        {"letter_request": letter_request, "form": form},
     )
 
 
 def letter_write_confirm(request, code: str):
-    """Show confirmation + links after a letter instance is created."""
     letter = get_object_or_404(LetterInstance, code=code)
     return render(request, "letter_write_confirm.html", {"letter": letter})
 
 
 # --------------------------------------------------
-# Public letter + printing
+# Public letter pages
 # --------------------------------------------------
 
 def letter_public_page(request, code: str):
-    """HTML page for QR scans: minimal story / info about the letter."""
     letter = get_object_or_404(
-        LetterInstance.objects.select_related("concept", "recipient"),
+        LetterInstance.objects.select_related("request"),
         code=code,
     )
     return render(request, "letter_public.html", {"letter": letter})
 
 
 def letter_print_view(request, code: str):
-    """Print single letter envelope + body (no hop creation)."""
     letter = get_object_or_404(LetterInstance, code=code, is_public=True)
     public_url = request.build_absolute_uri(f"/letters/l/{letter.code}/")
-    return render(
-        request,
-        "letters/letter_print.html",
-        {"letter": letter, "public_url": public_url},
-    )
+    return render(request, "letters/letter_print.html",
+                  {"letter": letter, "public_url": public_url})
 
 
 def print_queue(request):
-    """List letters that have not yet had any hops (unprinted / unreleased)."""
     letters = (
-        LetterInstance.objects.filter(is_public=True, hops__isnull=True)
-        .select_related("recipient")
+        LetterInstance.objects
+        .filter(is_public=True, hops__isnull=True)
+        .select_related("request")
         .order_by("-created_at")
     )
     return render(request, "letters/print_queue.html", {"letters": letters})
 
 
 def print_batch(request):
-    """
-    Create a batch from selected letters and show a page with
-    per-letter print links and a final batch QR for first-hop confirmation.
-    """
     if request.method == "POST":
         ids = request.POST.getlist("letters")
         batch_letters = LetterInstance.objects.filter(pk__in=ids)
@@ -242,13 +155,9 @@ def print_batch(request):
             "batch_id": batch_id,
         }
         batch_qr_url = request.build_absolute_uri(f"/letters/batch/{batch_id}/confirm/")
-
-        return render(
-            request,
-            "letters/print_batch_confirm.html",
-            {"letters": batch_letters, "batch_id": batch_id, "batch_qr_url": batch_qr_url},
-        )
-
+        return render(request, "letters/print_batch_confirm.html",
+                      {"letters": batch_letters, "batch_id": batch_id,
+                       "batch_qr_url": batch_qr_url})
     return redirect("print_queue")
 
 
@@ -257,28 +166,19 @@ def print_batch(request):
 # --------------------------------------------------
 
 def carry_list(request):
-    """
-    Letters whose latest hop is 'waiting', optionally filtered by city.
-    """
     city_filter = request.GET.get("city", "")
-
     nearby_letters = (
-        LetterInstance.objects.filter(
-            is_public=True,
-            hops__status="waiting",
-            hops__city__icontains=city_filter,
-        )
+        LetterInstance.objects
+        .filter(is_public=True, hops__status="waiting",
+                hops__city__icontains=city_filter)
         .distinct()
-        .select_related("recipient")
+        .select_related("request")
         .order_by("-hops__created_at")
     )
     return render(request, "letters/carry_list.html", {"letters": nearby_letters})
 
 
 def letter_hop_create(request, code=None, batch_id=None):
-    """
-    Create a new hop (single-letter or batch mode).
-    """
     letter = None
     batch_letters = []
 
@@ -290,15 +190,13 @@ def letter_hop_create(request, code=None, batch_id=None):
             batch_letters = LetterInstance.objects.filter(pk__in=pending["letters"])
 
     if request.method == "POST":
-        print_city = request.POST.get("print_city", "")
+        print_city  = request.POST.get("print_city", "")
         print_venue = request.POST.get("print_venue", "")
 
         if letter and not letter.hops.exists():
             LetterHop.objects.create(
-                letter=letter,
-                status="waiting",
-                city=print_city,
-                venue_hint=print_venue,
+                letter=letter, status="waiting",
+                city=print_city, venue_hint=print_venue,
                 notes=f"Printed {print_city}",
                 updated_by=request.user if request.user.is_authenticated else None,
             )
@@ -306,61 +204,39 @@ def letter_hop_create(request, code=None, batch_id=None):
             for l in batch_letters:
                 if not l.hops.exists():
                     LetterHop.objects.create(
-                        letter=l,
-                        status="waiting",
-                        city=print_city,
-                        venue_hint=print_venue,
+                        letter=l, status="waiting",
+                        city=print_city, venue_hint=print_venue,
                         notes=f"Batch printed {print_city}",
                         updated_by=request.user if request.user.is_authenticated else None,
                     )
             if "pending_batch" in request.session:
                 del request.session["pending_batch"]
-
         return redirect("carry_list")
 
-    context = {"letter": letter, "batch_letters": batch_letters}
-    return render(request, "letters/letter_hop_form.html", context)
+    return render(request, "letters/letter_hop_form.html",
+                  {"letter": letter, "batch_letters": batch_letters})
 
 
 # --------------------------------------------------
-# Reader / browse
+# Read / browse
 # --------------------------------------------------
 
 def letter_read_list(request):
-    """
-    Public browse/read view: filter by topic and text, show letter bodies.
-    """
-    topic_id = request.GET.get("topic")
     q = request.GET.get("q", "")
 
     qs = (
-        LetterInstance.objects.filter(is_public=True, body_text__gt="")
-        .select_related("concept", "recipient")
-        .prefetch_related("concept__letter_topics__topic")
+        LetterInstance.objects
+        .filter(is_public=True, body_text__gt="")
+        .select_related("request")
         .order_by("-created_at")
     )
-
-    if topic_id:
-        qs = qs.filter(concept__letter_topics__topic_id=topic_id)
 
     if q:
         qs = qs.filter(
             Q(body_text__icontains=q)
-            | Q(concept__title__icontains=q)
-            | Q(concept__write_prompt__icontains=q)
-            | Q(recipient__nickname__icontains=q)
+            | Q(request__nickname__icontains=q)
+            | Q(request__write_about__icontains=q)
         )
 
-    topics = Topic.objects.order_by("name")
-    letters = qs[:100]
-
-    return render(
-        request,
-        "letter_read_list.html",
-        {
-            "letters": letters,
-            "topics": topics,
-            "selected_topic": topic_id,
-            "q": q,
-        },
-    )
+    return render(request, "letter_read_list.html",
+                  {"letters": qs[:100], "q": q})

@@ -1,59 +1,31 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from .forms import RecipientSignupForm
-from .models import Person
-from django.contrib.auth.decorators import user_passes_test
-
-
-def write_home(request):
-    if request.method == "POST":
-        form = RecipientSignupForm(request.POST)
-        if form.is_valid():
-            person, concept = form.save(user=request.user)
-            return redirect("write_thanks", pk=person.pk)
-    else:
-        form = RecipientSignupForm()
-
-    return render(request, "write_home.html", {"form": form})
-
-
-def write_thanks(request, pk: int):
-    person = get_object_or_404(Person, pk=pk)
-    return render(request, "write_thanks.html", {"person": person})
-
-
-def is_collaborator(user):
-    return user.is_authenticated and getattr(user, "is_collaborator", False)
-
-
-@user_passes_test(is_collaborator)
-def recipient_list(request):
-    people = Person.objects.order_by("-created_at")[:200]
-    return render(request, "recipient_list.html", {"people": people})
+from django.shortcuts import render, redirect
+from .models import LetterRequest
 
 
 def request_a_letter(request):
     """
     Public intake form — no login required.
     Anyone can submit themselves to receive a Pirate Mail letter.
-    'pirate_address' is the single soft-address field (social handle OR venue).
+    Each submission creates a fresh LetterRequest row (no deduplication).
     """
     if request.method == "POST":
-        nickname      = (request.POST.get("nickname") or "").strip() or "A Stranger"
-        pirate_addr   = (request.POST.get("pirate_address") or "").strip()
-        city          = (request.POST.get("city") or "").strip()
-        state         = (request.POST.get("state") or "").strip()
-        region        = (request.POST.get("region") or "").strip()
-        write_about   = (request.POST.get("write_about") or "").strip()
-        email         = (request.POST.get("email") or "").strip()
+        nickname       = (request.POST.get("nickname")       or "").strip() or "A Stranger"
+        pirate_address = (request.POST.get("pirate_address") or "").strip()
+        city           = (request.POST.get("city")           or "").strip()
+        state          = (request.POST.get("state")          or "").strip()
+        region         = (request.POST.get("region")         or "").strip()
+        write_about    = (request.POST.get("write_about")    or "").strip()
+        email          = (request.POST.get("email")          or "").strip()
 
-        Person.objects.create(
+        LetterRequest.objects.create(
             nickname=nickname,
-            social_place_name=pirate_addr,   # single merged field
+            pirate_address=pirate_address,
             city=city,
             state=state,
             region=region,
             write_about=write_about,
             email=email,
+            status="pending",
         )
         return redirect("request_letter_thanks")
 
@@ -61,7 +33,4 @@ def request_a_letter(request):
 
 
 def request_letter_thanks(request):
-    """
-    Standalone thank-you page after a letter request is submitted.
-    """
     return render(request, "people/request_thanks.html")
