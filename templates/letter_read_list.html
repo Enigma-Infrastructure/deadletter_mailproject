@@ -18,10 +18,8 @@
     <h2 style="margin-bottom:0.25rem;">
       {% if letter.request and letter.request.write_about %}
         {{ letter.request.write_about }}
-      {% elif letter.request %}
-        A letter for {{ letter.request.nickname }}
       {% else %}
-        A Letter
+        {{ letter.body_text|first_line }}
       {% endif %}
     </h2>
 
@@ -36,8 +34,8 @@
       </p>
     {% endif %}
 
-    <div style="font-size:0.9rem; margin-bottom:0.75rem;">
-      {{ letter.body_text|render_markdown|safe|truncatewords_html:60 }}
+    <div style="font-size:0.9rem; color:#ccc; margin-bottom:0.75rem;">
+      {{ letter.body_text|truncatewords:30 }}
     </div>
 
     <p style="margin:0;">

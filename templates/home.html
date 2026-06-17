@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load letter_markdown %}
 {% block title %}Deadletter Mail — Pirate Mail Project{% endblock %}
 {% block content %}
 
@@ -19,14 +20,18 @@
   {% for letter in recent_letters %}
     <div class="card" style="margin-bottom:1rem;">
       <h3 style="margin-bottom:0.25rem;">
-        {% if letter.request %}For {{ letter.request.nickname }}{% else %}A Letter{% endif %}
+        {% if letter.request and letter.request.write_about %}
+          {{ letter.request.write_about }}
+        {% else %}
+          {{ letter.body_text|first_line }}
+        {% endif %}
       </h3>
       {% if letter.request %}
         <p style="margin:0 0 0.5rem; font-size:0.85rem; color:#888;">
-          {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
+          For {{ letter.request.nickname }}
+          {% if letter.request.city %}&nbsp;·&nbsp; {{ letter.request.city }}{% if letter.request.state %}, {{ letter.request.state }}{% endif %}{% endif %}
         </p>
       {% endif %}
-      <p style="font-size:0.9rem; color:#ccc;">{{ letter.body_text|truncatewords:30 }}</p>
       <a href="{% url 'letter_public' letter.code %}">Read full letter →</a>
     </div>
   {% endfor %}

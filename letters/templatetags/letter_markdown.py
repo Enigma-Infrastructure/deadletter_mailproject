@@ -1,9 +1,30 @@
 # letters/templatetags/letter_markdown.py
+import markdown
 from django import template
-from letters.markdown_utils import render_markdown_safe
+from django.utils.safestring import mark_safe
 
 register = template.Library()
 
-@register.filter(name="render_markdown")
+
+@register.filter
 def render_markdown(value):
-    return render_markdown_safe(value or "")
+    if not value:
+        return ""
+    return mark_safe(
+        markdown.markdown(
+            value,
+            extensions=["nl2br", "fenced_code"],
+        )
+    )
+
+
+@register.filter
+def first_line(value):
+    """Return the first non-empty line of a string, stripped of Markdown syntax."""
+    if not value:
+        return ""
+    for line in value.splitlines():
+        clean = line.strip().lstrip("#").strip()
+        if clean:
+            return clean
+    return ""

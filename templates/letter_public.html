@@ -1,23 +1,16 @@
 {% extends "base.html" %}
 {% load letter_markdown %}
 {% block title %}
-  {% if letter.request and letter.request.write_about %}
-    {{ letter.request.write_about }} — Deadletter Mail
-  {% else %}
-    Letter {{ letter.code }} — Deadletter Mail
-  {% endif %}
+  {% if letter.request and letter.request.write_about %}{{ letter.request.write_about }}{% else %}{{ letter.body_text|first_line }}{% endif %} — Deadletter Mail
 {% endblock %}
 {% block content %}
 <div class="card">
 
-  {# ---- Main title: the prompt / write_about ---- #}
   <h1>
     {% if letter.request and letter.request.write_about %}
       {{ letter.request.write_about }}
-    {% elif letter.request %}
-      A letter for {{ letter.request.nickname }}
     {% else %}
-      Letter {{ letter.code }}
+      {{ letter.body_text|first_line }}
     {% endif %}
   </h1>
 
