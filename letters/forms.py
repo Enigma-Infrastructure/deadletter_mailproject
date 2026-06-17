@@ -1,11 +1,4 @@
 from django import forms
-from .models import LetterConcept
-
-class ChooseConceptForm(forms.Form):
-    concept = forms.ModelChoiceField(
-        queryset=LetterConcept.objects.all(),
-        label="Choose someone / concept to write for",
-    )
 
 
 class LetterBodyForm(forms.Form):
