@@ -16,8 +16,10 @@
 {% for letter in letters %}
   <div class="card">
     <h2 style="margin-bottom:0.25rem;">
-      {% if letter.request %}
-        For {{ letter.request.nickname }}
+      {% if letter.request and letter.request.write_about %}
+        {{ letter.request.write_about }}
+      {% elif letter.request %}
+        A letter for {{ letter.request.nickname }}
       {% else %}
         A Letter
       {% endif %}
@@ -25,17 +27,21 @@
 
     {% if letter.request %}
       <p style="margin-top:0; font-size:0.85rem; color:#888;">
-        {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
+        For {{ letter.request.nickname }}
+        {% if letter.request.city or letter.request.state %}
+          &nbsp;·&nbsp;
+          {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
+        {% endif %}
         {% if letter.request.pirate_address %}&nbsp;·&nbsp; {{ letter.request.pirate_address }}{% endif %}
       </p>
     {% endif %}
 
     <div style="font-size:0.9rem; margin-bottom:0.75rem;">
-      {{ letter.body_text|render_markdown|safe }}
+      {{ letter.body_text|render_markdown|safe|truncatewords_html:60 }}
     </div>
 
     <p style="margin:0;">
-      <a href="{% url 'letter_public' letter.code %}">Open this letter ↗</a>
+      <a href="{% url 'letter_public' letter.code %}">Read full letter ↗</a>
     </p>
   </div>
 {% empty %}

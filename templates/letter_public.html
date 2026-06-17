@@ -1,37 +1,56 @@
 {% extends "base.html" %}
 {% load letter_markdown %}
-{% block title %}Letter {{ letter.code }} — Deadletter Mail{% endblock %}
+{% block title %}
+  {% if letter.request and letter.request.write_about %}
+    {{ letter.request.write_about }} — Deadletter Mail
+  {% else %}
+    Letter {{ letter.code }} — Deadletter Mail
+  {% endif %}
+{% endblock %}
 {% block content %}
 <div class="card">
-  <h1>Letter {{ letter.code }}</h1>
-  <p style="color:#888;">This letter is part of the Pirate Mail / Deadletter project.</p>
+
+  {# ---- Main title: the prompt / write_about ---- #}
+  <h1>
+    {% if letter.request and letter.request.write_about %}
+      {{ letter.request.write_about }}
+    {% elif letter.request %}
+      A letter for {{ letter.request.nickname }}
+    {% else %}
+      Letter {{ letter.code }}
+    {% endif %}
+  </h1>
+
+  <p style="color:#666; font-size:0.85rem; margin-top:0;">
+    Pirate Mail · <span style="font-family:monospace;">{{ letter.code }}</span>
+  </p>
 
   {% if letter.request %}
-    <h2>Recipient</h2>
-    {% if user.is_authenticated and user.is_staff %}
-      <p>
-        Nickname: {{ letter.request.nickname }}<br>
-        Location: {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
-        {% if letter.request.region %} ({{ letter.request.region }}){% endif %}<br>
-        Pirate address: {{ letter.request.pirate_address|default:"—" }}<br>
-        {% if letter.request.email %}Email (private): {{ letter.request.email }}<br>{% endif %}
-      </p>
-    {% else %}
-      <p>
-        For: {{ letter.request.nickname }}<br>
+    <p style="margin-bottom:1rem; font-size:0.9rem; color:#aaa;">
+      For {{ letter.request.nickname }}
+      {% if letter.request.city or letter.request.state %}
+        &nbsp;·&nbsp;
         {{ letter.request.city }}{% if letter.request.city and letter.request.state %}, {% endif %}{{ letter.request.state }}
-        {% if letter.request.pirate_address %}&nbsp;·&nbsp; {{ letter.request.pirate_address }}{% endif %}
-      </p>
-    {% endif %}
+      {% endif %}
+      {% if letter.request.pirate_address %}&nbsp;·&nbsp; {{ letter.request.pirate_address }}{% endif %}
+    </p>
 
-    {% if letter.request.write_about %}
-      <p style="color:#888; font-style:italic;">Topic: {{ letter.request.write_about }}</p>
+    {% if user.is_authenticated and user.is_staff %}
+      <details style="margin-bottom:1rem; font-size:0.85rem; color:#888;">
+        <summary>Organizer details</summary>
+        <p style="margin-top:0.5rem;">
+          Region: {{ letter.request.region|default:"—" }}<br>
+          {% if letter.request.email %}Email (private): {{ letter.request.email }}<br>{% endif %}
+        </p>
+      </details>
     {% endif %}
   {% endif %}
 
-  <h2>The Letter</h2>
+  <hr style="border:none; border-top:1px solid #2a2a2a; margin:1rem 0;">
+
   <div class="letter-body">
     {{ letter.body_text|render_markdown|safe }}
   </div>
+
 </div>
 {% endblock %}
