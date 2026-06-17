@@ -3,15 +3,10 @@ from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
-from people.models import Person
-
 
 class User(AbstractUser):
     """
     Custom user model for the project.
-
-    PII (email, etc.) lives here or in related profile models,
-    not in Person / letters.
     """
     is_collaborator = models.BooleanField(default=False)
 
@@ -21,26 +16,28 @@ class User(AbstractUser):
 
 class ParticipantProfile(models.Model):
     """
-    Optional account-level profile that can claim a Person
-    and store extra PII / preferences, separate from the art data.
+    Optional account-level profile.
+    claimed_request links an account to a LetterRequest they submitted.
+    Mk 1: entirely optional — no flow requires it.
     """
 
     user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    claimed_person = models.ForeignKey(
-        Person,
+    claimed_request = models.ForeignKey(
+        "people.LetterRequest",
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
         related_name="profiles",
+        help_text="The letter request this account is associated with, if any.",
     )
 
-    # Optional PII, only for this account (not used yet in core flows)
-    email_verified = models.BooleanField(default=False)
-    postal_address_line1 = models.CharField(max_length=255, blank=True)
-    postal_city = models.CharField(max_length=255, blank=True)
-    postal_state = models.CharField(max_length=255, blank=True)
-    postal_postcode = models.CharField(max_length=20, blank=True)
-    postal_country = models.CharField(max_length=255, blank=True)
+    # Optional PII, only for this account
+    email_verified        = models.BooleanField(default=False)
+    postal_address_line1  = models.CharField(max_length=255, blank=True)
+    postal_city           = models.CharField(max_length=255, blank=True)
+    postal_state          = models.CharField(max_length=255, blank=True)
+    postal_postcode       = models.CharField(max_length=20,  blank=True)
+    postal_country        = models.CharField(max_length=255, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
