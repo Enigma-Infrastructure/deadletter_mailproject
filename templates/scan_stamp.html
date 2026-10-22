@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 680px; margin: 0 auto;">
+  <h1>Letter {{ letter.code }}</h1>
+  <p class="text-muted">Stamp №{{ stamp.number }}</p>
+
+  <div class="card" style="background:#f6f4ef; padding: 1rem; margin: 1rem 0;">
+    {% if letter.recipient %}
+      <p><strong>To:</strong> {{ letter.recipient.nickname }}
+        {% if letter.recipient.pirate_address_display %}
+          — findable at <em>{{ letter.recipient.pirate_address_display }}</em>
+        {% endif %}
+      </p>
+    {% endif %}
+    {% if letter.concept and letter.concept.title %}
+      <p><strong>Topic:</strong> {{ letter.concept.title }}</p>
+    {% endif %}
+    <p><strong>Status:</strong> {{ letter.get_status_display }}</p>
+    {% if letter.current_location_display %}
+      <p><strong>Last known place:</strong> {{ letter.current_location_display }}</p>
+    {% endif %}
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <p class="card" style="padding: 0.6rem; border-left: 4px solid #4a4;">{{ message }}</p>
+    {% endfor %}
+  {% endif %}
+
+  <h2>Update this letter</h2>
+  <p class="text-muted" style="font-size: 0.85rem;">
+    Tell the network what happened. No account needed — but if you
+    <a href="/accounts/login/">log in</a>, your reputation counts toward the
+    <a href="/leaderboard/">courier leaderboard</a>.
+  </p>
+
+  <form method="post" enctype="multipart/form-data" style="margin: 1rem 0;">
+    {% csrf_token %}
+
+    {% if form %}
+      {% for field in form %}
+        <div class="form-group" style="margin-bottom: 0.8rem;">
+          <label for="{{ field.id }}">{{ field.label }}</label>
+          {{ field }}
+          {% for error in field.errors %}
+            <p style="color:#e05c5c; font-size:0.8rem;">{{ error }}</p>
+          {% endfor %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="kind">What happened?</label>
+        <select id="kind" name="kind">
+          <option value="spotted">I spotted it</option>
+          <option value="picked_up">I'm picking it up to carry it</option>
+          <option value="left_at_place">I left it somewhere</option>
+          <option value="delivered">I delivered it! 🎉</option>
+          <option value="photo_only">Just adding a photo / tag</option>
+        </select>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="note">Note (optional)</label>
+        <textarea id="note" name="note" rows="3" style="width: 100%;"
+          placeholder="Where did you find it? How did it feel?"></textarea>
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="place_name">Where is it now? (a pirate mail place — bar, cafe, venue…)</label>
+        <input id="place_name" name="place_name" style="width: 100%;" placeholder="e.g. The Know Bar">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="place_kind">Kind of place</label>
+        <input id="place_kind" name="place_kind" style="width: 100%;" placeholder="e.g. Bar, Cafe, Bookstore">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="city">City</label>
+        <input id="city" name="city" style="width: 100%;" value="Portland" placeholder="Portland">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="photo">Photo (optional)</label>
+        <input id="photo" name="photo" type="file" accept="image/*">
+      </div>
+
+      <div class="form-group" style="margin-bottom: 0.8rem;">
+        <label for="instagram_handle">Instagram handle (optional)</label>
+        <input id="instagram_handle" name="instagram_handle" placeholder="@yourhandle">
+      </div>
+    {% endif %}
+
+    <button type="submit" class="btn">Post update</button>
+  </form>
+
+  <h2>Journey so far</h2>
+  {% for update in updates %}
+    <div class="card" style="padding: 0.8rem; margin-bottom: 0.6rem;">
+      <strong>{{ update.get_kind_display }}</strong>
+      {% if update.place %}
+        at {{ update.place.name }}{% if update.place.city %}, {{ update.place.city }}{% endif %}
+      {% endif %}
+      <span class="text-muted" style="font-size: 0.8rem;">· {{ update.created_at|date:"M j, Y g:i a" }}</span>
+      {% if update.note %}<p style="margin: 0.4rem 0 0;">{{ update.note }}</p>{% endif %}
+      {% if update.media %}
+        <p style="margin: 0.4rem 0 0;"><img src="{{ update.media.file.url }}" alt="Letter photo" style="max-width: 240px; border-radius: 6px;"></p>
+      {% endif %}
+      {% if update.instagram_handle %}
+        <p class="text-muted" style="margin: 0.4rem 0 0; font-size: 0.8rem;">📸 tagged by {{ update.instagram_handle }}</p>
+      {% endif %}
+    </div>
+  {% empty %}
+    <p class="text-muted">No updates yet — this letter's story starts with you.</p>
+  {% endfor %}
+</div>
+{% endblock %}

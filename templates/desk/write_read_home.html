@@ -1,0 +1,38 @@
+{% extends "desk/desk_base.html" %}
+{% block desk_content %}
+<div class="card" style="max-width: 720px; margin: 0 auto;">
+  <h1>Writing Desk</h1>
+  <p class="text-muted">
+    Pick a letter from the queue and write it. The recipient, address, and
+    prompt are already set — you just write the letter.
+  </p>
+
+  {% if concepts %}
+    <ul style="list-style: none; padding: 0; margin: 1rem 0;">
+      {% for concept in concepts %}
+        <li style="margin-bottom: 0.75rem;">
+          <a href="{% url 'letter_write_claim' concept.pk %}" class="btn">
+            {{ concept.title|default:"Letter" }}
+          </a>
+          {% if concept.created_for %}
+            <span class="text-muted"> — for {{ concept.created_for.nickname }}</span>
+          {% endif %}
+          {% if concept.destination_place %}
+            <span class="text-muted"> · {{ concept.destination_place.name }}</span>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p>No letters waiting to be written. Check back soon.</p>
+  {% endif %}
+
+  <hr>
+
+  <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; justify-content: center;">
+    <a href="{% url 'desk_read_list' %}" class="btn-secondary">Read letters</a>
+    <a href="/write/request/" class="btn-secondary">Request a letter</a>
+    <a href="/letters/carry/" class="btn-secondary">Carry list</a>
+  </div>
+</div>
+{% endblock %}

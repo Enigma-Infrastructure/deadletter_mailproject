@@ -1,0 +1,12 @@
+# deadletter_mailproject — Python dependencies
+#
+# After your environment is working, pin exact versions for full reproducibility:
+#   pip freeze > requirements.txt
+
+Django>=6.1
+djangorestframework
+django-qr-code
+django-easymde
+markdown
+nh3
+Pillow

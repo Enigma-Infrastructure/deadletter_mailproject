@@ -1,60 +1,119 @@
 {% extends "base.html" %}
-{% load letter_markdown %}
 {% block content %}
 
-<div class="card">
-  <h1>Read letters</h1>
+<!-- Filter toggle button -->
+<button class="filter-toggle-btn" id="filter-toggle-btn">Filters</button>
 
-  <form method="get" style="margin-bottom: 1rem;">
-    <p>
-      <label for="q">Search</label>
-      <input type="text" name="q" id="q" value="{{ q }}">
-    </p>
-    <p>
-      <label for="topic">Topic</label>
-      <select name="topic" id="topic">
-        <option value="">All topics</option>
-        {% for topic in topics %}
-          <option value="{{ topic.id }}" {% if topic.id|stringformat:"s" == selected_topic %}selected{% endif %}>
-            {{ topic.name }}
-          </option>
-        {% endfor %}
-      </select>
-    </p>
-    <button type="submit">Filter</button>
+<!-- Filter side panel -->
+<div class="filter-panel" id="filter-panel">
+  <h2 style="margin-bottom: 0.75rem;">Filters</h2>
+  <form method="get" class="read-filters">
+    <div class="filter-row">
+      <div class="filter-field filter-search">
+        <label for="q" class="text-muted">Search</label>
+        <input type="text" name="q" id="q" value="{{ q }}">
+      </div>
+      <div class="filter-field">
+        <label for="topic" class="text-muted">Topic</label>
+        <select name="topic" id="topic">
+          <option value="">All</option>
+          {% for topic in topics %}
+          <option value="{{ topic.id }}" {% if topic.id|stringformat:"s" == selected_topic %}selected{% endif %}>{{ topic.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="filter-field">
+        <label for="city" class="text-muted">City / Destination</label>
+        <input type="text" name="city" id="city" value="{{ city_filter }}">
+      </div>
+      <div class="filter-field">
+        <label class="text-muted">View</label>
+        <select name="view" id="view">
+          <option value="list" {% if view == "list" %}selected{% endif %}>List</option>
+          <option value="tile" {% if view == "tile" %}selected{% endif %}>Tile</option>
+        </select>
+      </div>
+      <button type="submit" class="btn">Filter</button>
+    </div>
   </form>
 </div>
 
-{% for letter in letters %}
-  <div class="card">
-    <h2>
-      {% if letter.concept %}
-        {{ letter.concept.title|default:"Letter" }}
-      {% else %}
-        Letter
-      {% endif %}
-    </h2>
+<!-- Letter count -->
+{% if letters %}
+<p class="letter-count">{{ total_count }} letter{{ total_count|pluralize }} found</p>
+{% endif %}
 
-    {% if letter.recipient %}
-      <p style="margin-top: 0; font-size: 0.9rem; color: #666;">
-        For {{ letter.recipient.nickname }}
-        · {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}
-      </p>
-    {% endif %}
-
-    <div style="font-size: 0.9rem; margin-bottom: 0.75rem;">
-      {{ letter.body_text|render_markdown|safe }}
+<!-- Letter display -->
+{% if letters %}
+  {% if view == "tile" %}
+    <div class="tile-grid">
+      {% for letter in letters %}
+        <div class="card letter-tile">
+          <h3 class="tile-title">{{ letter.concept.title|default:"Letter" }}</h3>
+          {% if letter.recipient %}
+            <p class="tile-meta">
+              For {{ letter.recipient.nickname }}
+              · {{ letter.recipient.pirate_address_display|default:letter.recipient.city }}
+            </p>
+          {% endif %}
+          <div class="tile-body">
+            <p class="tile-text">{{ letter.body_text }}</p>
+          </div>
+          <a href="{% url 'letter_public' letter.code %}" class="btn-secondary tile-open">Open</a>
+        </div>
+      {% endfor %}
     </div>
+  {% else %}
+    <div class="letter-list">
+      {% for letter in letters %}
+        <div class="card letter-row">
+          <div class="row-inner">
+            <div class="row-content">
+              <h3 class="row-title">{{ letter.concept.title|default:"Letter" }}</h3>
+              {% if letter.recipient %}
+                <p class="row-meta">
+                  For {{ letter.recipient.nickname }}
+                  · {{ letter.recipient.pirate_address_display|default:letter.recipient.city }}
+                </p>
+              {% endif %}
+              <div class="row-body">
+                <p class="row-text">{{ letter.body_text }}</p>
+              </div>
+            </div>
+            <a href="{% url 'letter_public' letter.code %}" class="btn-secondary row-open">Open</a>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% else %}
+  <div class="card"><p>No letters found.</p></div>
+{% endif %}
 
-    {# Click-through: link to the public page for this letter #}
-    <p style="margin: 0;">
-      <a href="{% url 'letter_public' letter.code %}">Open this letter</a>
-    </p>
-  </div>
-{% empty %}
-  <div class="card">
-    <p>No letters found.</p>
-  </div>
-{% endfor %}
+<!-- Pagination -->
+{% if page_obj.paginator.num_pages > 1 %}
+<div class="pagination">
+  {% if page_obj.has_previous %}
+    <a class="btn-secondary" href="?q={{ q }}&topic={{ selected_topic }}&city={{ city_filter }}&view={{ view }}&page={{ page_obj.previous_page_number }}">← Previous</a>
+  {% endif %}
+  <span class="page-indicator">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a class="btn-secondary" href="?q={{ q }}&topic={{ selected_topic }}&city={{ city_filter }}&view={{ view }}&page={{ page_obj.next_page_number }}">Next →</a>
+  {% endif %}
+</div>
+{% endif %}
+
+<script>
+const btn = document.getElementById("filter-toggle-btn");
+const panel = document.getElementById("filter-panel");
+btn.addEventListener("click", function() {
+  panel.classList.toggle("open");
+});
+document.addEventListener("click", function(e) {
+  if (panel.classList.contains("open") && !panel.contains(e.target) && e.target !== btn) {
+    panel.classList.remove("open");
+  }
+});
+</script>
 
 {% endblock %}

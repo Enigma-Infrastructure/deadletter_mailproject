@@ -1,14 +1,29 @@
 {% extends "base.html" %}
-{% load qr_code %}
 {% block content %}
 <div class="card">
-  <h2>Batch {{ batch_id }}</h2>
-  {% for letter in letters %}
-    <div><a href="{% url 'letter_print' letter.code %}" target="_blank">Print {{ letter.code }}</a></div>
+  <h2>Ready to print — {{ batch|length }} letter{{ batch|length|pluralize }}</h2>
+  <p class="text-muted">
+    Print each letter, envelope it, and affix its stamp. Confirm below when the batch is done.
+  </p>
+
+  {% for letter in batch %}
+    <div style="border-bottom: 1px solid #ddd; padding: 0.6rem 0;">
+      <a href="{% url 'letter_print' letter.code %}" target="_blank">Print {{ letter.code }}</a>
+      — for {{ letter.recipient.nickname }}
+      {% if letter.recipient.pirate_address_display %} at {{ letter.recipient.pirate_address_display }}{% endif %}
+    </div>
   {% endfor %}
-  <div>
-    <p>THEN print/scan this:</p>
-    {% qr_from_text batch_qr_url size=10 %}
-  </div>
+
+  <form method="post" action="{% url 'print_confirm' %}" style="margin-top: 1rem;">
+    {% csrf_token %}
+    {% for letter in batch %}
+      <input type="hidden" name="letters" value="{{ letter.pk }}">
+    {% endfor %}
+    <button type="submit" class="btn">Confirm Print Complete</button>
+  </form>
+
+  <p style="margin-top: 1rem;">
+    <a href="{% url 'print_queue' %}" class="btn-secondary">Back to print queue</a>
+  </p>
 </div>
 {% endblock %}

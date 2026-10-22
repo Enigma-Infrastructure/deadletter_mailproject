@@ -1,0 +1,1 @@
+C:\Users\Prism\anaconda3\envs\DeadletterMail\python.exe manage.py runserver

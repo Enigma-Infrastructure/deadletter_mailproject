@@ -5,7 +5,7 @@
 
   {% if person %}
     <p><strong>{{ person.nickname }}</strong>
-       ({{ person.city }} {{ person.region }} {{ person.state }})</p>
+       {% if person.pirate_address_display %}({{ person.pirate_address_display }}){% endif %}</p>
   {% endif %}
 
   {% if concept.write_prompt %}

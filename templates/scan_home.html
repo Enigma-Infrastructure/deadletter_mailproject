@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="card" style="max-width: 560px; margin: 0 auto; text-align: center;">
+  <h1>You found a letter! 📮</h1>
+  <p>
+    This letter is part of <strong>Deadletter Mail</strong> — an experiment in
+    analog connection. Letters travel hand-to-hand until
+    they reach their person.
+  </p>
+
+  <form method="post" style="margin: 1.5rem 0;">
+    {% csrf_token %}
+    <label for="number" style="display:block; margin-bottom: 0.5rem;">
+      Enter the number printed on the stamp:
+    </label>
+    <input
+      id="number"
+      name="number"
+      placeholder="e.g. K7X2M9QP"
+      required
+      autocomplete="off"
+      style="text-transform: uppercase; padding: 0.5rem; font-size: 1.1rem; width: 60%;"
+    >
+    <button type="submit" class="btn" style="display: block; margin: 1rem auto 0;">
+      Open this letter's journey
+    </button>
+  </form>
+
+  <p class="text-muted" style="font-size: 0.85rem;">
+    No account needed. Tell us where it is, add a photo, tag your find —
+    then pass it on.
+  </p>
+</div>
+{% endblock %}

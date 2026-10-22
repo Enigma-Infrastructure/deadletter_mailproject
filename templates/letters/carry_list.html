@@ -1,11 +1,33 @@
 {% extends "base.html" %}
 {% block content %}
 <div class="card">
-  <h2>Carry ({{ letters.count }})</h2>
+  <h2>Carry ({{ letters|length }})</h2>
+  <p class="text-muted">
+    Stamped letters ready to be picked up or in transit. Pick one up, carry it
+    toward its pirate mail address, then scan its stamp (or visit
+    <a href="/scan/">/scan/</a>) to log the handoff.
+  </p>
+  <form method="get" style="margin: 0.8rem 0;">
+    <input name="city" placeholder="Filter by city" value="{{ request.GET.city }}">
+    <button>Filter</button>
+  </form>
   {% for letter in letters %}
-    <div>{{ letter.code }} - {{ letter.hops.first.city }}</div>
+    <div style="border-bottom: 1px solid #ddd; padding: 0.5rem 0;">
+      <strong>{{ letter.code }}</strong>
+      {% with stamp=letter.stamps.first %}
+        {% if stamp %} · Stamp №{{ stamp.number }}{% endif %}
+      {% endwith %}
+      — for {{ letter.recipient.nickname }}
+      {% if letter.recipient.pirate_address_display %}
+        → {{ letter.recipient.pirate_address_display }}
+      {% endif %}
+      <span class="text-muted">({{ letter.get_status_display }})</span>
+      {% if letter.current_location_display %}
+        <span class="text-muted">· {{ letter.current_location_display }}</span>
+      {% endif %}
+    </div>
   {% empty %}
-    <p>No letters waiting</p>
+    <p>No letters waiting to be carried.</p>
   {% endfor %}
 </div>
 {% endblock %}

@@ -5,10 +5,9 @@
   {% for person in people %}
     <li>
       {{ person.nickname }}
-      {% if person.social_place_name %}
-        – at {{ person.social_place_name }}
+      {% if person.pirate_address_display %}
+        – {{ person.pirate_address_display }}
       {% endif %}
-      ({{ person.city }} {{ person.region }} {{ person.state }})
     </li>
   {% endfor %}
 </ul>

@@ -1,92 +1,134 @@
-{% load static %}
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Get a Letter — Deadletter Mail</title>
-  <link rel="stylesheet" href="{% static 'css/desk.css' %}">
-</head>
-<body class="desk-body">
-<div class="desk-shell">
-  <header class="desk-header">
-    <h1 class="desk-title">DEADLETTER MAIL // INCOMING REQUEST</h1>
-    <p class="desk-subtitle"><i>Tell us who you are. A letter will find you.</i></p>
-  </header>
-  <main class="desk-main">
-    <div class="card" style="max-width:640px; margin:0 auto;">
-      <h2>Request a Letter</h2>
-      <p style="margin-bottom:1.5rem; color:#aaa;">
-        No postal address needed. Tell us who you are and where letters might find you
-        — a bar, a camp, a neighborhood. Someone out there will write to you.
-      </p>
-      <form method="post">
-        {% csrf_token %}
+{% extends "desk/desk_base.html" %}
+{% block title %}Get a Letter — Deadletter Mail{% endblock %}
+{% block desk_content %}
+<div class="card" style="max-width: 640px; margin: 0 auto;">
+  <h2>Request a Letter</h2>
+  <p class="text-muted" style="margin-bottom: 1.5rem;">
+    No postal address needed. Tell us who you are and where letters might find you
+    — a bar, a camp, a neighborhood. Someone out there will write to you.
+  </p>
 
-        <div class="form-group">
-          <label for="nickname">Name or Alias <span style="color:#e05c5c;">*</span></label>
-          <input type="text" id="nickname" name="nickname" required
-                 placeholder="What should we call you?">
-        </div>
+  <form method="post">
+    {% csrf_token %}
 
-        <div class="form-group">
-          <label for="pirate_address">Pirate Mail Address</label>
-          <input type="text" id="pirate_address" name="pirate_address"
-                 placeholder="@handle, 'the corner booth at Murphy&#39;s', etc.">
-          <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
-            How a letter might reach you — a social handle or a social location. No postal addresses.
-          </p>
-        </div>
-
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem;">
-          <div class="form-group">
-            <label for="city">City</label>
-            <input type="text" id="city" name="city" placeholder="Portland">
-          </div>
-          <div class="form-group">
-            <label for="state">State / Country</label>
-            <input type="text" id="state" name="state" placeholder="OR">
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label for="region">Region / Neighborhood</label>
-          <input type="text" id="region" name="region"
-                 placeholder="Pacific Northwest, Southeast PDX…">
-        </div>
-
-        <div class="form-group">
-          <label for="social_place_name">Venue / Hangout</label>
-          <input type="text" id="social_place_name" name="social_place_name"
-                 placeholder="Bar, camp, event space, record shop…">
-        </div>
-
-        <div class="form-group">
-          <label for="write_about">What should someone write to you about?</label>
-          <textarea id="write_about" name="write_about" rows="3"
-                    placeholder="A memory. A hope. Something weird that happened. Anything."></textarea>
-        </div>
-
-        <hr style="margin:1.5rem 0; border-color:#333;">
-
-        <div class="form-group">
-          <label for="email">Continued Interest — optional email</label>
-          <input type="email" id="email" name="email"
-                 placeholder="you@example.org — organizers only, never shown publicly">
-          <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
-            Leave this if you'd like us to reach out when your letter is on its way.
-          </p>
-        </div>
-
-        <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
-          Send my request into the network
-        </button>
-      </form>
+    {% if form.errors %}
+    <div style="background:#fde8e8; border:1px solid #e05c5c; border-radius:6px; padding:0.75rem 1rem; margin-bottom:1rem;">
+      <strong style="color:#e05c5c;">Please fix the following:</strong>
+      <ul style="margin:0.5rem 0 0 1.2rem; padding:0;">
+        {% for field in form %}
+          {% if field.errors %}
+            {% for error in field.errors %}
+            <li style="color:#e05c5c;"><strong>{{ field.label }}:</strong> {{ error|safe }}</li>
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+      </ul>
     </div>
-  </main>
-  <footer class="desk-footer">
-    <i>Every letter starts with someone willing to be found.</i>
-  </footer>
+    {% endif %}
+
+    <div class="form-group">
+      <label for="id_nickname">Name or Alias <span style="color:#e05c5c;">*</span></label>
+      {{ form.nickname }}
+    </div>
+
+    <div class="form-group">
+      <label for="id_pirate_address">Pirate Mail Address <span style="color:#e05c5c;">*</span></label>
+      {{ form.pirate_address }}
+
+      {% if form.pirate_address.errors or form.override_comment.errors %}
+      <div style="background:#fde8e8; border:1px solid #e05c5c; border-radius:6px; padding:0.75rem 1rem; margin-top:0.5rem;">
+        {% for error in form.pirate_address.errors %}
+        <p style="color:#e05c5c; margin:0 0 0.5rem;">{{ error|safe }}</p>
+        {% endfor %}
+        {% for error in form.override_comment.errors %}
+        <p style="color:#e05c5c; margin:0;">{{ error }}</p>
+        {% endfor %}
+      </div>
+
+      <div style="background:#f5f5f5; border-radius:6px; padding:1rem; margin-top:0.75rem;">
+        <label for="id_override" style="display:flex; align-items:flex-start; gap:0.5rem;">
+          {{ form.override }}
+          <span>I confirm this is a Pirate Mail address (not a postal address)</span>
+        </label>
+        <p class="text-muted" style="font-size:0.8rem; margin-top:0.5rem;">
+          Only check this if your place name happens to look like a street address
+          (e.g. a bar called "Main Street"). You must explain why it's a pirate mail address.
+        </p>
+        <div style="margin-top:0.75rem;">
+          <label for="id_override_comment">Explain why this is a Pirate Mail address</label>
+          {{ form.override_comment }}
+          {% if form.override_comment.errors %}
+          <div style="background:#fde8e8; border:1px solid #e05c5c; border-radius:6px; padding:0.5rem 0.75rem; margin-top:0.5rem;">
+            {% for error in form.override_comment.errors %}
+            <p style="color:#e05c5c; margin:0;">{{ error }}</p>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-top:0.5rem;">
+        <div style="position:relative;">
+          {{ form.pirate_place_kind }}
+          <span id="kind_placeholder" style="position:absolute; left:11.2px; top:50%; transform:translateY(-50%); color:#999; pointer-events:none; transition:opacity 0.5s;">Bar</span>
+        </div>
+        {{ form.city }}
+      </div>
+      <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
+        A public-ish facing thing where you can be found — a bar, a band, a bistro, a camp, a club, a discoteque, an entorage, a family, a harem, an institution, a karayoke night.
+        Mail reaches you by finding someone there who knows you. No postal addresses.
+      </p>
+    </div>
+
+    <div class="form-group">
+      <label for="id_write_about">What should someone write to you about?</label>
+      {{ form.write_about }}
+    </div>
+
+    <hr>
+
+    <div class="form-group">
+      <label for="id_email">Continued Interest — optional email</label>
+      {{ form.email }}
+      <p class="text-muted" style="font-size:0.8rem; margin-top:0.3rem;">
+        Leave this if you'd like us to reach out when your letter is on its way.
+      </p>
+    </div>
+
+    <button type="submit" class="btn" style="width:100%; margin-top:0.5rem;">
+      Send my request into the network
+    </button>
+  </form>
 </div>
-</body>
-</html>
+
+<script>
+  const placeKinds = ["Bar", "Bistro", "Restaurant", "Cafe", "Bookstore", "Venue", "Band", "Choir", "Burning Man camp", "Volunteer group", "Nonprofit", "Art Circle", "Family", "Entourage", "Harem", "Polyule", "Institution", "Karayoke Night", "[???]"];
+  let lastIndex = -1;
+  const kindInput = document.getElementById("id_pirate_place_kind");
+  const kindPlaceholder = document.getElementById("kind_placeholder");
+
+  function rotatePlaceholder() {
+    kindPlaceholder.style.opacity = 0;
+    setTimeout(() => {
+      let idx;
+      do {
+        idx = Math.floor(Math.random() * placeKinds.length);
+      } while (idx === lastIndex);
+      lastIndex = idx;
+      kindPlaceholder.textContent = placeKinds[idx];
+      if (kindInput.value === "") kindPlaceholder.style.opacity = 1;
+    }, 500);
+  }
+
+  kindInput.addEventListener("input", () => {
+    kindPlaceholder.style.opacity = kindInput.value === "" ? 1 : 0;
+  });
+
+  kindInput.addEventListener("blur", () => {
+    if (kindInput.value === "") kindPlaceholder.style.opacity = 1;
+  });
+
+  setInterval(rotatePlaceholder, 3000);
+</script>
+{% endblock %}

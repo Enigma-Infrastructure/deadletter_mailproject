@@ -13,29 +13,35 @@
     <header>
       <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
         <div>
-          <div style="font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; font-size: 0.9rem;">
-            deadletter
-          </div>
-          <div style="font-size: 0.8rem; color: #666a75;">
-            pirate mail for wandering letters
-          </div>
+          <a href="/">
+            <img src="{% static 'img/deadletter_logo.jpg' %}" alt="deadletter" style="height: 50px; width: auto;">
+          </a>
         </div>
 
         <nav style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end;">
-          <!-- Reader / public-side -->
-          <a class="btn" href="/letters/read/">Read letters</a>
+          <!-- Participant flow -->
+          <a class="btn" href="/write/request/">Request</a>
+          <a class="btn" href="/letters/read/">Read</a>
+          <a class="btn" href="/letters/desk/">Desk</a>
 
-          <!-- Writer flows -->
-          <a class="btn" href="/letters/write/queue/">Write: queue</a>
+          <!-- Secondary: physical interface -->
+          <a class="btn btn-secondary" href="/scan/">Scan</a>
 
-          <!-- Carry flow -->
-          <a class="btn" href="/carry/">Carry</a>
+          <!-- Secondary: game layer (authenticated only) -->
+          {% if user.is_authenticated %}
+          <a class="btn btn-secondary" href="/leaderboard/">Leaderboard</a>
+          {% endif %}
 
-          <!-- Print helper: list / recent (adjust URL when you have it) -->
-          <a class="btn" href="/letters/print/queue/">Print</a>
-
-          <!-- Admin -->
-          <a class="btn" href="/admin/">Admin</a>
+          <!-- Auth -->
+          {% if user.is_authenticated %}
+          {% if user.is_staff %}
+          <a class="btn btn-admin" href="/letters/print/queue/">Print</a>
+          <a class="btn btn-admin" href="/admin/">Admin</a>
+          {% endif %}
+          <a class="btn btn-auth" href="/accounts/logout/">Log out</a>
+          {% else %}
+          <a class="btn btn-auth" href="/accounts/login/">Log in</a>
+          {% endif %}
         </nav>
       </div>
     </header>

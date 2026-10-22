@@ -1,24 +1,9 @@
-from django.shortcuts import render, redirect, get_object_or_404
-from .forms import RecipientSignupForm
-from .models import Person
 from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import render
 
-
-def write_home(request):
-    if request.method == "POST":
-        form = RecipientSignupForm(request.POST)
-        if form.is_valid():
-            person, concept = form.save(user=request.user)
-            return redirect("write_thanks", pk=person.pk)
-    else:
-        form = RecipientSignupForm()
-
-    return render(request, "write_home.html", {"form": form})
-
-
-def write_thanks(request, pk: int):
-    person = get_object_or_404(Person, pk=pk)
-    return render(request, "write_thanks.html", {"person": person})
+from letters.models import LetterConcept
+from .forms import RequestALetterForm
+from .models import Person, Place
 
 
 def is_collaborator(user):
@@ -27,34 +12,66 @@ def is_collaborator(user):
 
 @user_passes_test(is_collaborator)
 def recipient_list(request):
-    people = Person.objects.order_by("-created_at")[:200]
+    people = Person.objects.select_related("pirate_place").order_by("-created_at")[:200]
     return render(request, "recipient_list.html", {"people": people})
 
 
 def request_a_letter(request):
     """
-    Public intake form — no login required.
-    Anyone can submit themselves to receive a Pirate Mail letter.
+    Public intake form — no login required. This is the single entry
+    point for "put your name on an envelope".
+
+    The pirate mail address is a social-network location (bar, cafe,
+    camp, venue...) where this person can be found — not a postal
+    address. Stored as a structured Place.
+
+    Also creates the LetterConcept (prompt) so the request appears in
+    the write queue for other participants.
     """
     if request.method == "POST":
-        nickname     = (request.POST.get("nickname") or "").strip() or "A Stranger"
-        pirate_addr  = (request.POST.get("pirate_address") or "").strip()
-        city         = (request.POST.get("city") or "").strip()
-        state        = (request.POST.get("state") or "").strip()
-        region       = (request.POST.get("region") or "").strip()
-        write_about  = (request.POST.get("write_about") or "").strip()
-        social_place = (request.POST.get("social_place_name") or "").strip()
-        email        = (request.POST.get("email") or "").strip()
+        form = RequestALetterForm(request.POST)
+        if form.is_valid():
+            nickname    = form.cleaned_data["nickname"].strip() or "A Stranger"
+            pirate_addr = form.cleaned_data["pirate_address"].strip()
+            place_kind  = form.cleaned_data.get("pirate_place_kind") or "other"
+            city        = form.cleaned_data.get("city") or ""
+            write_about = form.cleaned_data.get("write_about") or ""
+            email       = form.cleaned_data.get("email") or ""
 
-        Person.objects.create(
-            nickname=nickname,
-            social_place_name=pirate_addr,
-            city=city,
-            state=state,
-            region=region,
-            write_about=write_about,
-            email=email,
-        )
-        return render(request, "people/request_thanks.html", {"nickname": nickname})
+            place = None
+            if pirate_addr:
+                place, _ = Place.objects.get_or_create(
+                    name=pirate_addr,
+                    city=city,
+                    defaults={"kind": place_kind},
+                )
 
-    return render(request, "people/request_a_letter.html")
+            # Identity is the unique pair (nickname, pirate_place).
+            # If this pair already exists, update the existing entry.
+            person, created = Person.objects.get_or_create(
+                nickname=nickname,
+                pirate_place=place,
+                defaults={
+                    "city": city,
+                    "write_about": write_about,
+                    "email": email,
+                },
+            )
+            if not created:
+                person.write_about = write_about
+                person.email = email
+                person.save(update_fields=["write_about", "email"])
+
+            LetterConcept.objects.create(
+                title=f"Letter for {nickname}",
+                write_prompt=write_about,
+                destination_place=place,
+                destination_city=city,
+                created_for=person,
+            )
+
+            return render(request, "people/request_thanks.html", {"nickname": nickname})
+        # Form invalid — re-render with errors
+        return render(request, "people/request_a_letter.html", {"form": form})
+
+    return render(request, "people/request_a_letter.html", {"form": RequestALetterForm()})

@@ -1,48 +1,86 @@
 {% extends "base.html" %}
-{% load qr_code letter_markdown %}
+{% load qr_code letter_markdown static %}
 {% block content %}
 <style>
+@page {
+  size: 6.75in 3.5in;
+  margin: 0;
+}
 @media print {
-  header, nav, button { 
-    display: none !important; 
+  header, nav, button {
+    display: none !important;
   }
-  body { 
-    margin: 0; 
-    font-family: serif; 
+  body {
+    margin: 0;
+    font-family: serif;
   }
 }
-/* Keep envelope + letter-body always visible */
-.envelope, .letter-body {
-  border: 2px solid #000; 
-  margin: 20px 0; 
-  padding: 20px; 
+
+/* Envelope: the physical 6¾" x 3.5" piece. */
+.envelope {
+  width: 6.75in;
+  height: 3.5in;
+  position: relative;
+  border: 2px solid #000;
+  page-break-after: always;
+}
+
+/* The stencil (logo): scaled UP to fit the envelope with a safety margin.
+   object-fit: contain keeps the aspect ratio — no stretching. */
+.stencil {
+  position: absolute;
+  top: 0.25in;
+  left: 0.25in;
+  width: 6.25in;   /* 6.75in minus 0.25in safety on each side */
+  height: 3.0in;    /* 3.5in minus 0.25in safety on each side */
+  object-fit: contain;
+}
+
+/* QR / stamp sits in the logo's stamp slot (top-right corner).
+   Positioned relative to the contain-fitted, centered stencil. */
+.envelope-qr {
+  position: absolute;
+  left: 80%;
+  top: 25%;
+  transform: translate(-50%, -50%);
+  width: 1in;
+  height: 1in;
+}
+
+/* Recipient address, written on top of the stencil */
+.envelope-address {
+  position: absolute;
+  top: 42%;
+  left: 38%;
+  width: 40%;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Letter body: separate piece that goes inside the envelope */
+.letter-body {
+  width: 6in;
+  margin: 0.25in auto;
+  padding: 0.25in;
+  border: 1px solid #000;
   page-break-inside: avoid;
 }
-.envelope { 
-  width: 4in; height: 2in; 
-  display: flex; 
-  align-items: center; 
-  justify-content: space-between;
-  font-size: 14px;
-}
-.letter-body { max-width: 6in; }
-.qr { width: 1.2in; height: 1.2in; }
 </style>
 
-
 <div class="envelope">
-  <div>
+  <img class="stencil" src="{% static 'img/deadletter_logo.jpg' %}" alt="deadletter stencil">
+  <div class="envelope-address">
     <strong>To: {{ letter.recipient.nickname }}</strong><br>
-    {{ letter.recipient.city }}, {{ letter.recipient.region }}<br>
-    Letter {{ letter.code }}
+    {{ letter.recipient.pirate_address_display }}<br>
+    Letter {{ letter.code }}{% if stamp %} · Stamp №{{ stamp.number }}{% endif %}
   </div>
-  <div class="qr">
-    {% qr_from_text public_url size=6 %}
+  <div class="envelope-qr">
+    {% qr_from_text scan_url size=6 %}
   </div>
 </div>
 
 <div class="letter-body">
-  {{ letter.body_textrender_markdownsafe }}
+  {{ letter.body_text|render_markdown|safe }}
 </div>
 
 <button onclick="window.print()" style="margin: 20px 0;">🖨️ Print Envelope + Letter</button>

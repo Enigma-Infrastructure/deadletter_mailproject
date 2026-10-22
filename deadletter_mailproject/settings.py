@@ -10,7 +10,10 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+from django.utils.crypto import get_random_string
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,13 +22,20 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-_*-p$%*)a5v)iid&$x%k3)wb2vktvr1g$y#su#ts=^*lpej5od'
+# SECURITY: the secret key is read from the environment, never hardcoded.
+# For local development, a random per-process key is generated when
+# DJANGO_SECRET_KEY is unset, so the server runs without manual setup.
+# Set DJANGO_SECRET_KEY for a stable key (production, or to persist sessions).
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if SECRET_KEY is None:
+    SECRET_KEY = get_random_string(50)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# DEBUG defaults to True for local development; set DJANGO_DEBUG=false for production.
+DEBUG = os.environ.get("DJANGO_DEBUG", "true").strip().lower() in ("1", "true", "yes")
 
-ALLOWED_HOSTS = []
+# Local development only (personal laptop / git-synced folder). Add your domain
+# here when deploying.
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -51,7 +61,6 @@ INSTALLED_APPS = [
     "letters",
     "topics",
     "media_app",
-    "routing",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -151,5 +160,12 @@ STATICFILES_DIRS = [
     BASE_DIR / "static",
 ]
 
+# Cache for rate limiting (in-memory for dev; use Redis for production)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+    }
+}
+
 LOGIN_URL = "/accounts/login/"
-LOGIN_REDIRECT_URL = "/accounts/profile/"
+LOGIN_REDIRECT_URL = "/letters/desk/"

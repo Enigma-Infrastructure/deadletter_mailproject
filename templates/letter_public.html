@@ -18,24 +18,29 @@
 
   {% if letter.recipient %}
     <h2>Recipient</h2>
-    {% if user.is_authenticated and user.is_collaborator %}
-      <p>
-        Nickname: {{ letter.recipient.nickname }}<br>
-        City/Region/State: {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}<br>
-        {% if letter.recipient.real_name %}Real name: {{ letter.recipient.real_name }}<br>{% endif %}
-        {% if letter.recipient.email %}Email: {{ letter.recipient.email }}<br>{% endif %}
-        {% if letter.recipient.has_opt_in_postal %}
-          Postal (private): {{ letter.recipient.postal_address_line1 }}
-          {{ letter.recipient.postal_city }} {{ letter.recipient.postal_state }} {{ letter.recipient.postal_postcode }}
-        {% endif %}
-      </p>
-    {% else %}
-      <p>
-        For: {{ letter.recipient.nickname }}<br>
-        City/Region/State: {{ letter.recipient.city }} {{ letter.recipient.region }} {{ letter.recipient.state }}
-      </p>
-    {% endif %}
+    <p>
+      For: {{ letter.recipient.nickname }}<br>
+      Pirate mail address:
+      {% if letter.recipient.pirate_place %}
+        {{ letter.recipient.pirate_place.name }}{% if letter.recipient.pirate_place.kind %} ({{ letter.recipient.pirate_place.kind }}){% endif %}{% if letter.recipient.pirate_place.city %}, {{ letter.recipient.pirate_place.city }}{% endif %}
+      {% else %}
+        —
+      {% endif %}<br>
+      <span class="text-muted">Mail reaches them by being handed to someone who knows them there.</span>
+    </p>
+
   {% endif %}
+
+  <h2>Status</h2>
+  <p>
+    {{ letter.get_status_display }}
+    {% if letter.current_location_display %} — {{ letter.current_location_display }}{% endif %}
+  </p>
+  {% with stamp=letter.stamps.first %}
+    {% if stamp %}
+      <p><a href="/scan/{{ stamp.number }}/">Track or update this letter (stamp №{{ stamp.number }})</a></p>
+    {% endif %}
+  {% endwith %}
 
   <h2>Letter body</h2>
   <div class="letter-body">
