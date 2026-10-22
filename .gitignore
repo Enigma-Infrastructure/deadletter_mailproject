@@ -1,0 +1,9 @@
+# Obsidian metadata
+.obsidian/
+
+# Python
+__pycache__/
+*.pyc
+
+# Django
+media/
