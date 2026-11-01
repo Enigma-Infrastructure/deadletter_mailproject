@@ -4,6 +4,15 @@
 # Python
 __pycache__/
 *.pyc
+.venv/
 
-# Django
+# Secrets (examples may be committed)
+.env
+.env.*
+!.env.example
+
+# Django runtime files; existing tracked database is not removed
 media/
+staticfiles/
+db.sqlite3
+db.sqlite3-*
