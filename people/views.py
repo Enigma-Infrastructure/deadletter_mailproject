@@ -1,4 +1,5 @@
 from django.contrib.auth.decorators import user_passes_test
+from django.db import transaction
 from django.shortcuts import render
 
 from letters.models import LetterConcept
@@ -17,61 +18,33 @@ def recipient_list(request):
 
 
 def request_a_letter(request):
-    """
-    Public intake form — no login required. This is the single entry
-    point for "put your name on an envelope".
-
-    The pirate mail address is a social-network location (bar, cafe,
-    camp, venue...) where this person can be found — not a postal
-    address. Stored as a structured Place.
-
-    Also creates the LetterConcept (prompt) so the request appears in
-    the write queue for other participants.
-    """
+    """Public intake creates requests, never edits an existing recipient profile."""
     if request.method == "POST":
         form = RequestALetterForm(request.POST)
         if form.is_valid():
-            nickname    = form.cleaned_data["nickname"].strip() or "A Stranger"
+            nickname = form.cleaned_data["nickname"].strip() or "A Stranger"
             pirate_addr = form.cleaned_data["pirate_address"].strip()
-            place_kind  = form.cleaned_data.get("pirate_place_kind") or "other"
-            city        = form.cleaned_data.get("city") or ""
+            place_kind = form.cleaned_data.get("pirate_place_kind") or "other"
+            city = form.cleaned_data.get("city") or ""
             write_about = form.cleaned_data.get("write_about") or ""
-            email       = form.cleaned_data.get("email") or ""
+            email = form.cleaned_data.get("email") or ""
 
-            place = None
-            if pirate_addr:
-                place, _ = Place.objects.get_or_create(
-                    name=pirate_addr,
-                    city=city,
-                    defaults={"kind": place_kind},
+            with transaction.atomic():
+                place = None
+                if pirate_addr:
+                    place, _ = Place.objects.get_or_create(
+                        name=pirate_addr, city=city, defaults={"kind": place_kind},
+                    )
+                # Matching public identifiers do not prove profile ownership.
+                person, _ = Person.objects.get_or_create(
+                    nickname=nickname, pirate_place=place,
+                    defaults={"city": city, "write_about": write_about, "email": email},
                 )
-
-            # Identity is the unique pair (nickname, pirate_place).
-            # If this pair already exists, update the existing entry.
-            person, created = Person.objects.get_or_create(
-                nickname=nickname,
-                pirate_place=place,
-                defaults={
-                    "city": city,
-                    "write_about": write_about,
-                    "email": email,
-                },
-            )
-            if not created:
-                person.write_about = write_about
-                person.email = email
-                person.save(update_fields=["write_about", "email"])
-
-            LetterConcept.objects.create(
-                title=f"Letter for {nickname}",
-                write_prompt=write_about,
-                destination_place=place,
-                destination_city=city,
-                created_for=person,
-            )
-
+                # Every request keeps its own prompt, including repeat requests.
+                LetterConcept.objects.create(
+                    title=f"Letter for {nickname}", write_prompt=write_about,
+                    destination_place=place, destination_city=city, created_for=person,
+                )
             return render(request, "people/request_thanks.html", {"nickname": nickname})
-        # Form invalid — re-render with errors
         return render(request, "people/request_a_letter.html", {"form": form})
-
     return render(request, "people/request_a_letter.html", {"form": RequestALetterForm()})
