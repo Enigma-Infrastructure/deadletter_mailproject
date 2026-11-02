@@ -3,13 +3,15 @@ from django.contrib.auth.forms import UserCreationForm
 from .models import RegistrationSource, User
 
 VISIBILITY_HELP = ('Public: Anyone on the internet, including search engines and automated scrapers or AI systems, can read it. Copies may remain after visibility changes. Participants only: Approved participants and organizers can read it and may copy or share it. This is not confidential or end-to-end encrypted.')
+EMAIL_HELP = 'Optional contact email. This does not approve participation or subscribe you to updates. Email confirmation is not available yet.'
 
 class RegistrationForm(UserCreationForm):
     source = forms.SlugField(max_length=64, required=False, label='Event source code')
+    email = forms.EmailField(required=False, max_length=254, help_text=EMAIL_HELP)
 
     class Meta(UserCreationForm.Meta):
         model = User
-        fields = ('username', 'default_request_visibility', 'default_body_visibility')
+        fields = ('username', 'email', 'default_request_visibility', 'default_body_visibility')
         help_texts = {name: VISIBILITY_HELP for name in ('default_request_visibility', 'default_body_visibility')}
 
     def clean_source(self):
@@ -26,6 +28,7 @@ class RegistrationForm(UserCreationForm):
         user = super().save(commit=False)
         user.participant_status = 'pending'
         user.is_staff = user.is_superuser = user.is_collaborator = False
+        user.email_verified = False
         user.registration_source = self.registration_source
         user.participant_reviewed_by = None
         user.participant_reviewed_at = None

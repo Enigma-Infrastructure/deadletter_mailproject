@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Recovery unavailable | deadletter{% endblock %}
+{% block content %}
+<section class="card" aria-labelledby="recovery-title">
+  <h1 id="recovery-title">Email recovery is not available yet</h1>
+  <p>No recovery email was sent and no password was changed by this request.</p>
+  <p><a href="{% url 'login' %}">Return to login</a></p>
+</section>
+{% endblock %}

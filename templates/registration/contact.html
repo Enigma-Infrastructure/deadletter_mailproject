@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+{% block title %}Contact email | deadletter{% endblock %}
+{% block content %}
+<section class="card" aria-labelledby="contact-title">
+  <h1 id="contact-title">Contact email</h1>
+  {% if not contact_account.email %}<p>No email provided.</p>
+  {% elif contact_account.email_verified %}<p>Email status: Verified.</p>
+  {% else %}<p>Email status: Unverified.</p>{% endif %}
+  <p>Email confirmation and email-based recovery are not available yet. An email does not grant participant approval, request ownership, or a subscription to project updates.</p>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Save contact email</button></form>
+  <p style="margin-top: 1rem;">Leave email blank to remove it. Enter your current password to save. Changing or removing email clears its verification status.</p>
+  <p><a href="{% url 'account_preferences' %}">Preferences</a> · <a href="{% url 'participant_status' %}">Account status</a></p>
+</section>
+{% endblock %}

@@ -2,6 +2,7 @@
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from .email_state import EmailStateMixin
 
 
 VISIBILITY_CHOICES = [("public", "Public"), ("participants_only", "Participants only")]
@@ -27,11 +28,11 @@ class RegistrationSource(models.Model):
         return self.is_active and (self.expires_at is None or self.expires_at > at)
 
 
-class User(AbstractUser):
+class User(EmailStateMixin, AbstractUser):
     """Account identity, participation approval, and future-submission defaults.
 
     Approval is independent of is_active, is_staff, and is_superuser.
-    These new fields do not enforce access until adapters/views are connected.
+    Email verification is separate from approval, identity, and ownership.
     """
     is_collaborator = models.BooleanField(default=False)
     participant_status = models.CharField(
