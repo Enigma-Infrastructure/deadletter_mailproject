@@ -6,6 +6,8 @@ class EmailStateMixin(models.Model):
 
     class Meta:
         abstract = True
+        verbose_name = 'user'
+        verbose_name_plural = 'users'
 
     @classmethod
     def from_db(cls, db, field_names, values):
