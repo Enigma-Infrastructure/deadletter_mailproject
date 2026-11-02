@@ -1,0 +1,8 @@
+{% extends 'base.html' %}
+{% block title %}Preferences | deadletter{% endblock %}
+{% block content %}
+<h1>Future-submission preferences</h1>
+<p>These defaults apply when future submission forms adopt them. Saving does not change existing requests, bodies, approval, ownership, or automated restrictions.</p>
+<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Save preferences</button></form>
+<p><a href="{% url 'participant_status' %}">Participation status</a></p>
+{% endblock %}

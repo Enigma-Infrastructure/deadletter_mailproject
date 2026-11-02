@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Participation status | deadletter{% endblock %}
+{% block content %}
+<h1>Participation status</h1>
+{% if status == 'approved' %}<p>Your participant account is approved. Approval does not grant administrative access or access to organizer-hidden content.</p>
+{% elif status == 'pending' %}<p>Your account is awaiting organizer approval. Signing in does not grant participant access.</p>
+{% elif status == 'rejected' %}<p>Your participation request was not approved. Your account does not have participant access.</p>
+{% elif status == 'suspended' %}<p>Your participation is suspended. Your account does not have participant access.</p>
+{% else %}<p>Participant access is unavailable.</p>{% endif %}
+<p><a href="{% url 'account_preferences' %}">Future-submission preferences</a></p>
+{% endblock %}
