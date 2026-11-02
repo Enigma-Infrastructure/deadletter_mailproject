@@ -1,11 +1,13 @@
 {% extends 'base.html' %}
 {% block title %}Register | deadletter{% endblock %}
 {% block content %}
-<h1>Join Deadletter</h1>
-<p>Registration starts pending. An organizer must approve your account for participant access. Event codes provide attribution only.</p>
-<p>Choose defaults for future submissions. Body visibility cannot broaden a restricted request. Automated restrictions may narrow visibility.</p>
-<p>Under the privacy policy, social addresses and delivery locations require approved-participant or authorized organizer access. Website settings cannot prevent people handling printed letters from reading, photographing, or sharing them.</p>
-<p>Integrated privacy enforcement is still under development. Registration does not mean every existing route is protected.</p>
-<form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Create pending account</button></form>
-<p><a href="{% url 'login' %}">Log in</a></p>
+<section class="card" aria-labelledby="register-title">
+  <h1 id="register-title">Join Deadletter</h1>
+  <p>Registration starts pending. An organizer must approve your account for participant access. Event codes provide attribution only.</p>
+  <p>Choose defaults for future submissions. Body visibility cannot broaden a restricted request. Automated restrictions may narrow visibility.</p>
+  <p>Under the privacy policy, social addresses and delivery locations require approved-participant or authorized organizer access. Website settings cannot prevent people handling printed letters from reading, photographing, or sharing them.</p>
+  <p>Integrated privacy enforcement is still under development. Registration does not mean every existing route is protected.</p>
+  <form method="post">{% csrf_token %}{{ form.as_p }}<button type="submit">Create pending account</button></form>
+  <p style="margin-top: 1rem;"><a href="{% url 'login' %}">Log in</a></p>
+</section>
 {% endblock %}
