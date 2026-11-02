@@ -8,47 +8,33 @@
   <link rel="stylesheet" href="{% static 'css/base.css' %}">
 </head>
 <body>
-  <div class="app-shell">
-
-    <header>
-      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
-        <div>
-          <a href="/">
-            <img src="{% static 'img/deadletter_logo.jpg' %}" alt="deadletter" style="height: 50px; width: auto;">
-          </a>
-        </div>
-
-        <nav style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end;">
-          <!-- Participant flow -->
-          <a class="btn" href="/write/request/">Request</a>
-          <a class="btn" href="/letters/read/">Read</a>
-          <a class="btn" href="/letters/desk/">Desk</a>
-
-          <!-- Secondary: physical interface -->
-          <a class="btn btn-secondary" href="/scan/">Scan</a>
-
-          <!-- Secondary: game layer (authenticated only) -->
-          {% if user.is_authenticated %}
-          <a class="btn btn-secondary" href="/leaderboard/">Leaderboard</a>
-          {% endif %}
-
-          <!-- Auth -->
-          {% if user.is_authenticated %}
+<div class="app-shell">
+  <header>
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem;">
+      <a href="{% url 'home' %}"><img src="{% static 'img/deadletter_logo.jpg' %}" alt="deadletter" style="height: 50px; width: auto;"></a>
+      <nav aria-label="Main navigation" style="display: flex; flex-wrap: wrap; gap: 0.5rem; justify-content: flex-end;">
+        <a class="btn" href="/write/request/">Request</a>
+        <a class="btn" href="/letters/read/">Read</a>
+        <a class="btn" href="/letters/desk/">Desk</a>
+        <a class="btn btn-secondary" href="/scan/">Scan</a>
+        {% if user.is_authenticated %}
+          <a class="btn btn-secondary" href="{% url 'leaderboard' %}">Leaderboard</a>
+          <a class="btn btn-auth" href="{% url 'participant_status' %}">Account status</a>
+          <a class="btn btn-auth" href="{% url 'account_preferences' %}">Preferences</a>
           {% if user.is_staff %}
-          <a class="btn btn-admin" href="/letters/print/queue/">Print</a>
-          <a class="btn btn-admin" href="/admin/">Admin</a>
+            <a class="btn btn-admin" href="/letters/print/queue/">Print</a>
+            <a class="btn btn-admin" href="{% url 'admin_hub' %}">Admin hub</a>
+            <a class="btn btn-admin" href="{% url 'admin:index' %}">Admin</a>
           {% endif %}
-          <a class="btn btn-auth" href="/accounts/logout/">Log out</a>
-          {% else %}
-          <a class="btn btn-auth" href="/accounts/login/">Log in</a>
-          {% endif %}
-        </nav>
-      </div>
-    </header>
-
-    <main>
-      {% block content %}{% endblock %}
-    </main>
-  </div>
+          <form method="post" action="{% url 'logout' %}" style="margin: 0;">{% csrf_token %}<button class="btn btn-auth" type="submit">Log out</button></form>
+        {% else %}
+          <a class="btn btn-auth" href="{% url 'register' %}">Register</a>
+          <a class="btn btn-auth" href="{% url 'login' %}">Log in</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+  <main>{% block content %}{% endblock %}</main>
+</div>
 </body>
 </html>
