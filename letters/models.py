@@ -145,6 +145,7 @@ class LetterInstance(models.Model):
         max_length=16,
         choices=ORIGIN_CHOICES,
         default="desk",
+        help_text="Where this letter was created.",
     )
     needs_printing = models.BooleanField(
         default=True,
