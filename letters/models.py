@@ -145,7 +145,6 @@ class LetterInstance(models.Model):
         max_length=16,
         choices=ORIGIN_CHOICES,
         default="desk",
-        help_text="Where this letter was created.",
     )
     needs_printing = models.BooleanField(
         default=True,
@@ -369,3 +368,22 @@ class Letter(models.Model):
 
     def __str__(self):
         return f'Letter {self.pk}'
+
+
+class DomainSubmissionReceipt(models.Model):
+    """Private durable replay record. No raw keys, prompts or bodies."""
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='domain_submission_receipts')
+    operation = models.CharField(max_length=16, choices=[('request', 'Request'), ('response', 'Response')])
+    key_digest = models.CharField(max_length=64)
+    payload_digest = models.CharField(max_length=64)
+    completed = models.BooleanField(default=False)
+    request_result = models.ForeignKey('letters.LetterRequest', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    letter_result = models.ForeignKey('letters.Letter', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    instance_result = models.ForeignKey('letters.LetterInstance', null=True, blank=True, on_delete=models.SET_NULL, related_name='+')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['actor', 'operation', 'key_digest'], name='domain_submission_actor_op_key'),
+            models.CheckConstraint(condition=models.Q(operation__in=['request', 'response']), name='domain_submission_operation_valid'),
+        ]
