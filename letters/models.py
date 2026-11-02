@@ -269,7 +269,7 @@ class StampUpdate(models.Model):
         ("spotted", "Spotted it"),
         ("picked_up", "Picked it up to carry"),
         ("left_at_place", "Left it at a place"),
-        ("delivered", "Delivered"),
+        ("delivered", "Delivered it"),
         ("photo_only", "Just adding a photo / tag"),
     ]
 
