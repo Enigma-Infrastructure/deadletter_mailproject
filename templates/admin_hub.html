@@ -1,13 +1,17 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
+{% block title %}Admin hub | deadletter{% endblock %}
 {% block content %}
-<h1>Deadletter Admin Hub</h1>
-
-{% for section in sections %}
-  <h2>{{ section.title }}</h2>
-  <ul>
-    {% for link in section.links %}
-      <li><a href="{{ link.url }}">{{ link.label }}</a></li>
-    {% endfor %}
-  </ul>
-{% endfor %}
+<section class="card" aria-labelledby="admin-hub-title">
+  <h1 id="admin-hub-title">Deadletter Admin Hub</h1>
+  {% for section in sections %}
+    <section aria-labelledby="hub-section-{{ forloop.counter }}" style="margin-top: 1.5rem;">
+      <h2 id="hub-section-{{ forloop.counter }}">{{ section.title }}</h2>
+      <ul>
+        {% for link in section.links %}
+          <li><a href="{{ link.url }}">{{ link.label }}</a></li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+</section>
 {% endblock %}
