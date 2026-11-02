@@ -11,48 +11,108 @@ from .models import LetterConcept, LetterHop, LetterInstance, Stamp, StampUpdate
 
 class RecipientIntakeTests(TestCase):
     def payload(self, **overrides):
-        data = {"nickname": "Test Pirate", "pirate_address": "Test Cafe",
-                "city": "Somerville", "write_about": "First prompt",
-                "email": "first@example.com"}
+        data = {'nickname': 'Test Pirate', 'pirate_address': 'Test Cafe',
+                'city': 'Somerville', 'write_about': 'First prompt'}
         data.update(overrides)
         return data
 
     def submit(self, **overrides):
-        return self.client.post(reverse("request_a_letter"), self.payload(**overrides))
+        return self.client.post(reverse('request_a_letter'), self.payload(**overrides))
+
+    def seed_legacy_email(self):
+        person = Person.objects.get()
+        Person.objects.filter(pk=person.pk).update(email='legacy@example.com')
+        return person.pk
 
     def test_first_submission_creates_recipient_and_request(self):
         response = self.submit()
         self.assertEqual(response.status_code, 200)
         person = Person.objects.get()
-        self.assertEqual(person.email, "first@example.com")
-        self.assertEqual(person.write_about, "First prompt")
+        self.assertEqual(person.email, '')
+        self.assertEqual(person.write_about, 'First prompt')
         self.assertEqual(LetterConcept.objects.get().created_for, person)
 
     def test_repeat_submission_preserves_profile_and_new_prompt(self):
         self.submit()
-        response = self.submit(email="replacement@example.com", write_about="New request prompt")
+        self.seed_legacy_email()
+        response = self.submit(email='replacement@example.com', write_about='New request prompt')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Person.objects.count(), 1)
         self.assertEqual(Place.objects.count(), 1)
         person = Person.objects.get()
-        self.assertEqual(person.email, "first@example.com")
-        self.assertEqual(person.write_about, "First prompt")
+        self.assertEqual(person.email, 'legacy@example.com')
+        self.assertEqual(person.write_about, 'First prompt')
         self.assertEqual(LetterConcept.objects.filter(created_for=person).count(), 2)
-        self.assertTrue(LetterConcept.objects.filter(write_prompt="New request prompt").exists())
+        self.assertTrue(LetterConcept.objects.filter(write_prompt='New request prompt').exists())
+        self.assertNotContains(response, 'legacy@example.com')
+        self.assertNotContains(response, 'replacement@example.com')
 
     def test_blank_repeat_does_not_erase_profile(self):
         self.submit()
-        self.submit(email="", write_about="")
+        self.seed_legacy_email()
+        self.submit(email='', write_about='')
         person = Person.objects.get()
-        self.assertEqual(person.email, "first@example.com")
-        self.assertEqual(person.write_about, "First prompt")
+        self.assertEqual(person.email, 'legacy@example.com')
+        self.assertEqual(person.write_about, 'First prompt')
 
     def test_invalid_submission_creates_nothing(self):
-        response = self.submit(email="not-an-email")
+        response = self.submit(nickname='')
         self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['form'].errors)
         self.assertFalse(Person.objects.exists())
         self.assertFalse(Place.objects.exists())
         self.assertFalse(LetterConcept.objects.exists())
+
+    def test_email_field_absent_and_extra_email_ignored(self):
+        response = self.client.get(reverse('request_a_letter'))
+        self.assertNotIn('email', response.context['form'].fields)
+        self.assertNotContains(response, 'name="email"')
+        self.assertNotContains(response, 'Continued Interest')
+        self.assertNotContains(response, 'reach out when your letter')
+        response = self.submit(email='not-an-email')
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'people/request_thanks.html')
+        self.assertEqual(Person.objects.get().email, '')
+        self.assertNotContains(response, 'not-an-email')
+        self.assertIn('no-store', response['Cache-Control'])
+
+    def test_anonymous_confirmation_prompts_without_claiming(self):
+        response = self.submit()
+        self.assertContains(response, 'href="' + reverse('register') + '"')
+        self.assertContains(response, 'href="' + reverse('login') + '"')
+        self.assertContains(response, 'Linking this request to an account is not available yet.')
+        self.assertContains(response, 'does not claim this request or enable delivery notifications')
+        concept = LetterConcept.objects.get()
+        self.assertIsNone(concept.created_by_id)
+        registration = {'username': 'post-submit-account', 'email': 'legacy@example.com', 'password1': 'Post-submit-password-79!', 'password2': 'Post-submit-password-79!', 'default_request_visibility': 'public', 'default_body_visibility': 'public'}
+        self.client.post(reverse('register'), registration)
+        self.assertTrue(get_user_model().objects.filter(username='post-submit-account').exists())
+        concept.refresh_from_db()
+        self.assertIsNone(concept.created_by_id)
+        self.assertEqual(LetterConcept.objects.count(), 1)
+
+    def test_signed_in_contact_not_copied_to_recipient(self):
+        user = get_user_model().objects.create_user(username='signed-submitter', email='account@example.org')
+        self.client.force_login(user)
+        response = self.submit(email='forged@example.org')
+        self.assertContains(response, 'href="' + reverse('account_contact') + '"')
+        self.assertNotContains(response, 'href="' + reverse('register') + '"')
+        self.assertEqual(Person.objects.get().email, '')
+        user.refresh_from_db()
+        self.assertEqual(user.email, 'account@example.org')
+        self.assertEqual(user.participant_status, 'pending')
+        self.assertFalse(user.email_verified)
+        self.assertIsNone(LetterConcept.objects.get().created_by_id)
+        self.assertNotContains(response, 'account@example.org')
+        self.assertNotContains(response, 'forged@example.org')
+
+    def test_postal_detection_and_override_still_work(self):
+        response = self.submit(pirate_address='123 Main Street')
+        self.assertTrue(response.context['form'].errors)
+        self.assertFalse(LetterConcept.objects.exists())
+        response = self.submit(pirate_address='123 Main Street', override='on', override_comment='A venue with this name, not a home address.')
+        self.assertTemplateUsed(response, 'people/request_thanks.html')
+        self.assertEqual(LetterConcept.objects.count(), 1)
 
 
 class LetterPrivacyTests(TestCase):
