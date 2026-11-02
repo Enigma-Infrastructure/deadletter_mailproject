@@ -16,7 +16,7 @@ def generate_stamp_number() -> str:
 
 
 class LetterConcept(models.Model):
-    """The idea/subject of a letter that might have many physical instances."""
+    """Legacy mixed-purpose concept/request record; retained during refactor."""
 
     # Name/topic facing
     title = models.CharField(max_length=255, blank=True)
@@ -72,7 +72,7 @@ class LetterConcept(models.Model):
 
 
 class LetterInstance(models.Model):
-    """A physical or specific copy of a concept with a unique ID/QR."""
+    """Physical copy; legacy content fields remain until workflow cutover."""
 
     ORIGIN_CHOICES = [
         ("desk", "Writing desk / iPad at an event"),
@@ -91,6 +91,10 @@ class LetterInstance(models.Model):
         ("archived", "Archived"),
     ]
 
+    authored_letter = models.ForeignKey(
+        'letters.Letter', null=True, blank=True, on_delete=models.PROTECT,
+        related_name='instances', editable=False,
+    )
     concept = models.ForeignKey(
         LetterConcept,
         null=True,
@@ -265,7 +269,7 @@ class StampUpdate(models.Model):
         ("spotted", "Spotted it"),
         ("picked_up", "Picked it up to carry"),
         ("left_at_place", "Left it at a place"),
-        ("delivered", "Delivered it"),
+        ("delivered", "Delivered"),
         ("photo_only", "Just adding a photo / tag"),
     ]
 
@@ -308,3 +312,60 @@ class StampUpdate(models.Model):
 
     def __str__(self) -> str:
         return f"{self.get_kind_display()} on {self.stamp.number}"
+
+
+AUDIENCE_CHOICES = [('public', 'Public'), ('participants_only', 'Participants only')]
+
+
+class LetterRequest(models.Model):
+    """One recipient-specific invitation; not a reusable concept."""
+    prompt = models.TextField(blank=True)
+    recipient = models.ForeignKey('people.Person', null=True, blank=True, on_delete=models.SET_NULL, related_name='letter_requests')
+    recipient_alias = models.CharField(max_length=255, blank=True)
+    destination_place = models.ForeignKey('people.Place', null=True, blank=True, on_delete=models.SET_NULL, related_name='letter_requests')
+    destination_city = models.CharField(max_length=255, blank=True)
+    destination_label = models.CharField(max_length=1024, blank=True)
+    concept = models.ForeignKey('letters.LetterConcept', null=True, blank=True, on_delete=models.SET_NULL, related_name='linked_requests')
+    legacy_source = models.OneToOneField('letters.LetterConcept', null=True, blank=True, editable=False, on_delete=models.SET_NULL, related_name='migrated_request')
+    submitted_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, editable=False, on_delete=models.SET_NULL, related_name='letter_requests_submitted')
+    owner = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, editable=False, on_delete=models.SET_NULL, related_name='letter_requests_owned')
+    requested_visibility = models.CharField(max_length=24, choices=AUDIENCE_CHOICES, default='participants_only')
+    automatically_restricted = models.BooleanField(default=False, editable=False)
+    restriction_reason = models.CharField(max_length=255, blank=True, editable=False)
+    is_published = models.BooleanField(default=False, editable=False)
+    is_open = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.CheckConstraint(condition=models.Q(requested_visibility__in=['public', 'participants_only']), name='letter_req_visibility_valid')]
+
+    def __str__(self):
+        return f'Request {self.pk}'
+
+
+class Letter(models.Model):
+    """An authored work; its physical copies are LetterInstance rows."""
+    request = models.ForeignKey('letters.LetterRequest', null=True, blank=True, on_delete=models.PROTECT, related_name='responses')
+    concept = models.ForeignKey('letters.LetterConcept', null=True, blank=True, on_delete=models.SET_NULL, related_name='authored_letters')
+    writer = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, editable=False, on_delete=models.SET_NULL, related_name='letters_written')
+    body_text = models.TextField(blank=True)
+    prompt_snapshot = models.TextField(blank=True)
+    recipient = models.ForeignKey('people.Person', null=True, blank=True, on_delete=models.SET_NULL, related_name='authored_letters')
+    recipient_alias = models.CharField(max_length=255, blank=True)
+    destination_place = models.ForeignKey('people.Place', null=True, blank=True, on_delete=models.SET_NULL, related_name='authored_letters')
+    destination_city = models.CharField(max_length=255, blank=True)
+    destination_label = models.CharField(max_length=1024, blank=True)
+    requested_visibility = models.CharField(max_length=24, choices=AUDIENCE_CHOICES, default='participants_only')
+    automatically_restricted = models.BooleanField(default=False, editable=False)
+    restriction_reason = models.CharField(max_length=255, blank=True, editable=False)
+    is_published = models.BooleanField(default=False, editable=False)
+    finalized_at = models.DateTimeField(null=True, blank=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [models.CheckConstraint(condition=models.Q(requested_visibility__in=['public', 'participants_only']), name='auth_letter_visibility_valid')]
+
+    def __str__(self):
+        return f'Letter {self.pk}'
