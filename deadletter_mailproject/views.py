@@ -24,6 +24,8 @@ def admin_hub(request):
             {'label': 'Courier leaderboard', 'url': '/leaderboard/'},
         ]},
         {'title': 'Domain admin', 'links': [
+            {'label': 'Letter requests', 'url': '/admin/letters/letterrequest/'},
+            {'label': 'Authored letters', 'url': '/admin/letters/letter/'},
             {'label': 'People (recipients)', 'url': '/admin/people/person/'},
             {'label': 'Pirate mail places', 'url': '/admin/people/place/'},
             {'label': 'Letter concepts', 'url': '/admin/letters/letterconcept/'},

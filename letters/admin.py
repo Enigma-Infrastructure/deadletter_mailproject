@@ -1,6 +1,80 @@
 # letters/admin.py
 from django.contrib import admin
-from .models import LetterConcept, LetterInstance, LetterHop, Stamp, StampUpdate
+from .models import (
+    DomainSubmissionReceipt,
+    Letter,
+    LetterConcept,
+    LetterHop,
+    LetterInstance,
+    LetterRequest,
+    Stamp,
+    StampUpdate,
+)
+
+
+@admin.register(LetterRequest)
+class LetterRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "recipient_alias",
+        "destination_city",
+        "requested_visibility",
+        "is_published",
+        "automatically_restricted",
+        "is_open",
+        "created_at",
+    )
+    list_filter = (
+        "requested_visibility",
+        "is_published",
+        "automatically_restricted",
+        "is_open",
+        "destination_city",
+    )
+    search_fields = ("recipient_alias", "prompt", "destination_label")
+    readonly_fields = ("legacy_source", "submitted_by", "owner", "created_at")
+    raw_id_fields = ("recipient", "destination_place", "concept")
+
+
+@admin.register(Letter)
+class LetterAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "recipient_alias",
+        "destination_city",
+        "requested_visibility",
+        "is_published",
+        "automatically_restricted",
+        "finalized_at",
+        "created_at",
+    )
+    list_filter = (
+        "requested_visibility",
+        "is_published",
+        "automatically_restricted",
+        "destination_city",
+    )
+    search_fields = ("recipient_alias", "body_text", "prompt_snapshot", "destination_label")
+    readonly_fields = ("writer", "finalized_at", "created_at")
+    raw_id_fields = ("request", "concept", "recipient", "destination_place")
+
+
+@admin.register(DomainSubmissionReceipt)
+class DomainSubmissionReceiptAdmin(admin.ModelAdmin):
+    list_display = ("id", "actor", "operation", "completed", "created_at")
+    list_filter = ("operation", "completed")
+    search_fields = ("actor__username", "key_digest", "payload_digest")
+    readonly_fields = (
+        "actor",
+        "operation",
+        "key_digest",
+        "payload_digest",
+        "completed",
+        "request_result",
+        "letter_result",
+        "instance_result",
+        "created_at",
+    )
 
 
 @admin.register(LetterConcept)
@@ -20,6 +94,7 @@ class LetterConceptAdmin(admin.ModelAdmin):
 class LetterInstanceAdmin(admin.ModelAdmin):
     list_display = (
         "code",
+        "authored_letter",
         "concept",
         "recipient",
         "status",
@@ -38,6 +113,7 @@ class LetterInstanceAdmin(admin.ModelAdmin):
         "current_city",
         "is_public",
     )
+    raw_id_fields = ("authored_letter", "concept", "recipient", "current_place")
 
 
 @admin.register(LetterHop)

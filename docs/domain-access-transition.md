@@ -1,16 +1,14 @@
 # Domain workflow transition and child-agent handoff
 
 ## Last confirmed checkpoint: user-local, 2026-11-03
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 7aa7519: full test suite and workflow integration tests passing cleanly.
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 353017c: 108 targeted tests passed cleanly, full 232-test suite passed (231 OK, 1 skipped), and zero backfill anomalies across 4 legacy concepts.
 
-## Current batch: domain privacy and reader/carry/desk/account view cutover
-Consolidated pass wiring domain privacy, audience boundaries, and participant dashboard:
-1. Public & Desk Readers (/letters/read/, /letters/desk/read/): Exclude unpublished and restricted authored letters; exclude participants_only letters for unapproved/anonymous viewers.
-2. Letter Public Page (/letters/l/<code_or_id>/): Enforces can_read_body access policy (404 on unpublished/restricted/unauthorized); gates social destination address on can_read_social_address (visible only to approved participants).
-3. Carry & API Views (/letters/carry/, /letters/api/letters/): Exclude restricted or unpublished authored letters from active courier circulation.
-4. Desk Queues (/letters/desk/, /letters/write/queue/): Exclude concepts whose linked requests are restricted or closed.
-5. Participant Account Dashboard (/accounts/status/): Surfaces the logged-in user's active requests and authored letters with their current pipeline status while preserving single-card layout.
-6. Automated Tests: letters/test_domain_views_cutover.py covering reader visibility, address shielding, courier filtering, queue exclusion, and account dashboard rendering.
+## Current batch: Django admin registration, domain admin hub links, and serializer consistency
+Consolidated administrative and data projection pass:
+1. Django Admin Registrations (letters/admin.py): Registered LetterRequestAdmin, LetterAdmin, and DomainSubmissionReceiptAdmin with full list filters, searches, and readonly provenance fields. Updated LetterInstanceAdmin with authored_letter in list_display and raw_id_fields.
+2. Admin Hub (deadletter_mailproject/views.py): Added direct links to Letter requests and Authored letters changelists under 'Domain admin'.
+3. Domain Serializer Consistency (letters/serializers.py): Validated LetterInstanceSerializer representations with authored_letter and active stamp numbers.
+4. Automated Tests: letters/test_admin_and_serializers.py covering admin changelists, admin hub link surfacing, and serializer payload integrity.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 
