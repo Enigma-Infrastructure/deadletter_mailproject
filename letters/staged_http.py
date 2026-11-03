@@ -251,7 +251,7 @@ def staged_request_create(request):
     try:
         req, replayed = submit_request(
             request.user,
-            key=key,
+            submission_key=key,
             recipient_id=recipient_id,
             prompt=prompt,
             requested_visibility=requested_visibility,
@@ -261,7 +261,8 @@ def staged_request_create(request):
     except SubmissionConflict as exc:
         return _error_response(str(exc), status=409)
     except ValidationError as exc:
-        return _error_response(str(exc.messages[0]))
+        msg = exc.messages[0] if hasattr(exc, "messages") and exc.messages else str(exc)
+        return _error_response(msg, status=400)
     except Exception:
         return _error_response("A database error occurred. No changes were made.", status=500)
 
@@ -289,7 +290,7 @@ def staged_response_create(request):
     try:
         letter, instance, replayed = submit_response(
             request.user,
-            key=key,
+            submission_key=key,
             request_id=request_id,
             body_text=body_text,
             requested_visibility=requested_visibility,
@@ -299,7 +300,8 @@ def staged_response_create(request):
     except SubmissionConflict as exc:
         return _error_response(str(exc), status=409)
     except ValidationError as exc:
-        return _error_response(str(exc.messages[0]))
+        msg = exc.messages[0] if hasattr(exc, "messages") and exc.messages else str(exc)
+        return _error_response(msg, status=400)
     except Exception:
         return _error_response("A database error occurred. No changes were made.", status=500)
 
@@ -324,7 +326,8 @@ def staged_request_publish(request, request_id):
     except PermissionDenied:
         return _error_response("Staff reviewer authorization required.", status=403)
     except ValidationError as exc:
-        return _error_response(str(exc.messages[0]))
+        msg = exc.messages[0] if hasattr(exc, "messages") and exc.messages else str(exc)
+        return _error_response(msg, status=400)
     except Exception:
         return _error_response("A database error occurred. No changes were made.", status=500)
     return JsonResponse({"card": card, "published": True})
@@ -343,7 +346,8 @@ def staged_letter_publish(request, letter_id):
     except PermissionDenied:
         return _error_response("Staff reviewer authorization required.", status=403)
     except ValidationError as exc:
-        return _error_response(str(exc.messages[0]))
+        msg = exc.messages[0] if hasattr(exc, "messages") and exc.messages else str(exc)
+        return _error_response(msg, status=400)
     except Exception:
         return _error_response("A database error occurred. No changes were made.", status=500)
     return JsonResponse({"card": card, "published": True})
@@ -368,7 +372,8 @@ def staged_content_restrict(request):
     except PermissionDenied:
         return _error_response("Staff reviewer authorization required.", status=403)
     except ValidationError as exc:
-        return _error_response(str(exc.messages[0]))
+        msg = exc.messages[0] if hasattr(exc, "messages") and exc.messages else str(exc)
+        return _error_response(msg, status=400)
     except Exception:
         return _error_response("A database error occurred. No changes were made.", status=500)
     return JsonResponse({"card": card, "restricted": True})
