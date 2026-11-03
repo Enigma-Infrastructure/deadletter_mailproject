@@ -82,9 +82,17 @@ def letter_write_claim(request, pk: int):
     person = concept.created_for
 
     if request.method == "POST":
+        from .ratelimit import check_rate_limit, rate_limit_response
+        if not check_rate_limit(request, "desk_claim", max_requests=15, window_seconds=60):
+            return rate_limit_response()
+
         form = LetterBodyForm(request.POST)
         if form.is_valid():
             body_text = form.cleaned_data["body_text"]
+
+            from .content_screening import screen_content
+            is_restricted, restriction_reason = screen_content(body_text)
+
             with transaction.atomic():
                 dest_place = concept.destination_place
                 dest_city = concept.destination_city or (person.city if person else "")
@@ -124,9 +132,10 @@ def letter_write_claim(request, pk: int):
                     destination_city=dest_city,
                     destination_label=dest_label,
                     requested_visibility="public",
-                    automatically_restricted=False,
-                    is_published=True,
-                    finalized_at=timezone.now(),
+                    automatically_restricted=is_restricted,
+                    restriction_reason=restriction_reason,
+                    is_published=not is_restricted,
+                    finalized_at=timezone.now() if not is_restricted else None,
                 )
 
                 if letter_req.is_open:
@@ -141,10 +150,10 @@ def letter_write_claim(request, pk: int):
                     body_text=body_text,
                     current_place=dest_place,
                     current_city=dest_city,
-                    status="waiting_print",
+                    status="waiting_print" if not is_restricted else "created",
                     origin="online",
                     needs_printing=True,
-                    is_public=True,
+                    is_public=not is_restricted,
                     created_by=author,
                 )
             return redirect("letter_write_confirm", code=instance.code)
@@ -376,7 +385,8 @@ def scan_stamp(request, number: str):
     updates = stamp.updates.select_related("place", "media", "submitted_by")
 
     if request.method == "POST":
-        if not _rate_limit_check(request):
+        from .ratelimit import check_rate_limit
+        if not check_rate_limit(request, "scan_stamp", max_requests=RATE_LIMIT_MAX, window_seconds=RATE_LIMIT_WINDOW):
             messages.error(request, "Too many updates from your address. Please wait a minute.")
             return redirect("scan_stamp", number=stamp.number)
 
@@ -399,6 +409,11 @@ def scan_stamp(request, number: str):
         if kind not in dict(StampUpdate.KIND_CHOICES):
             kind = "spotted"
         note = form.cleaned_data.get("note", "").strip()
+        if note:
+            from .content_screening import screen_content
+            note_flagged, _ = screen_content(note)
+            if note_flagged:
+                note = "[Note held for review]"
         place_name = form.cleaned_data.get("place_name", "").strip()
         place_kind = form.cleaned_data.get("place_kind", "other")
         city = form.cleaned_data.get("city", "").strip()

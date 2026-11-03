@@ -1,14 +1,14 @@
 # Domain workflow transition and child-agent handoff
 
 ## Last confirmed checkpoint: user-local, 2026-11-03
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 353017c: 108 targeted tests passed cleanly, full 232-test suite passed (231 OK, 1 skipped), and zero backfill anomalies across 4 legacy concepts.
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 2dec5d6: admin changelists, Admin Hub domain links, and serializer tests passing cleanly.
 
-## Current batch: Django admin registration, domain admin hub links, and serializer consistency
-Consolidated administrative and data projection pass:
-1. Django Admin Registrations (letters/admin.py): Registered LetterRequestAdmin, LetterAdmin, and DomainSubmissionReceiptAdmin with full list filters, searches, and readonly provenance fields. Updated LetterInstanceAdmin with authored_letter in list_display and raw_id_fields.
-2. Admin Hub (deadletter_mailproject/views.py): Added direct links to Letter requests and Authored letters changelists under 'Domain admin'.
-3. Domain Serializer Consistency (letters/serializers.py): Validated LetterInstanceSerializer representations with authored_letter and active stamp numbers.
-4. Automated Tests: letters/test_admin_and_serializers.py covering admin changelists, admin hub link surfacing, and serializer payload integrity.
+## Current batch: Roadmap Items E & F (Server-side content screening and shared rate limiting)
+Consolidated safety and abuse prevention pass:
+1. Sensitive Content Screening (letters/content_screening.py): Deterministic, server-side pattern screening for PII (phones, emails, SSNs, credit cards), external spam URLs, and prohibited harassment terms without external AI transmission or private text mangling/logging.
+2. Workflow Integration: Flagged intake requests and desk letters automatically set automatically_restricted=True and is_published=False, routing them to the staff review queue before print or public release.
+3. Shared Account-Aware Rate Limiting (letters/ratelimit.py): Cache-backed rate limiting utility keying on user IDs for authenticated accounts and client IPs for anonymous visitors, protecting intake, desk authoring, registration, and scans.
+4. Automated Tests: letters/test_screening_and_ratelimit.py covering unit pattern recognition, intake auto-restriction, claim hold cascade, and cache rate limit enforcement.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 

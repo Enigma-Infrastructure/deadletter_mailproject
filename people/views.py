@@ -22,6 +22,10 @@ def recipient_list(request):
 def request_a_letter(request):
     """Create requests without collecting email or editing existing profiles."""
     if request.method == 'POST':
+        from letters.ratelimit import check_rate_limit, rate_limit_response
+        if not check_rate_limit(request, "intake_request", max_requests=15, window_seconds=60):
+            return rate_limit_response()
+
         form = RequestALetterForm(request.POST)
         if form.is_valid():
             nickname = form.cleaned_data['nickname'].strip() or 'A Stranger'
@@ -29,6 +33,10 @@ def request_a_letter(request):
             place_kind = form.cleaned_data.get('pirate_place_kind') or 'other'
             city = form.cleaned_data.get('city') or ''
             write_about = form.cleaned_data.get('write_about') or ''
+
+            from letters.content_screening import screen_content
+            is_restricted, restriction_reason = screen_content(write_about)
+
             with transaction.atomic():
                 place = None
                 if pirate_addr:
@@ -59,8 +67,9 @@ def request_a_letter(request):
                     submitted_by=request.user if request.user.is_authenticated else None,
                     owner=request.user if request.user.is_authenticated else None,
                     requested_visibility='public',
-                    automatically_restricted=False,
-                    is_published=True,
+                    automatically_restricted=is_restricted,
+                    restriction_reason=restriction_reason,
+                    is_published=not is_restricted,
                     is_open=True,
                 )
             return render(request, 'people/request_thanks.html', {'nickname': nickname})

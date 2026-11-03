@@ -15,6 +15,10 @@ def leaderboard(request):
 def register(request):
     if request.user.is_authenticated:
         return redirect('participant_status')
+    if request.method == 'POST':
+        from letters.ratelimit import check_rate_limit, rate_limit_response
+        if not check_rate_limit(request, 'registration', max_requests=10, window_seconds=60):
+            return rate_limit_response()
     form = RegistrationForm(request.POST if request.method == 'POST' else None, initial={'source': request.GET.get('source', '')})
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
