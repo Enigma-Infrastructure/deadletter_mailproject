@@ -1,12 +1,18 @@
 # Domain workflow transition and child-agent handoff
 
 ## Last confirmed checkpoint: user-local, 2026-11-02
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source c64b2c6853fae60447a62e4745722733d0bef3c1: all 32 targeted tests passed; full suite 168 tests, 167 passed/1 skipped. Checks clean, no model drift or pending operations. Assistant did not independently execute tests. Conditional replay concurrency test is skipped on backends lacking select_for_update; no deployment-backend multiworker validation claimed. Prior replay baseline passed 159 tests with one skip. Origin metadata fix is b87dedf; schema letters.0011_domain_submission_receipt was user-applied successfully.
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 93c20413026d43d56c8bfacff063dacdd45119cd (including dfc28bf staged HTTP harness): all 64 targeted tests passed; full suite 209 tests, 208 passed / 1 skipped. Checks clean, no model drift. Schema letters.0011_domain_submission_receipt and accounts.0006/0007 are user-applied locally.
 
-Latest user-local audit: four requests/all mapped to four legacy concepts, two authored letters/two linked instances, zero linked body differences or missing alias/destination snapshots, no publication, both instances need printing. Backfill preview zero work. Not deployment/child-agent DB evidence. Backup verification requested but not evidenced in pasted output. No further backfill --apply needed locally.
+Latest user-local audit: 4 legacy concepts with recipients and destinations, 0 instances, 0 new requests; backfill preview planned 4 requests and 0 letters with zero conflicts.
 
-## Current batch: signed draft-state checks, NOT yet validated
-Adds letters.domain_editing and tests. No models/migrations/routes/templates/serializers/admin changes or saved-data operations from committing this batch. New tests not run by assistant or reported by user. New helpers remain unwired.
+## Current batch: content review, publication approval, and finalization workflow
+Adds letters.domain_review and letters.test_domain_review. No models, migrations, live routes, templates, serializers, admin changes, or saved-data operations from committing this batch.
+
+Enforces transactional, staff-authorized publication and moderation workflows:
+- publish_request(reviewer, request_id): Clears review restrictions, marks request is_published=True, returns allowlisted card.
+- publish_letter(reviewer, letter_id): Enforces that originating request must be published; marks letter is_published=True, sets finalized_at, and transitions linked physical instance to is_public=True and status='waiting_print' to enter the physical print pipeline.
+- restrict_content(reviewer, record_type, record_id, reason): Sets automatically_restricted=True, is_published=False, and hides linked physical instances.
+- pending_review_requests/pending_review_letters: Allowlisted queues for staff inspection.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 
@@ -39,7 +45,7 @@ git log -1 --oneline &&
 python manage.py check &&
 python manage.py makemigrations --check --dry-run &&
 python manage.py migrate --plan &&
-python manage.py test letters.test_domain_editing letters.test_domain_drafts letters.test_domain_presentation &&
+python manage.py test letters.test_domain_editing letters.test_domain_drafts letters.test_domain_presentation letters.test_staged_http letters.test_domain_review &&
 python manage.py test &&
 python manage.py audit_letter_sources --json &&
 python manage.py backfill_letter_sources
