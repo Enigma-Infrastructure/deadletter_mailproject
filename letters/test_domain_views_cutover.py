@@ -95,6 +95,7 @@ class DomainViewsCutoverTests(TestCase):
             url = reverse(url_name)
 
             # Anonymous view
+            self.client.logout()
             anon_resp = self.client.get(url)
             self.assertEqual(anon_resp.status_code, 200)
             self.assertContains(anon_resp, "PUBLIC-READABLE-MARKER")
