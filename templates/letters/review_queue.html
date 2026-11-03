@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}Content Review Queue | deadletter{% endblock %}
+{% block content %}
+<div class="card">
+  <h2>Content Review & Moderation Queue</h2>
+  <p class="text-muted">
+    Staff review portal for inspecting submitted letter requests and authored letters.
+    Approving an authored letter finalizes it and unlocks it for physical printing and carrier transport.
+  </p>
+
+  {% if messages %}
+    <div style="margin-bottom: 1.5rem;">
+      {% for message in messages %}
+        <div style="padding: 0.6rem 1rem; margin-bottom: 0.5rem; border-radius: 4px; background: {% if message.tags == 'error' %}#fde8e8; color: #9b1c1c;{% elif message.tags == 'warning' %}#fef08a; color: #854d0e;{% else %}#def7ec; color: #03543f;{% endif %}">
+          {{ message }}
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <section style="margin-top: 1.5rem;">
+    <h3>Authored Letters Needing Review ({{ letters|length }})</h3>
+    {% if letters %}
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
+              <th style="padding: 0.5rem;">Letter ID</th>
+              <th style="padding: 0.5rem;">Recipient / Destination</th>
+              <th style="padding: 0.5rem;">Body Preview</th>
+              <th style="padding: 0.5rem;">Moderation Status</th>
+              <th style="padding: 0.5rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for letter in letters %}
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.5rem; vertical-align: top;">
+                  <strong>#{{ letter.pk }}</strong>
+                  {% if letter.request %}
+                    <br><small class="text-muted">Req #{{ letter.request.pk }} ({{ letter.request.is_published|yesno:"published,unpublished" }})</small>
+                  {% endif %}
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top;">
+                  {{ letter.recipient_alias|default:"A Stranger" }}<br>
+                  <small class="text-muted">{{ letter.destination_label|default:"No destination" }}</small>
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top; max-width: 320px;">
+                  <span style="font-family: monospace; font-size: 0.9em; white-space: pre-wrap;">{{ letter.body_text|truncatewords:25 }}</span>
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top;">
+                  {% if letter.automatically_restricted %}
+                    <span style="color: #c53030; font-weight: bold;">Restricted</span>
+                    {% if letter.restriction_reason %}
+                      <br><small class="text-muted">({{ letter.restriction_reason }})</small>
+                    {% endif %}
+                  {% elif not letter.is_published %}
+                    <span style="color: #d97706;">Unpublished Draft</span>
+                  {% else %}
+                    <span style="color: #059669;">Published</span>
+                  {% endif %}
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top; white-space: nowrap;">
+                  <form method="post" action="{% url 'letter_review_queue' %}" style="display: inline-block; margin-right: 0.3rem;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve_letter">
+                    <input type="hidden" name="record_id" value="{{ letter.pk }}">
+                    <button type="submit" style="background: #059669; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;">Approve</button>
+                  </form>
+                  <form method="post" action="{% url 'letter_review_queue' %}" style="display: inline-block;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="restrict_letter">
+                    <input type="hidden" name="record_id" value="{{ letter.pk }}">
+                    <input type="hidden" name="reason" value="Staff moderation hold">
+                    <button type="submit" style="background: #dc2626; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;">Restrict</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">No authored letters currently require review.</p>
+    {% endif %}
+  </section>
+
+  <section style="margin-top: 2rem;">
+    <h3>Letter Requests Needing Review ({{ requests|length }})</h3>
+    {% if requests %}
+      <div style="overflow-x: auto;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 0.5rem;">
+          <thead>
+            <tr style="border-bottom: 2px solid #e5e7eb; text-align: left;">
+              <th style="padding: 0.5rem;">Request ID</th>
+              <th style="padding: 0.5rem;">Recipient / Destination</th>
+              <th style="padding: 0.5rem;">Prompt</th>
+              <th style="padding: 0.5rem;">Moderation Status</th>
+              <th style="padding: 0.5rem;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for req in requests %}
+              <tr style="border-bottom: 1px solid #e5e7eb;">
+                <td style="padding: 0.5rem; vertical-align: top;">
+                  <strong>#{{ req.pk }}</strong>
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top;">
+                  {{ req.recipient_alias|default:"A Stranger" }}<br>
+                  <small class="text-muted">{{ req.destination_label|default:"No destination" }}</small>
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top; max-width: 320px;">
+                  <span style="font-family: monospace; font-size: 0.9em; white-space: pre-wrap;">{{ req.prompt|truncatewords:25 }}</span>
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top;">
+                  {% if req.automatically_restricted %}
+                    <span style="color: #c53030; font-weight: bold;">Restricted</span>
+                    {% if req.restriction_reason %}
+                      <br><small class="text-muted">({{ req.restriction_reason }})</small>
+                    {% endif %}
+                  {% elif not req.is_published %}
+                    <span style="color: #d97706;">Unpublished Draft</span>
+                  {% else %}
+                    <span style="color: #059669;">Published</span>
+                  {% endif %}
+                </td>
+                <td style="padding: 0.5rem; vertical-align: top; white-space: nowrap;">
+                  <form method="post" action="{% url 'letter_review_queue' %}" style="display: inline-block; margin-right: 0.3rem;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="approve_request">
+                    <input type="hidden" name="record_id" value="{{ req.pk }}">
+                    <button type="submit" style="background: #059669; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;">Approve</button>
+                  </form>
+                  <form method="post" action="{% url 'letter_review_queue' %}" style="display: inline-block;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="restrict_request">
+                    <input type="hidden" name="record_id" value="{{ req.pk }}">
+                    <input type="hidden" name="reason" value="Staff moderation hold">
+                    <button type="submit" style="background: #dc2626; color: white; border: none; padding: 0.3rem 0.6rem; border-radius: 4px; cursor: pointer;">Restrict</button>
+                  </form>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="text-muted">No letter requests currently require review.</p>
+    {% endif %}
+  </section>
+
+  <div style="margin-top: 2rem;">
+    <a href="{% url 'print_queue' %}">&rarr; Go to Print Queue</a> |
+    <a href="{% url 'admin_hub' %}">&larr; Return to Admin Hub</a>
+  </div>
+</div>
+{% endblock %}

@@ -3,6 +3,7 @@
 from django.contrib import messages
 from django.contrib.admin.views.decorators import staff_member_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -16,7 +17,15 @@ from media_app.models import MediaItem
 from people.models import Person, Place
 from topics.models import Topic
 from .forms import LetterBodyForm, ScanUpdateForm
-from .models import LetterConcept, LetterInstance, LetterHop, Stamp, StampUpdate
+from .models import (
+    Letter,
+    LetterConcept,
+    LetterHop,
+    LetterInstance,
+    LetterRequest,
+    Stamp,
+    StampUpdate,
+)
 from .serializers import LetterInstanceSerializer
 
 
@@ -71,17 +80,69 @@ def letter_write_claim(request, pk: int):
     if request.method == "POST":
         form = LetterBodyForm(request.POST)
         if form.is_valid():
-            instance = LetterInstance.objects.create(
-                concept=concept,
-                recipient=person,
-                body_text=form.cleaned_data["body_text"],
-                current_place=concept.destination_place,
-                current_city=concept.destination_city or (person.city if person else ""),
-                status="waiting_print",
-                origin="online",
-                needs_printing=True,
-                created_by=request.user if request.user.is_authenticated else None,
-            )
+            body_text = form.cleaned_data["body_text"]
+            with transaction.atomic():
+                dest_place = concept.destination_place
+                dest_city = concept.destination_city or (person.city if person else "")
+                dest_label = (dest_place.name.strip() if dest_place else "") + (f" · {dest_city}" if dest_city else "")
+                author = request.user if request.user.is_authenticated else None
+
+                # Find or create linked LetterRequest for provenance
+                letter_req = LetterRequest.objects.filter(concept=concept).first()
+                if letter_req is None:
+                    letter_req = LetterRequest.objects.create(
+                        prompt=concept.write_prompt,
+                        recipient=person,
+                        recipient_alias=person.nickname if person else "A Stranger",
+                        destination_place=dest_place,
+                        destination_city=dest_city,
+                        destination_label=dest_label,
+                        concept=concept,
+                        legacy_source=concept,
+                        submitted_by=concept.created_by,
+                        owner=concept.created_by,
+                        requested_visibility="public",
+                        automatically_restricted=False,
+                        is_published=True,
+                        is_open=True,
+                    )
+
+                # Create the domain Letter (authored work)
+                letter = Letter.objects.create(
+                    request=letter_req,
+                    concept=concept,
+                    writer=author,
+                    body_text=body_text,
+                    prompt_snapshot=letter_req.prompt or concept.write_prompt,
+                    recipient=person,
+                    recipient_alias=letter_req.recipient_alias or (person.nickname if person else "A Stranger"),
+                    destination_place=dest_place,
+                    destination_city=dest_city,
+                    destination_label=dest_label,
+                    requested_visibility="public",
+                    automatically_restricted=False,
+                    is_published=True,
+                    finalized_at=timezone.now(),
+                )
+
+                if letter_req.is_open:
+                    letter_req.is_open = False
+                    letter_req.save(update_fields=["is_open"])
+
+                # Create physical LetterInstance linked to authored_letter
+                instance = LetterInstance.objects.create(
+                    authored_letter=letter,
+                    concept=concept,
+                    recipient=person,
+                    body_text=body_text,
+                    current_place=dest_place,
+                    current_city=dest_city,
+                    status="waiting_print",
+                    origin="online",
+                    needs_printing=True,
+                    is_public=True,
+                    created_by=author,
+                )
             return redirect("letter_write_confirm", code=instance.code)
     else:
         form = LetterBodyForm()
@@ -97,6 +158,72 @@ def letter_write_confirm(request, code: str):
     """Show confirmation + links after a letter instance is created."""
     letter = get_object_or_404(LetterInstance, code=code)
     return render(request, "letter_write_confirm.html", {"letter": letter})
+
+
+# --------------------------------------------------
+# Staff moderation and content review pipeline
+# --------------------------------------------------
+
+@staff_member_required
+def letter_review_queue(request):
+    """
+    Staff moderation queue for inspecting, approving, and restricting
+    submitted requests and authored letters.
+    """
+    if request.method == "POST":
+        action = request.POST.get("action")
+        record_id = request.POST.get("record_id")
+        reason = request.POST.get("reason", "").strip() or "Moderator review"
+        try:
+            record_id_int = int(record_id)
+        except (TypeError, ValueError):
+            messages.error(request, "Invalid record ID.")
+            return redirect("letter_review_queue")
+
+        from django.core.exceptions import ValidationError
+        from .domain_review import publish_letter, publish_request, restrict_content
+
+        try:
+            if action == "approve_request":
+                publish_request(request.user, record_id_int)
+                messages.success(request, f"Request #{record_id_int} approved and published.")
+            elif action == "restrict_request":
+                restrict_content(request.user, "request", record_id_int, reason=reason)
+                messages.warning(request, f"Request #{record_id_int} restricted.")
+            elif action == "approve_letter":
+                publish_letter(request.user, record_id_int)
+                messages.success(request, f"Letter #{record_id_int} approved and released to print queue.")
+            elif action == "restrict_letter":
+                restrict_content(request.user, "letter", record_id_int, reason=reason)
+                messages.warning(request, f"Letter #{record_id_int} restricted.")
+            else:
+                messages.error(request, f"Unknown action: {action}")
+        except ValidationError as err:
+            messages.error(request, str(err.message if hasattr(err, "message") else err))
+        except Exception as err:
+            messages.error(request, f"Review action failed: {err}")
+
+        return redirect("letter_review_queue")
+
+    unreviewed_requests = (
+        LetterRequest.objects.filter(Q(is_published=False) | Q(automatically_restricted=True))
+        .select_related("recipient", "destination_place")
+        .order_by("-created_at")[:50]
+    )
+    unreviewed_letters = (
+        Letter.objects.filter(Q(is_published=False) | Q(automatically_restricted=True))
+        .select_related("recipient", "destination_place", "request")
+        .order_by("-created_at")[:50]
+    )
+
+    return render(
+        request,
+        "letters/review_queue.html",
+        {
+            "requests": unreviewed_requests,
+            "letters": unreviewed_letters,
+        },
+    )
 
 
 # --------------------------------------------------

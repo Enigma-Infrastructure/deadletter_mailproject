@@ -1,16 +1,15 @@
 # Domain workflow transition and child-agent handoff
 
-## Last confirmed checkpoint: user-local, 2026-11-02
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 2dc59e73b61113f290a1670e5c407b2698a38286 (including domain review and publication workflow): all 70 targeted tests passed; full suite 215 tests, 214 passed / 1 skipped. Checks clean, no model drift. Historical backfill applied: 4 LetterRequest rows mapped 1-to-1 from 4 legacy concepts with zero conflicts.
+## Last confirmed checkpoint: user-local, 2026-11-03
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 945ed85 (including staged creation with durable replay and review HTTP endpoints): all 77 targeted tests passed; full suite 222 tests, 221 passed / 1 skipped. Checks clean, no model drift.
 
-## Current batch: staged creation with durable replay and review HTTP endpoints
-Extends letters.staged_http, letters.staged_urls, and letters.test_staged_http. No models, migrations, live routes, templates, serializers, admin changes, or saved-data operations from committing this batch.
-
-Adds isolated HTTP endpoints:
-- staged_request_create (POST /staged/requests/create/): Accepts UUID4 idempotency_key, recipient_id, prompt, requested_visibility; calls submit_request; returns 201 Created or 200 OK on identical replay; rejects key reuse with altered payload with 409 Conflict.
-- staged_response_create (POST /staged/responses/create/): Accepts UUID4 idempotency_key, request_id, body_text, requested_visibility; calls submit_response; returns 201 Created or 200 OK on identical replay.
-- staged_request_publish & staged_letter_publish: Staff-authorized POST endpoints to approve requests and letters for publication.
-- staged_content_restrict: Staff-authorized POST endpoint to restrict/unpublish content.
+## Current batch: live workflow cutover (intake dual-write, desk claim, staff review queue, print pipeline)
+Wires the end-to-end production workflow:
+1. Public Intake (/write/request/): Dual-writes LetterConcept and domain LetterRequest with full recipient/destination provenance and legacy link.
+2. Writing Desk Claim (/letters/write/claim/<id>/): Writes authored Letter, closes LetterRequest, and creates physical LetterInstance with authored_letter link, status='waiting_print', needs_printing=True, is_public=True.
+3. Content Review Queue (/letters/review/queue/): Staff moderation portal to inspect, approve, or restrict requests and letters, cascading publication and restriction to physical instances.
+4. Admin Hub (/admin/hub/): Links to Content review queue and Print queue under 'Production & Review Pipeline'.
+5. Automated Tests: letters/test_workflow_integration.py covering intake, claim, review approval/restriction cascade, and print queue verification.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 

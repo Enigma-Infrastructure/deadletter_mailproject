@@ -12,6 +12,10 @@ def admin_hub(request):
         {'title': 'Django Admin', 'links': [
             {'label': 'Site admin', 'url': '/admin/'},
         ]},
+        {'title': 'Production & Review Pipeline', 'links': [
+            {'label': 'Content review queue (moderation)', 'url': '/letters/review/queue/'},
+            {'label': 'Print queue (unprinted letters)', 'url': '/letters/print/queue/'},
+        ]},
         {'title': 'Public entry points', 'links': [
             {'label': 'Request a letter (intake)', 'url': '/write/request/'},
             {'label': 'Write & Read desk', 'url': '/letters/desk/'},

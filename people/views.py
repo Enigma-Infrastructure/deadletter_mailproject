@@ -41,9 +41,27 @@ def request_a_letter(request):
                     defaults={'city': city, 'write_about': write_about},
                 )
                 # Keep each request's prompt. Account ownership is a later batch.
-                LetterConcept.objects.create(
+                concept = LetterConcept.objects.create(
                     title=f'Letter for {nickname}', write_prompt=write_about,
                     destination_place=place, destination_city=city, created_for=person,
+                )
+                from letters.models import LetterRequest
+                destination_label = (place.name.strip() if place else '') + (f' · {city}' if city else '')
+                LetterRequest.objects.create(
+                    prompt=write_about,
+                    recipient=person,
+                    recipient_alias=nickname,
+                    destination_place=place,
+                    destination_city=city,
+                    destination_label=destination_label,
+                    concept=concept,
+                    legacy_source=concept,
+                    submitted_by=request.user if request.user.is_authenticated else None,
+                    owner=request.user if request.user.is_authenticated else None,
+                    requested_visibility='public',
+                    automatically_restricted=False,
+                    is_published=True,
+                    is_open=True,
                 )
             return render(request, 'people/request_thanks.html', {'nickname': nickname})
         return render(request, 'people/request_a_letter.html', {'form': form})
