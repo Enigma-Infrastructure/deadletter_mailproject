@@ -285,6 +285,6 @@ class WorkflowIntegrationTests(TestCase):
         self.client.force_login(self.staff_user)
         response = self.client.get(reverse("admin_hub"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Production & Review Pipeline")
+        self.assertContains(response, "Production and Review Pipeline")
         self.assertContains(response, reverse("letter_review_queue"))
         self.assertContains(response, reverse("print_queue"))
