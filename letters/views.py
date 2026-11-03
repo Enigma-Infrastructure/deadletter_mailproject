@@ -40,6 +40,8 @@ def write_read_home(request):
     """
     concepts = (
         LetterConcept.objects.filter(instances__isnull=True)
+        .exclude(linked_requests__automatically_restricted=True)
+        .exclude(linked_requests__is_open=False)
         .select_related("created_for", "destination_place")
         .order_by("-created_at")
     )
@@ -63,6 +65,8 @@ def letter_write_queue(request):
 
     concepts = (
         LetterConcept.objects.filter(instances__isnull=True)
+        .exclude(linked_requests__automatically_restricted=True)
+        .exclude(linked_requests__is_open=False)
         .select_related("created_for", "destination_place")
         .order_by("-created_at")
     )
@@ -487,6 +491,32 @@ def scan_stamp(request, number: str):
 # Carry / courier list
 # --------------------------------------------------
 
+def _is_approved_participant(user):
+    return (
+        user is not None
+        and getattr(user, "is_authenticated", False)
+        and getattr(user, "is_active", False)
+        and getattr(user, "participant_status", None) == "approved"
+    )
+
+
+def _filter_readable_letters(qs, user):
+    """
+    Apply domain privacy rules to LetterInstance querysets:
+    1. Only public instances (is_public=True).
+    2. Exclude unpublished or restricted authored letters.
+    3. If user is not an approved participant, exclude participants_only authored letters.
+    """
+    qs = qs.filter(is_public=True).exclude(
+        authored_letter__is_published=False
+    ).exclude(
+        authored_letter__automatically_restricted=True
+    )
+    if not _is_approved_participant(user):
+        qs = qs.exclude(authored_letter__requested_visibility="participants_only")
+    return qs
+
+
 def carry_list(request):
     """
     Letters that have been printed/stamped and are ready to be picked
@@ -500,6 +530,8 @@ def carry_list(request):
             stamps__is_active=True,
             status__in=["waiting_carrier", "traveling", "left"],
         )
+        .exclude(authored_letter__is_published=False)
+        .exclude(authored_letter__automatically_restricted=True)
         .select_related("recipient", "current_place")
         .distinct()
     )
@@ -526,11 +558,16 @@ class LettersInMyAreaAPIView(APIView):
         city = request.query_params.get("city")
         place = request.query_params.get("place")
 
-        qs = LetterInstance.objects.filter(
-            is_public=True,
-            stamps__is_active=True,
-            status__in=["waiting_carrier", "traveling", "left"],
-        ).select_related("current_place", "recipient")
+        qs = (
+            LetterInstance.objects.filter(
+                is_public=True,
+                stamps__is_active=True,
+                status__in=["waiting_carrier", "traveling", "left"],
+            )
+            .exclude(authored_letter__is_published=False)
+            .exclude(authored_letter__automatically_restricted=True)
+            .select_related("current_place", "recipient")
+        )
 
         if city:
             qs = qs.filter(
@@ -550,17 +587,50 @@ class LettersInMyAreaAPIView(APIView):
 def letter_public_page(request, code: str):
     """HTML page for QR scans: minimal story / info about the letter.
 
-    Respects the explicit `is_public=False` opt-out: a letter that has been
-    marked non-public is not readable here (404).
+    Respects domain access policy: unpublished, restricted, or participants_only
+    content (for unapproved viewers) returns 404. Social destination address
+    is only visible to approved participants.
     """
+    from django.http import Http404
+    from .access_policy import Viewer, ContentAccess, can_read_body, can_read_social_address
+
     letter = get_object_or_404(
         LetterInstance.objects.select_related(
-            "concept", "recipient", "recipient__pirate_place", "current_place"
+            "concept", "recipient", "recipient__pirate_place", "current_place", "authored_letter", "authored_letter__request"
         ),
         code=code,
         is_public=True,
     )
-    return render(request, "letter_public.html", {"letter": letter})
+
+    is_approved = _is_approved_participant(request.user)
+    show_address = is_approved
+
+    if letter.authored_letter:
+        viewer = Viewer(
+            authenticated=request.user.is_authenticated,
+            active=request.user.is_active if request.user.is_authenticated else False,
+            status=getattr(request.user, "participant_status", "pending") if request.user.is_authenticated else "pending",
+        )
+        req = letter.authored_letter.request
+        req_access = (
+            ContentAccess(
+                visibility=req.requested_visibility,
+                restricted=req.automatically_restricted,
+                published=req.is_published,
+            )
+            if req
+            else ContentAccess(visibility="public", restricted=False, published=True)
+        )
+        body_access = ContentAccess(
+            visibility=letter.authored_letter.requested_visibility,
+            restricted=letter.authored_letter.automatically_restricted,
+            published=letter.authored_letter.is_published,
+        )
+        if not can_read_body(viewer, req_access, body_access):
+            raise Http404("This letter is not available for public reading.")
+        show_address = can_read_social_address(viewer, req_access)
+
+    return render(request, "letter_public.html", {"letter": letter, "show_address": show_address})
 
 
 def letter_read_list(request):
@@ -574,11 +644,10 @@ def letter_read_list(request):
     view = request.GET.get("view", "list")
     page = request.GET.get("page", 1)
 
-    qs = (
-        LetterInstance.objects.filter(is_public=True, body_text__gt="")
-        .select_related("concept", "recipient", "recipient__pirate_place")
-        .order_by("-created_at")
-    )
+    qs = LetterInstance.objects.filter(body_text__gt="")
+    qs = _filter_readable_letters(qs, request.user).select_related(
+        "concept", "recipient", "recipient__pirate_place", "authored_letter"
+    ).order_by("-created_at")
 
     if topic_id:
         qs = qs.filter(concept__letter_topics__topic_id=topic_id)
@@ -623,9 +692,8 @@ def desk_read_list(request):
     Desk-only reading view: show recent public letters
     using the desk skin.
     """
-    letters = (
-        LetterInstance.objects.filter(is_public=True, body_text__gt="")
-        .select_related("concept", "recipient", "recipient__pirate_place")
-        .order_by("-created_at")[:50]
-    )
+    qs = LetterInstance.objects.filter(body_text__gt="")
+    letters = _filter_readable_letters(qs, request.user).select_related(
+        "concept", "recipient", "recipient__pirate_place", "authored_letter"
+    ).order_by("-created_at")[:50]
     return render(request, "desk/desk_read_list.html", {"letters": letters})

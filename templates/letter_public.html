@@ -20,13 +20,17 @@
     <h2>Recipient</h2>
     <p>
       For: {{ letter.recipient.nickname }}<br>
-      Pirate mail address:
-      {% if letter.recipient.pirate_place %}
-        {{ letter.recipient.pirate_place.name }}{% if letter.recipient.pirate_place.kind %} ({{ letter.recipient.pirate_place.kind }}){% endif %}{% if letter.recipient.pirate_place.city %}, {{ letter.recipient.pirate_place.city }}{% endif %}
+      {% if show_address %}
+        Pirate mail address:
+        {% if letter.recipient.pirate_place %}
+          {{ letter.recipient.pirate_place.name }}{% if letter.recipient.pirate_place.kind %} ({{ letter.recipient.pirate_place.kind }}){% endif %}{% if letter.recipient.pirate_place.city %}, {{ letter.recipient.pirate_place.city }}{% endif %}
+        {% else %}
+          —
+        {% endif %}<br>
+        <span class="text-muted">Mail reaches them by being handed to someone who knows them there.</span>
       {% else %}
-        —
-      {% endif %}<br>
-      <span class="text-muted">Mail reaches them by being handed to someone who knows them there.</span>
+        <span class="text-muted">Social destination address visible to approved participants.</span>
+      {% endif %}
     </p>
 
   {% endif %}

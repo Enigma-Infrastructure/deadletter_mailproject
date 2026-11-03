@@ -36,7 +36,17 @@ def register(request):
 @require_http_methods(['GET'])
 def participant_status(request):
     request.user.refresh_from_db(fields=['participant_status'])
-    return render(request, 'registration/participant_status.html', {'status': request.user.participant_status})
+    my_requests = request.user.letter_requests_owned.select_related('recipient', 'destination_place').order_by('-created_at')[:20]
+    my_letters = request.user.letters_written.select_related('recipient', 'destination_place', 'request').prefetch_related('instances', 'instances__stamps').order_by('-created_at')[:20]
+    return render(
+        request,
+        'registration/participant_status.html',
+        {
+            'status': request.user.participant_status,
+            'my_requests': my_requests,
+            'my_letters': my_letters,
+        },
+    )
 
 @never_cache
 @login_required

@@ -1,15 +1,16 @@
 # Domain workflow transition and child-agent handoff
 
 ## Last confirmed checkpoint: user-local, 2026-11-03
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 945ed85 (including staged creation with durable replay and review HTTP endpoints): all 77 targeted tests passed; full suite 222 tests, 221 passed / 1 skipped. Checks clean, no model drift.
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 7aa7519: full test suite and workflow integration tests passing cleanly.
 
-## Current batch: live workflow cutover (intake dual-write, desk claim, staff review queue, print pipeline)
-Wires the end-to-end production workflow:
-1. Public Intake (/write/request/): Dual-writes LetterConcept and domain LetterRequest with full recipient/destination provenance and legacy link.
-2. Writing Desk Claim (/letters/write/claim/<id>/): Writes authored Letter, closes LetterRequest, and creates physical LetterInstance with authored_letter link, status='waiting_print', needs_printing=True, is_public=True.
-3. Content Review Queue (/letters/review/queue/): Staff moderation portal to inspect, approve, or restrict requests and letters, cascading publication and restriction to physical instances.
-4. Admin Hub (/admin/hub/): Links to Content review queue and Print queue under 'Production & Review Pipeline'.
-5. Automated Tests: letters/test_workflow_integration.py covering intake, claim, review approval/restriction cascade, and print queue verification.
+## Current batch: domain privacy and reader/carry/desk/account view cutover
+Consolidated pass wiring domain privacy, audience boundaries, and participant dashboard:
+1. Public & Desk Readers (/letters/read/, /letters/desk/read/): Exclude unpublished and restricted authored letters; exclude participants_only letters for unapproved/anonymous viewers.
+2. Letter Public Page (/letters/l/<code_or_id>/): Enforces can_read_body access policy (404 on unpublished/restricted/unauthorized); gates social destination address on can_read_social_address (visible only to approved participants).
+3. Carry & API Views (/letters/carry/, /letters/api/letters/): Exclude restricted or unpublished authored letters from active courier circulation.
+4. Desk Queues (/letters/desk/, /letters/write/queue/): Exclude concepts whose linked requests are restricted or closed.
+5. Participant Account Dashboard (/accounts/status/): Surfaces the logged-in user's active requests and authored letters with their current pipeline status while preserving single-card layout.
+6. Automated Tests: letters/test_domain_views_cutover.py covering reader visibility, address shielding, courier filtering, queue exclusion, and account dashboard rendering.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 

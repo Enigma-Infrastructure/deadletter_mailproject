@@ -9,5 +9,55 @@
   {% elif status == 'suspended' %}<p>Your participation is suspended. Your account does not have participant access.</p>
   {% else %}<p>Participant access is unavailable.</p>{% endif %}
   <p><a href="{% url 'account_preferences' %}">Future-submission preferences</a></p>
+
+  {% if my_requests %}
+    <h2 style="margin-top: 1.5rem; font-size: 1.2rem;">My Letter Requests</h2>
+    <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
+      {% for req in my_requests %}
+        <li style="margin-bottom: 0.5rem;">
+          <strong>Request #{{ req.pk }}</strong> for {{ req.recipient_alias|default:"A Stranger" }}
+          {% if req.destination_label %}({{ req.destination_label }}){% endif %} —
+          {% if req.automatically_restricted %}
+            <span style="color: #c53030;">Restricted</span>
+          {% elif not req.is_published %}
+            <span style="color: #d97706;">Pending Review</span>
+          {% elif req.is_open %}
+            <span style="color: #059669;">Open (Awaiting Writer)</span>
+          {% else %}
+            <span style="color: #4b5563;">Claimed &amp; Written</span>
+          {% endif %}
+          <br><small class="text-muted">{{ req.prompt|truncatewords:15 }}</small>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
+  {% if my_letters %}
+    <h2 style="margin-top: 1.5rem; font-size: 1.2rem;">My Authored Letters</h2>
+    <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
+      {% for let in my_letters %}
+        <li style="margin-bottom: 0.5rem;">
+          <strong>Letter #{{ let.pk }}</strong> for {{ let.recipient_alias|default:"A Stranger" }} —
+          {% if let.automatically_restricted %}
+            <span style="color: #c53030;">Restricted</span>
+          {% elif not let.is_published %}
+            <span style="color: #d97706;">Pending Review</span>
+          {% else %}
+            {% with inst=let.instances.first %}
+              {% if inst %}
+                <span style="color: #059669;">{{ inst.get_status_display }}</span>
+                {% if inst.stamps.first %}
+                  (Stamp №{{ inst.stamps.first.number }})
+                {% endif %}
+              {% else %}
+                <span style="color: #059669;">Published</span>
+              {% endif %}
+            {% endwith %}
+          {% endif %}
+          <br><small class="text-muted">{{ let.body_text|truncatewords:15 }}</small>
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
 </section>
 {% endblock %}
