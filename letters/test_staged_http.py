@@ -7,6 +7,7 @@ URLconf is NOT included in the main project routing.
 import json
 import time
 from unittest.mock import patch
+import uuid
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -518,3 +519,142 @@ class StagedHttpTests(TestCase):
         paths = [str(p.pattern) for p in main_patterns]
         self.assertIn("letters/", paths)
         self.assertIn("write/", paths)
+
+    # --------------------------------------------------
+    # 10. Creation with durable replay
+    # --------------------------------------------------
+
+    def test_request_create_with_uuid4_key_and_replay(self):
+        self.client.force_login(self.approved)
+        key = str(uuid.uuid4())
+        person = Person.objects.first()
+        payload = {
+            "key": key,
+            "recipient_id": person.pk,
+            "prompt": "New HTTP request prompt",
+            "requested_visibility": "public",
+        }
+        # First submission -> 201 Created
+        resp = self._post("/staged/requests/create/", payload)
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertFalse(data["replayed"])
+        self.assertEqual(data["card"]["prompt"], "New HTTP request prompt")
+        req_id = data["card"]["id"]
+
+        # Exact replay with same key -> 200 OK, replayed=True, same request ID
+        resp_replay = self._post("/staged/requests/create/", payload)
+        self.assertEqual(resp_replay.status_code, 200)
+        data_replay = resp_replay.json()
+        self.assertTrue(data_replay["replayed"])
+        self.assertEqual(data_replay["card"]["id"], req_id)
+
+    def test_request_create_mismatched_payload_conflict(self):
+        self.client.force_login(self.approved)
+        key = str(uuid.uuid4())
+        person = Person.objects.first()
+        payload1 = {"key": key, "recipient_id": person.pk, "prompt": "Prompt A"}
+        resp1 = self._post("/staged/requests/create/", payload1)
+        self.assertEqual(resp1.status_code, 201)
+
+        # Altered prompt under same key -> 409 Conflict
+        payload2 = {"key": key, "recipient_id": person.pk, "prompt": "Prompt B"}
+        resp2 = self._post("/staged/requests/create/", payload2)
+        self.assertEqual(resp2.status_code, 409)
+
+    def test_request_create_invalid_key_and_unapproved(self):
+        self.client.force_login(self.approved)
+        person = Person.objects.first()
+        # Invalid key format -> 400
+        resp = self._post(
+            "/staged/requests/create/",
+            {"key": "not-a-uuid", "recipient_id": person.pk, "prompt": "Test"},
+        )
+        self.assertEqual(resp.status_code, 400)
+
+        # Unapproved user -> 403
+        self.client.force_login(self.unapproved)
+        resp_unapproved = self._post(
+            "/staged/requests/create/",
+            {"key": str(uuid.uuid4()), "recipient_id": person.pk, "prompt": "Test"},
+        )
+        self.assertEqual(resp_unapproved.status_code, 403)
+
+    def test_response_create_with_uuid4_key_and_replay(self):
+        self.client.force_login(self.approved)
+        key = str(uuid.uuid4())
+        payload = {
+            "key": key,
+            "request_id": self.published_request.pk,
+            "body_text": "Authored response text via HTTP",
+            "requested_visibility": "public",
+        }
+        # First submission -> 201 Created
+        resp = self._post("/staged/responses/create/", payload)
+        self.assertEqual(resp.status_code, 201)
+        data = resp.json()
+        self.assertFalse(data["replayed"])
+        self.assertEqual(data["card"]["body_text"], "Authored response text via HTTP")
+        letter_id = data["card"]["id"]
+
+        # Exact replay -> 200 OK
+        resp_replay = self._post("/staged/responses/create/", payload)
+        self.assertEqual(resp_replay.status_code, 200)
+        self.assertTrue(resp_replay.json()["replayed"])
+        self.assertEqual(resp_replay.json()["card"]["id"], letter_id)
+
+    # --------------------------------------------------
+    # 11. Review and publication endpoints
+    # --------------------------------------------------
+
+    def test_review_endpoints_require_staff(self):
+        # Regular approved participant -> 403
+        self.client.force_login(self.approved)
+        resp = self._post(f"/staged/requests/{self.draft_request.pk}/publish/")
+        self.assertEqual(resp.status_code, 403)
+
+    def test_staff_publish_request_and_letter(self):
+        User = get_user_model()
+        staff = User.objects.create_user(
+            username="staff-reviewer", is_staff=True, participant_status="approved",
+        )
+        self.client.force_login(staff)
+
+        # Publish request
+        resp = self._post(f"/staged/requests/{self.draft_request.pk}/publish/")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["published"])
+        self.draft_request.refresh_from_db()
+        self.assertTrue(self.draft_request.is_published)
+
+        # Publish letter on published parent request
+        resp_let = self._post(f"/staged/letters/{self.draft_letter.pk}/publish/")
+        self.assertEqual(resp_let.status_code, 200)
+        self.assertTrue(resp_let.json()["published"])
+        self.draft_letter.refresh_from_db()
+        self.draft_instance.refresh_from_db()
+        self.assertTrue(self.draft_letter.is_published)
+        self.assertTrue(self.draft_instance.is_public)
+        self.assertEqual(self.draft_instance.status, "waiting_print")
+
+    def test_staff_restrict_content(self):
+        User = get_user_model()
+        staff = User.objects.create_user(
+            username="staff-moderator", is_staff=True, participant_status="approved",
+        )
+        self.client.force_login(staff)
+        resp = self._post(
+            "/staged/review/restrict/",
+            {
+                "record_type": "request",
+                "record_id": self.published_request.pk,
+                "reason": "sensitive_location",
+            },
+        )
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["restricted"])
+        self.published_request.refresh_from_db()
+        self.assertFalse(self.published_request.is_published)
+        self.assertTrue(self.published_request.automatically_restricted)
+        self.assertEqual(self.published_request.restriction_reason, "sensitive_location")
+

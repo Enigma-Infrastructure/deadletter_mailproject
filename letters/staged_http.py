@@ -27,6 +27,16 @@ from .domain_presentation import (
     request_cards,
     request_draft_card,
 )
+from .domain_review import (
+    publish_letter,
+    publish_request,
+    restrict_content,
+)
+from .domain_submissions import (
+    SubmissionConflict,
+    submit_request,
+    submit_response,
+)
 
 
 def _error_response(message, status=400):
@@ -215,3 +225,151 @@ def staged_letter_draft_save(request, letter_id):
     except Exception:
         return _error_response("A database error occurred. No changes were made.", status=500)
     return JsonResponse(envelope)
+
+
+# --------------------------------------------------
+# Creation with durable replay (POST only, CSRF protected)
+# --------------------------------------------------
+
+@csrf_protect
+@require_POST
+def staged_request_create(request):
+    """POST a new request with UUID4 idempotency key."""
+    key = request.POST.get("idempotency_key") or request.POST.get("key")
+    if not key:
+        return _error_response("A UUID4 submission key is required.")
+
+    raw_recipient = request.POST.get("recipient_id")
+    try:
+        recipient_id = int(raw_recipient)
+    except (ValueError, TypeError):
+        return _error_response("A positive integer record identifier is required.")
+
+    prompt = request.POST.get("prompt")
+    requested_visibility = request.POST.get("requested_visibility") or None
+
+    try:
+        req, replayed = submit_request(
+            request.user,
+            key=key,
+            recipient_id=recipient_id,
+            prompt=prompt,
+            requested_visibility=requested_visibility,
+        )
+    except PermissionDenied:
+        return _error_response("Active approved participation is required.", status=403)
+    except SubmissionConflict as exc:
+        return _error_response(str(exc), status=409)
+    except ValidationError as exc:
+        return _error_response(str(exc.messages[0]))
+    except Exception:
+        return _error_response("A database error occurred. No changes were made.", status=500)
+
+    card = request_draft_card(request.user, req.pk)
+    return JsonResponse({"card": card, "replayed": replayed}, status=200 if replayed else 201)
+
+
+@csrf_protect
+@require_POST
+def staged_response_create(request):
+    """POST a new authored response with UUID4 idempotency key."""
+    key = request.POST.get("idempotency_key") or request.POST.get("key")
+    if not key:
+        return _error_response("A UUID4 submission key is required.")
+
+    raw_request_id = request.POST.get("request_id")
+    try:
+        request_id = int(raw_request_id)
+    except (ValueError, TypeError):
+        return _error_response("A positive integer record identifier is required.")
+
+    body_text = request.POST.get("body_text")
+    requested_visibility = request.POST.get("requested_visibility") or None
+
+    try:
+        letter, instance, replayed = submit_response(
+            request.user,
+            key=key,
+            request_id=request_id,
+            body_text=body_text,
+            requested_visibility=requested_visibility,
+        )
+    except PermissionDenied:
+        return _error_response("The request is not available for responses.", status=403)
+    except SubmissionConflict as exc:
+        return _error_response(str(exc), status=409)
+    except ValidationError as exc:
+        return _error_response(str(exc.messages[0]))
+    except Exception:
+        return _error_response("A database error occurred. No changes were made.", status=500)
+
+    card = letter_draft_card(request.user, letter.pk)
+    return JsonResponse({"card": card, "replayed": replayed}, status=200 if replayed else 201)
+
+
+# --------------------------------------------------
+# Content review and publication (POST only, staff only)
+# --------------------------------------------------
+
+@csrf_protect
+@require_POST
+def staged_request_publish(request, request_id):
+    """POST to approve a request for publication."""
+    try:
+        identifier = int(request_id)
+    except (ValueError, TypeError):
+        return _error_response("A positive integer record identifier is required.")
+    try:
+        card = publish_request(request.user, identifier)
+    except PermissionDenied:
+        return _error_response("Staff reviewer authorization required.", status=403)
+    except ValidationError as exc:
+        return _error_response(str(exc.messages[0]))
+    except Exception:
+        return _error_response("A database error occurred. No changes were made.", status=500)
+    return JsonResponse({"card": card, "published": True})
+
+
+@csrf_protect
+@require_POST
+def staged_letter_publish(request, letter_id):
+    """POST to approve an authored letter for publication and finalization."""
+    try:
+        identifier = int(letter_id)
+    except (ValueError, TypeError):
+        return _error_response("A positive integer record identifier is required.")
+    try:
+        card = publish_letter(request.user, identifier)
+    except PermissionDenied:
+        return _error_response("Staff reviewer authorization required.", status=403)
+    except ValidationError as exc:
+        return _error_response(str(exc.messages[0]))
+    except Exception:
+        return _error_response("A database error occurred. No changes were made.", status=500)
+    return JsonResponse({"card": card, "published": True})
+
+
+@csrf_protect
+@require_POST
+def staged_content_restrict(request):
+    """POST to restrict and unpublish content."""
+    record_type = request.POST.get("record_type")
+    raw_id = request.POST.get("record_id")
+    reason = request.POST.get("reason")
+    try:
+        record_id = int(raw_id)
+    except (ValueError, TypeError):
+        return _error_response("A positive integer record identifier is required.")
+    if not reason:
+        return _error_response("A restriction reason is required.")
+
+    try:
+        card = restrict_content(request.user, record_type, record_id, reason=reason)
+    except PermissionDenied:
+        return _error_response("Staff reviewer authorization required.", status=403)
+    except ValidationError as exc:
+        return _error_response(str(exc.messages[0]))
+    except Exception:
+        return _error_response("A database error occurred. No changes were made.", status=500)
+    return JsonResponse({"card": card, "restricted": True})
+

@@ -21,4 +21,13 @@ urlpatterns = [
     # Token-checked draft saves (POST only, CSRF protected)
     path("staged/requests/<int:request_id>/save/", staged_http.staged_request_draft_save, name="staged_request_draft_save"),
     path("staged/letters/<int:letter_id>/save/", staged_http.staged_letter_draft_save, name="staged_letter_draft_save"),
+
+    # Creation with durable replay (POST only, CSRF protected)
+    path("staged/requests/create/", staged_http.staged_request_create, name="staged_request_create"),
+    path("staged/responses/create/", staged_http.staged_response_create, name="staged_response_create"),
+
+    # Content review and publication (POST only, staff only)
+    path("staged/requests/<int:request_id>/publish/", staged_http.staged_request_publish, name="staged_request_publish"),
+    path("staged/letters/<int:letter_id>/publish/", staged_http.staged_letter_publish, name="staged_letter_publish"),
+    path("staged/review/restrict/", staged_http.staged_content_restrict, name="staged_content_restrict"),
 ]

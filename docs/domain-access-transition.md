@@ -1,18 +1,16 @@
 # Domain workflow transition and child-agent handoff
 
 ## Last confirmed checkpoint: user-local, 2026-11-02
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 93c20413026d43d56c8bfacff063dacdd45119cd (including dfc28bf staged HTTP harness): all 64 targeted tests passed; full suite 209 tests, 208 passed / 1 skipped. Checks clean, no model drift. Schema letters.0011_domain_submission_receipt and accounts.0006/0007 are user-applied locally.
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 2dc59e73b61113f290a1670e5c407b2698a38286 (including domain review and publication workflow): all 70 targeted tests passed; full suite 215 tests, 214 passed / 1 skipped. Checks clean, no model drift. Historical backfill applied: 4 LetterRequest rows mapped 1-to-1 from 4 legacy concepts with zero conflicts.
 
-Latest user-local audit: 4 legacy concepts with recipients and destinations, 0 instances, 0 new requests; backfill preview planned 4 requests and 0 letters with zero conflicts.
+## Current batch: staged creation with durable replay and review HTTP endpoints
+Extends letters.staged_http, letters.staged_urls, and letters.test_staged_http. No models, migrations, live routes, templates, serializers, admin changes, or saved-data operations from committing this batch.
 
-## Current batch: content review, publication approval, and finalization workflow
-Adds letters.domain_review and letters.test_domain_review. No models, migrations, live routes, templates, serializers, admin changes, or saved-data operations from committing this batch.
-
-Enforces transactional, staff-authorized publication and moderation workflows:
-- publish_request(reviewer, request_id): Clears review restrictions, marks request is_published=True, returns allowlisted card.
-- publish_letter(reviewer, letter_id): Enforces that originating request must be published; marks letter is_published=True, sets finalized_at, and transitions linked physical instance to is_public=True and status='waiting_print' to enter the physical print pipeline.
-- restrict_content(reviewer, record_type, record_id, reason): Sets automatically_restricted=True, is_published=False, and hides linked physical instances.
-- pending_review_requests/pending_review_letters: Allowlisted queues for staff inspection.
+Adds isolated HTTP endpoints:
+- staged_request_create (POST /staged/requests/create/): Accepts UUID4 idempotency_key, recipient_id, prompt, requested_visibility; calls submit_request; returns 201 Created or 200 OK on identical replay; rejects key reuse with altered payload with 409 Conflict.
+- staged_response_create (POST /staged/responses/create/): Accepts UUID4 idempotency_key, request_id, body_text, requested_visibility; calls submit_response; returns 201 Created or 200 OK on identical replay.
+- staged_request_publish & staged_letter_publish: Staff-authorized POST endpoints to approve requests and letters for publication.
+- staged_content_restrict: Staff-authorized POST endpoint to restrict/unpublish content.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 
