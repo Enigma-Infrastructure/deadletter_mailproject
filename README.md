@@ -24,6 +24,8 @@ If you prefer `conda activate`, initialize it once in cmd:
 `C:\Users\Prism\anaconda3\Scripts\conda.exe init cmd.exe`, open a new
 window, then `conda activate DeadletterMail` and `python manage.py runserver`.
 
+`source /c/Users/Prism/anaconda3/etc/profile.d/conda.sh && conda activate DeadletterMail`
+
 ### Option B — venv
 
 ```
