@@ -23,12 +23,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY: the secret key is read from the environment, never hardcoded.
-# For local development, a random per-process key is generated when
-# DJANGO_SECRET_KEY is unset, so the server runs without manual setup.
-# Set DJANGO_SECRET_KEY for a stable key (production, or to persist sessions).
+# For local development, a stable development fallback key is used when
+# DJANGO_SECRET_KEY is unset, so the server runs without manual setup and
+# browser sessions persist across restarts without 'Session data corrupted'.
+# In production (settings_production.py), DJANGO_SECRET_KEY is strictly enforced.
 SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
-if SECRET_KEY is None:
-    SECRET_KEY = get_random_string(50)
+if not SECRET_KEY:
+    SECRET_KEY = "django-insecure-deadletter-mailproject-local-dev-key-stable-session-2026"
 
 # DEBUG defaults to True for local development; set DJANGO_DEBUG=false for production.
 DEBUG = os.environ.get("DJANGO_DEBUG", "true").strip().lower() in ("1", "true", "yes")

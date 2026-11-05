@@ -42,6 +42,8 @@ def write_read_home(request):
         LetterConcept.objects.filter(instances__isnull=True)
         .exclude(linked_requests__automatically_restricted=True)
         .exclude(linked_requests__is_open=False)
+        .exclude(migrated_request__automatically_restricted=True)
+        .exclude(migrated_request__is_open=False)
         .select_related("created_for", "destination_place")
         .order_by("-created_at")
     )
@@ -67,6 +69,8 @@ def letter_write_queue(request):
         LetterConcept.objects.filter(instances__isnull=True)
         .exclude(linked_requests__automatically_restricted=True)
         .exclude(linked_requests__is_open=False)
+        .exclude(migrated_request__automatically_restricted=True)
+        .exclude(migrated_request__is_open=False)
         .select_related("created_for", "destination_place")
         .order_by("-created_at")
     )
@@ -99,9 +103,28 @@ def letter_write_claim(request, pk: int):
                 dest_label = (dest_place.name.strip() if dest_place else "") + (f" · {dest_city}" if dest_city else "")
                 author = request.user if request.user.is_authenticated else None
 
-                # Find or create linked LetterRequest for provenance
-                letter_req = LetterRequest.objects.filter(concept=concept).first()
-                if letter_req is None:
+                # Find or create linked LetterRequest for provenance (checking both concept and legacy_source)
+                letter_req = LetterRequest.objects.filter(
+                    Q(concept=concept) | Q(legacy_source=concept)
+                ).first()
+                if letter_req is not None:
+                    update_fields = []
+                    if letter_req.concept_id != concept.pk:
+                        letter_req.concept = concept
+                        update_fields.append("concept")
+                    if letter_req.is_open:
+                        letter_req.is_open = False
+                        update_fields.append("is_open")
+                    if not letter_req.is_published and not letter_req.automatically_restricted:
+                        letter_req.is_published = True
+                        update_fields.append("is_published")
+                    if letter_req.requested_visibility != "public":
+                        letter_req.requested_visibility = "public"
+                        update_fields.append("requested_visibility")
+                    if update_fields:
+                        letter_req.save(update_fields=update_fields)
+                else:
+                    has_legacy = LetterRequest.objects.filter(legacy_source=concept).exists()
                     letter_req = LetterRequest.objects.create(
                         prompt=concept.write_prompt,
                         recipient=person,
@@ -110,13 +133,13 @@ def letter_write_claim(request, pk: int):
                         destination_city=dest_city,
                         destination_label=dest_label,
                         concept=concept,
-                        legacy_source=concept,
+                        legacy_source=concept if not has_legacy else None,
                         submitted_by=concept.created_by,
                         owner=concept.created_by,
                         requested_visibility="public",
                         automatically_restricted=False,
                         is_published=True,
-                        is_open=True,
+                        is_open=False,
                     )
 
                 # Create the domain Letter (authored work)
@@ -137,10 +160,6 @@ def letter_write_claim(request, pk: int):
                     is_published=not is_restricted,
                     finalized_at=timezone.now() if not is_restricted else None,
                 )
-
-                if letter_req.is_open:
-                    letter_req.is_open = False
-                    letter_req.save(update_fields=["is_open"])
 
                 # Create physical LetterInstance linked to authored_letter
                 instance = LetterInstance.objects.create(

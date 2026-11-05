@@ -288,3 +288,47 @@ class WorkflowIntegrationTests(TestCase):
         self.assertContains(response, "Production and Review Pipeline")
         self.assertContains(response, reverse("letter_review_queue"))
         self.assertContains(response, reverse("print_queue"))
+
+    def test_desk_claim_on_backfilled_concept_re_uses_request_and_publishes(self):
+        place = Place.objects.create(name="Historical Tavern", city="Newport", kind="bar")
+        person = Person.objects.create(nickname="OldTimer", pirate_place=place, city="Newport")
+        concept = LetterConcept.objects.create(
+            title="Backfilled Letter",
+            write_prompt="Reminiscing old harbor days.",
+            destination_place=place,
+            destination_city="Newport",
+            created_for=person,
+        )
+        # Emulate historical backfill (where legacy_source was set, but concept was null, and is_published was False)
+        backfilled_req = LetterRequest.objects.create(
+            prompt=concept.write_prompt,
+            recipient=person,
+            recipient_alias="OldTimer",
+            destination_place=place,
+            destination_city="Newport",
+            destination_label="Historical Tavern · Newport",
+            legacy_source=concept,
+            concept=None,
+            is_published=False,
+            is_open=True,
+        )
+
+        claim_url = reverse("letter_write_claim", kwargs={"pk": concept.pk})
+        self.client.force_login(self.regular_user)
+        response = self.client.post(claim_url, {"body_text": "Here is a story of the high seas."})
+        self.assertEqual(response.status_code, 302)
+
+        # Ensure no duplicate LetterRequest was created
+        self.assertEqual(LetterRequest.objects.filter(legacy_source=concept).count(), 1)
+        backfilled_req.refresh_from_db()
+        self.assertFalse(backfilled_req.is_open)
+        self.assertTrue(backfilled_req.is_published)
+        self.assertEqual(backfilled_req.concept, concept)
+
+        # Authored letter and physical copy exist
+        letter = Letter.objects.get(request=backfilled_req)
+        self.assertEqual(letter.body_text, "Here is a story of the high seas.")
+        self.assertTrue(letter.is_published)
+        instance = LetterInstance.objects.get(authored_letter=letter)
+        self.assertTrue(instance.is_public)
+        self.assertEqual(instance.status, "waiting_print")
