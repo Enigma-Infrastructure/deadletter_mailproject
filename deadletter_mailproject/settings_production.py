@@ -58,10 +58,25 @@ SECURE_PROXY_SSL_HEADER = (
 )
 USE_X_FORWARDED_HOST = False
 
-# No subdomain or preload commitment in the initial production pass.
-SECURE_HSTS_SECONDS = 0
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-SECURE_HSTS_PRELOAD = False
+def _integer(name, default):
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw.strip())
+    except ValueError:
+        raise ImproperlyConfigured(f"{name} must be an integer.")
+
+
+# HTTP Strict Transport Security (HSTS)
+# Default to 31536000 seconds (1 year) for production SSL.
+SECURE_HSTS_SECONDS = _integer("DJANGO_SECURE_HSTS_SECONDS", 31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _boolean("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", True)
+SECURE_HSTS_PRELOAD = _boolean("DJANGO_SECURE_HSTS_PRELOAD", False)
+
+SILENCED_SYSTEM_CHECKS = []
+if not SECURE_HSTS_PRELOAD:
+    SILENCED_SYSTEM_CHECKS.append("security.W021")
 
 STATIC_ROOT = _absolute_path("DJANGO_STATIC_ROOT", BASE_DIR / "staticfiles")
 MEDIA_ROOT = _absolute_path("DJANGO_MEDIA_ROOT", BASE_DIR / "media")

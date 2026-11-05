@@ -23,6 +23,7 @@ class EnvironmentSettingsTests(SimpleTestCase):
             "'csrf_secure': s.CSRF_COOKIE_SECURE, "
             "'redirect': s.SECURE_SSL_REDIRECT, "
             "'proxy': s.SECURE_PROXY_SSL_HEADER, "
+            "'hsts_seconds': getattr(s, 'SECURE_HSTS_SECONDS', 0), "
             "'database': str(s.DATABASES['default']['NAME'])}))"
         )
         return subprocess.run(
@@ -59,6 +60,7 @@ class EnvironmentSettingsTests(SimpleTestCase):
         self.assertTrue(values["csrf_secure"])
         self.assertTrue(values["redirect"])
         self.assertIsNone(values["proxy"])
+        self.assertEqual(values["hsts_seconds"], 31536000)
 
     def test_production_rejects_missing_or_weak_secret(self):
         for secret in ("", "short", "x" * 60):
