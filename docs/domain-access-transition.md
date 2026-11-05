@@ -1,14 +1,26 @@
 # Domain workflow transition and child-agent handoff
 
-## Last confirmed checkpoint: user-local, 2026-11-03
-Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 2dec5d6: admin changelists, Admin Hub domain links, and serializer tests passing cleanly.
+## Last confirmed checkpoint: user-local, 2026-11-04
+Repository Enigma-Infrastructure/deadletter_mailproject; branch production-readiness. Validated source 376816b:
+- Full test suite: 245 tests (244 passed, 1 skipped concurrency test, 0 failures).
+- Targeted test suites: letters.test_workflow_integration, letters.test_screening_and_ratelimit, letters.test_admin_and_serializers, letters.test_domain_views_cutover, deadletter_mailproject.test_settings passing cleanly.
+- Legacy sources audit: audit_letter_sources --json reports clean schema version 1 state across legacy concepts and new requests.
+- Desk claim fix: re-uses backfilled LetterRequest, handles legacy_source unique constraint cleanly, and excludes closed migrated requests from desk queues.
+- Local dev secret key: deterministic fallback key in settings.py eliminates 'Session data corrupted' on runserver restart while settings_production.py strictly enforces production secret keys.
 
-## Current batch: Roadmap Items E & F (Server-side content screening and shared rate limiting)
+## Completed roadmap items: Items E & F (Server-side content screening and shared rate limiting)
 Consolidated safety and abuse prevention pass:
 1. Sensitive Content Screening (letters/content_screening.py): Deterministic, server-side pattern screening for PII (phones, emails, SSNs, credit cards), external spam URLs, and prohibited harassment terms without external AI transmission or private text mangling/logging.
 2. Workflow Integration: Flagged intake requests and desk letters automatically set automatically_restricted=True and is_published=False, routing them to the staff review queue before print or public release.
 3. Shared Account-Aware Rate Limiting (letters/ratelimit.py): Cache-backed rate limiting utility keying on user IDs for authenticated accounts and client IPs for anonymous visitors, protecting intake, desk authoring, registration, and scans.
 4. Automated Tests: letters/test_screening_and_ratelimit.py covering unit pattern recognition, intake auto-restriction, claim hold cascade, and cache rate limit enforcement.
+5. Claim Provenance & Legacy Safety: letter_write_claim re-uses existing backfilled or dual-written LetterRequest instances, avoiding unique constraint violations on legacy_source and ensuring authored letters are published and open for reading.
+
+## Next roadmap item: Item G (Production deployment readiness checklist for EC2)
+- Validate production settings with `check --deploy --settings=deadletter_mailproject.settings_production`.
+- Confirm static asset collection via `collectstatic`.
+- Verify environment configuration template (.env.production).
+- Document systemd service unit and Nginx reverse proxy configuration.
 
 request_draft_snapshot/letter_draft_snapshot require persisted active approved owner/writer and unpublished record. Return a private envelope {card, edit_token}; card keeps existing field allowlists. Snapshot retrieval uses a transaction/row locks where supported, but performs no SQL data writes. Snapshot availability is not a guarantee of editability: finalization, history and other guards can still prevent saves.
 
