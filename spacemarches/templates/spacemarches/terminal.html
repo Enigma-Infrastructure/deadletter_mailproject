@@ -1,0 +1,257 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Spacemarches Terminal // {{ user.username }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  {# Drop-in hook: add compiled mesh-net CSS bundle here once extracted into spacemarches/static/spacemarches/assets/ #}
+  {# <link rel="stylesheet" href="{% static 'spacemarches/assets/index.css' %}"> #}
+  <style>
+    :root {
+      color-scheme: dark;
+      --term-bg: #070b10;
+      --term-panel: #0f1722;
+      --term-border: #1e293b;
+      --term-fg: #e2e8f0;
+      --term-muted: #94a3b8;
+      --term-accent: #38bdf8;
+      --term-ok: #34d399;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--term-bg);
+      color: var(--term-fg);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .term-topbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.75rem;
+      padding: 0.75rem 1.25rem;
+      background: var(--term-panel);
+      border-bottom: 1px solid var(--term-border);
+      font-size: 0.85rem;
+    }
+    .term-topbar a, .term-topbar button {
+      color: var(--term-fg);
+      background: #162032;
+      border: 1px solid var(--term-border);
+      border-radius: 6px;
+      padding: 0.35rem 0.7rem;
+      text-decoration: none;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 0.8rem;
+    }
+    .term-topbar a:hover, .term-topbar button:hover {
+      border-color: var(--term-accent);
+    }
+    .term-container {
+      flex: 1;
+      padding: 1.5rem;
+      max-width: 1120px;
+      width: 100%;
+      margin: 0 auto;
+    }
+    .term-shell-card {
+      background: var(--term-panel);
+      border: 1px solid var(--term-border);
+      border-radius: 10px;
+      padding: 1.5rem;
+    }
+    .badge-ok { color: var(--term-ok); }
+    .muted { color: var(--term-muted); }
+  </style>
+</head>
+<body>
+  <header class="term-topbar">
+    <div>
+      <strong>MESH-NET TERMINAL</strong>
+      <span class="muted"> // Agent: {{ user.username }} // Slot: {{ slot_name }}</span>
+      <span id="bridge-status" class="badge-ok" style="margin-left: 0.5rem;">[BRIDGE READY]</span>
+    </div>
+    <div style="display: flex; gap: 0.5rem; align-items: center;">
+      <button type="button" id="bridge-manual-sync">Sync Save</button>
+      <a href="{% url 'spacemarches:dossier_list' %}">Character Dossiers</a>
+      <a href="{% url 'spacemarches:portal' %}">Spacemarches Portal</a>
+      <a href="{% url 'home' %}">Deadletter Home</a>
+    </div>
+  </header>
+
+  <main class="term-container">
+    {# Mount root for the incoming mesh-net JS application #}
+    <div id="root" data-spacemarches-terminal="true" data-slot="{{ slot_name }}">
+      <section class="term-shell-card">
+        <h1 style="margin-top: 0; font-size: 1.2rem; color: var(--term-accent);">
+          MESH-NET RUNTIME MOUNT POINT
+        </h1>
+        <p class="muted">
+          Authenticated cloud save bridge is active for slot <code>{{ slot_name }}</code>.
+          Extract the compiled <code>mesh-net</code> bundle into
+          <code>spacemarches/static/spacemarches/assets/</code> and link the CSS/JS entry points in
+          <code>terminal.html</code> (removing <code>sw.js</code> and <code>workbox-*.js</code>).
+        </p>
+        <div style="margin-top: 1rem;">
+          <strong style="font-size: 0.85rem;">Hydrated Cloud State Preview:</strong>
+          <pre id="bridge-state-preview" style="background: #04070b; padding: 0.9rem; border-radius: 6px; border: 1px solid var(--term-border); overflow-x: auto; font-size: 0.8rem;"></pre>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  {{ initial_save|json_script:"spacemarches-initial-save" }}
+
+  <script>
+    (function () {
+      const STORAGE_PREFIX = "spacemarches:";
+      const syncUrl = "{% url 'spacemarches:api_sync' %}";
+      const slotName = "{{ slot_name|escapejs }}";
+      const initialScript = document.getElementById("spacemarches-initial-save");
+      const initialData = initialScript ? JSON.parse(initialScript.textContent || "{}") : {};
+      const statusEl = document.getElementById("bridge-status");
+      const previewEl = document.getElementById("bridge-state-preview");
+
+      function getCookie(name) {
+        const parts = (document.cookie || "").split(";");
+        for (const part of parts) {
+          const trimmed = part.trim();
+          if (trimmed.startsWith(name + "=")) {
+            return decodeURIComponent(trimmed.slice(name.length + 1));
+          }
+        }
+        return "";
+      }
+
+      function snapshotLocalStorage() {
+        const state = {};
+        try {
+          for (let i = 0; i < window.localStorage.length; i++) {
+            const key = window.localStorage.key(i);
+            if (key !== null) {
+              state[key] = window.localStorage.getItem(key);
+            }
+          }
+        } catch (err) {
+          console.warn("SpacemarchesBridge localStorage read unavailable:", err);
+        }
+        return state;
+      }
+
+      function applyStateToLocalStorage(rawState) {
+        if (!rawState || typeof rawState !== "object") return;
+        try {
+          for (const [k, v] of Object.entries(rawState)) {
+            if (typeof v === "string") {
+              originalSetItem(k, v);
+            } else {
+              originalSetItem(k, JSON.stringify(v));
+            }
+          }
+        } catch (err) {
+          console.warn("SpacemarchesBridge hydrate error:", err);
+        }
+      }
+
+      const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+      const originalRemoveItem = window.localStorage.removeItem.bind(window.localStorage);
+
+      let syncTimer = null;
+      let latestSummary = initialData.clearance_summary || {};
+
+      async function syncNow(overrideRawState, overrideSummary) {
+        if (statusEl) statusEl.textContent = "[SYNCING...]";
+        const payload = {
+          slot_name: slotName,
+          raw_state: overrideRawState || snapshotLocalStorage(),
+          clearance_summary: overrideSummary || latestSummary || {}
+        };
+        try {
+          const resp = await fetch(syncUrl, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: JSON.stringify(payload)
+          });
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const data = await resp.json();
+          if (statusEl) statusEl.textContent = "[SYNCED " + (data.updated_at || "") + "]";
+          if (previewEl) previewEl.textContent = JSON.stringify(payload.raw_state, null, 2);
+          return data;
+        } catch (err) {
+          if (statusEl) statusEl.textContent = "[SYNC ERROR]";
+          console.error("SpacemarchesBridge sync failed:", err);
+          throw err;
+        }
+      }
+
+      function scheduleSync() {
+        if (syncTimer) window.clearTimeout(syncTimer);
+        syncTimer = window.setTimeout(() => { syncNow().catch(() => {}); }, 600);
+      }
+
+      window.localStorage.setItem = function (key, value) {
+        originalSetItem(key, value);
+        if (String(key).startsWith(STORAGE_PREFIX) || true) {
+          scheduleSync();
+        }
+      };
+
+      window.localStorage.removeItem = function (key) {
+        originalRemoveItem(key);
+        scheduleSync();
+      };
+
+      // Hydrate from server-injected initial save immediately
+      if (initialData && initialData.exists && initialData.raw_state) {
+        applyStateToLocalStorage(initialData.raw_state);
+      }
+      if (previewEl) {
+        previewEl.textContent = JSON.stringify(initialData.raw_state || {}, null, 2);
+      }
+
+      window.SpacemarchesBridge = {
+        slotName: slotName,
+        syncUrl: syncUrl,
+        getInitialSave: function () { return initialData; },
+        hydrateFromServer: async function () {
+          const resp = await fetch(syncUrl + "?slot=" + encodeURIComponent(slotName), {
+            credentials: "same-origin"
+          });
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          const data = await resp.json();
+          if (data.raw_state) applyStateToLocalStorage(data.raw_state);
+          return data;
+        },
+        sync: function (rawState, clearanceSummary) {
+          if (clearanceSummary) latestSummary = clearanceSummary;
+          return syncNow(rawState, clearanceSummary);
+        },
+        setClearanceSummary: function (summary) {
+          latestSummary = summary || {};
+          scheduleSync();
+        }
+      };
+
+      const manualBtn = document.getElementById("bridge-manual-sync");
+      if (manualBtn) {
+        manualBtn.addEventListener("click", () => {
+          syncNow().catch(() => {});
+        });
+      }
+    })();
+  </script>
+
+  {# Drop-in hook: load compiled mesh-net ES module bundle AFTER window.SpacemarchesBridge #}
+  {# <script type="module" src="{% static 'spacemarches/assets/index.js' %}"></script> #}
+</body>
+</html>

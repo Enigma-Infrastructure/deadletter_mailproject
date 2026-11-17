@@ -62,6 +62,7 @@ INSTALLED_APPS = [
     "letters",
     "topics",
     "media_app",
+    "spacemarches",
 ]
 
 AUTH_USER_MODEL = "accounts.User"
@@ -170,3 +171,7 @@ CACHES = {
 
 LOGIN_URL = "/accounts/login/"
 LOGIN_REDIRECT_URL = "/letters/desk/"
+
+# Spacemarches Discord bot integration (optional)
+DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
+

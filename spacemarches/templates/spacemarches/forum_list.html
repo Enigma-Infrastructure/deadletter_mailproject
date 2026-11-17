@@ -1,0 +1,59 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}Forums | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<h1>Spacemarches Forums</h1>
+<p class="text-muted">Public archive commentary and mission dispatches. Sign in to start a thread or reply.</p>
+
+{% if user.is_authenticated %}
+  <details style="margin: 1rem 0; border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; background: #f8fafc;">
+    <summary style="cursor: pointer; font-weight: 600;">+ Open New Discussion Thread</summary>
+    <form method="post" action="{% url 'spacemarches:forum_new' %}" style="margin-top: 0.85rem;">
+      {% csrf_token %}
+      <div class="form-group">
+        <label for="id_thread_title">Title</label>
+        <input id="id_thread_title" type="text" name="title" required maxlength="255" placeholder="Thread subject or incident title">
+      </div>
+      {% if public_archives %}
+        <div class="form-group">
+          <label for="id_related_archive">Related Archive Entry (optional)</label>
+          <select id="id_related_archive" name="related_archive">
+            <option value="">— None —</option>
+            {% for arch in public_archives %}
+              <option value="{{ arch.slug }}">[{{ arch.classification_level }}] {{ arch.title }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <div class="form-group">
+        <label for="id_thread_body">Body (Markdown supported)</label>
+        <textarea id="id_thread_body" name="body" required rows="5" placeholder="Write your dispatch or analysis..."></textarea>
+      </div>
+      <button type="submit" class="btn">Publish Thread</button>
+    </form>
+  </details>
+{% else %}
+  <p style="margin: 1rem 0;">
+    <a class="btn btn-auth" href="{% url 'login' %}?next={% url 'spacemarches:forum_list' %}">Log in to start a thread</a>
+  </p>
+{% endif %}
+
+{% if threads %}
+  <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+    {% for thread in threads %}
+      <article style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem;">
+        <h2 style="margin: 0 0 0.25rem;"><a href="{% url 'spacemarches:forum_detail' slug=thread.slug %}">{{ thread.title }}</a></h2>
+        <p class="text-muted" style="margin: 0 0 0.4rem;">
+          Started by {{ thread.author|default:"Anonymous" }} &middot; {{ thread.created_at|date:"Y-m-d H:i" }}
+          {% if thread.related_archive and thread.related_archive.is_public %}
+            &middot; Archive: <a href="{% url 'spacemarches:archive_detail' slug=thread.related_archive.slug %}">{{ thread.related_archive.title }}</a>
+          {% endif %}
+        </p>
+        <p style="margin: 0;">{{ thread.body|truncatewords:28 }}</p>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">No forum threads have been posted yet.</p>
+{% endif %}
+{% endblock %}

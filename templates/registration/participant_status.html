@@ -59,5 +59,28 @@
       {% endfor %}
     </ul>
   {% endif %}
+
+  {% if spacemarches_summary %}
+    <h2 style="margin-top: 1.5rem; font-size: 1.2rem;">Spacemarches Agent Summary</h2>
+    <p class="text-muted">
+      Active dossiers: <strong>{{ spacemarches_summary.dossier_count }}</strong> &middot;
+      Cloud save slots: <strong>{{ spacemarches_summary.save_slots_count }}</strong> &middot;
+      Discord: <strong>{% if spacemarches_summary.discord_linked %}Linked{% else %}Not linked{% endif %}</strong>
+    </p>
+    {% if spacemarches_summary.active_dossiers %}
+      <ul style="margin-top: 0.5rem; padding-left: 1.2rem;">
+        {% for d in spacemarches_summary.active_dossiers %}
+          <li>
+            <a href="{% url 'spacemarches:dossier_detail' slug=d.slug %}">{{ d.character_name }}</a>
+            ({{ d.answered_count }} answered)
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <p style="margin-top: 0.5rem;">
+      <a href="{% url 'spacemarches:dossier_list' %}">Open Dossiers</a> &middot;
+      <a href="{% url 'spacemarches:terminal' %}">Open Terminal</a>
+    </p>
+  {% endif %}
 </section>
 {% endblock %}

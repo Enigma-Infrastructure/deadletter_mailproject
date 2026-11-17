@@ -42,6 +42,11 @@ def participant_status(request):
     request.user.refresh_from_db(fields=['participant_status'])
     my_requests = request.user.letter_requests_owned.select_related('recipient', 'destination_place').order_by('-created_at')[:20]
     my_letters = request.user.letters_written.select_related('recipient', 'destination_place', 'request').prefetch_related('instances', 'instances__stamps').order_by('-created_at')[:20]
+    try:
+        from spacemarches.selectors import get_user_spacemarches_summary
+        spacemarches_summary = get_user_spacemarches_summary(request.user)
+    except ImportError:
+        spacemarches_summary = None
     return render(
         request,
         'registration/participant_status.html',
@@ -49,6 +54,7 @@ def participant_status(request):
             'status': request.user.participant_status,
             'my_requests': my_requests,
             'my_letters': my_letters,
+            'spacemarches_summary': spacemarches_summary,
         },
     )
 

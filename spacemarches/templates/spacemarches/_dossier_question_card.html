@@ -1,0 +1,85 @@
+<article
+  class="dossier-card"
+  data-question-id="{{ node.id }}"
+  data-tier="{{ node.tier }}"
+  data-category="{{ node.category }}"
+  data-answered="{% if node.is_answered %}true{% else %}false{% endif %}"
+  data-gm-only="{% if node.is_gm_only %}true{% else %}false{% endif %}"
+  style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 0.85rem; background: {% if node.tier == 'sensitive_appendix' %}#fff8f8{% elif node.tier == 'deep' %}#f8fafc{% else %}#ffffff{% endif %};"
+>
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem;">
+    <div>
+      <code style="font-weight: 700; background: #0f172a; color: #f8fafc; padding: 0.15rem 0.45rem; border-radius: 4px;">[{{ node.id }}]</code>
+      <span class="text-muted" style="font-size: 0.8rem; margin-left: 0.35rem;">{{ node.category }}</span>
+    </div>
+    <div style="display: flex; gap: 0.35rem; align-items: center;">
+      <span style="font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: {% if node.tier == 'sensitive_appendix' %}#fee2e2; color: #991b1b;{% elif node.tier == 'deep' %}#e2e8f0; color: #334155;{% else %}#dbeafe; color: #1e40af;{% endif %}">
+        {% if node.tier == 'sensitive_appendix' %}Sensitive Appendix{% elif node.tier == 'deep' %}Dive Deeper{% else %}Core{% endif %}
+      </span>
+      <span class="card-gm-badge" style="font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: #fef3c7; color: #92400e; {% if not node.is_gm_only %}display: none;{% endif %}">
+        GM Eyes Only
+      </span>
+      <span class="card-save-status text-muted" style="font-size: 0.78rem;">
+        {% if node.is_answered %}Saved{% if node.session_tag %} ({{ node.session_tag }}){% endif %}{% else %}Unanswered{% endif %}
+      </span>
+    </div>
+  </div>
+
+  <p style="font-weight: 600; margin-bottom: 0.3rem;">{{ node.prompt }}</p>
+  {% if node.lore_text %}
+    <p class="text-muted" style="font-size: 0.84rem; margin-bottom: 0.65rem;">{{ node.lore_text }}</p>
+  {% endif %}
+
+  <form class="dossier-answer-form" method="post" action="{% url 'spacemarches:dossier_answer' slug=dossier.slug %}" style="margin: 0;">
+    {% csrf_token %}
+    <input type="hidden" name="question_id" value="{{ node.id }}">
+    <input type="hidden" name="session_tag" class="card-session-tag-input" value="{{ node.session_tag|default:'Session 0' }}">
+    <input type="hidden" name="is_gm_only_present" value="1">
+    <textarea
+      name="answer_text"
+      rows="3"
+      style="min-height: 5.5rem;"
+      placeholder="Write your character's response for [{{ node.id }}]..."
+    >{{ node.answer }}</textarea>
+    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
+      <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.85rem; cursor: pointer;">
+        <input type="checkbox" name="is_gm_only" value="1" {% if node.is_gm_only %}checked{% endif %} style="width: auto;">
+        GM Eyes Only (redact from public exports)
+      </label>
+      <div style="display: flex; align-items: center; gap: 0.5rem;">
+        {% if node.revision_count %}
+          <span class="text-muted" style="font-size: 0.8rem;">{{ node.revision_count }} prior revision{{ node.revision_count|pluralize }}</span>
+        {% endif %}
+        <button type="submit" class="btn" style="padding: 0.35rem 0.85rem; font-size: 0.85rem;">Save Response</button>
+      </div>
+    </div>
+  </form>
+
+  {% if node.revisions %}
+    <details style="margin-top: 0.55rem;">
+      <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">Revision History ({{ node.revisions|length }})</summary>
+      <ul style="margin: 0.4rem 0 0; padding-left: 1.2rem; font-size: 0.82rem;">
+        {% for rev in node.revisions %}
+          <li style="margin-bottom: 0.35rem;">
+            <strong>{{ rev.session_tag|default:"Prior entry" }}</strong>
+            <span class="text-muted">({{ rev.source|default:"web" }} &middot; {{ rev.updated_at }})</span>:
+            {{ rev.answer }}
+          </li>
+        {% endfor %}
+      </ul>
+    </details>
+  {% endif %}
+
+  {% if node.children %}
+    <details class="dive-deeper" style="margin-top: 0.85rem; border-top: 1px dashed var(--border); padding-top: 0.75rem;">
+      <summary style="cursor: pointer; font-weight: 600; font-size: 0.9rem; color: #1e40af;">
+        Dive Deeper ({{ node.children|length }} follow-up prompt{{ node.children|length|pluralize }})
+      </summary>
+      <div style="margin-top: 0.75rem; padding-left: 0.75rem; border-left: 2px solid #cbd5e1;">
+        {% for child in node.children %}
+          {% include "spacemarches/_dossier_question_card.html" with node=child dossier=dossier %}
+        {% endfor %}
+      </div>
+    </details>
+  {% endif %}
+</article>

@@ -16,4 +16,6 @@ urlpatterns = [
     path('scan/<str:number>/', public_stamp_required(letters_views.scan_stamp), name='scan_stamp'),
     path('write/', include('people.urls')),
     path('letters/', include('letters.urls')),
+    path('spacemarches/', include('spacemarches.urls')),
 ]
+

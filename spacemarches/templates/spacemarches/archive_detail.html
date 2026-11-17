@@ -1,0 +1,24 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ entry.title }} | Spacemarches Archives{% endblock %}
+
+{% block spacemarches_content %}
+<p><a href="{% url 'spacemarches:archive_list' %}">&larr; All Declassified Archives</a></p>
+<div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
+  <h1 style="margin-bottom: 0.25rem;">{{ entry.title }}</h1>
+  <span style="font-family: monospace; font-size: 0.85rem; padding: 0.25rem 0.55rem; border-radius: 4px; background: #0f172a; color: #f8fafc;">{{ entry.classification_level }}</span>
+</div>
+<p class="text-muted">Slug: <code>{{ entry.slug }}</code> &middot; Published {{ entry.created_at|date:"Y-m-d" }}</p>
+
+<hr>
+<div>{{ rendered_body|safe }}</div>
+
+{% if related_threads %}
+  <hr>
+  <h2>Related Forum Threads</h2>
+  <ul>
+    {% for thread in related_threads %}
+      <li><a href="{% url 'spacemarches:forum_detail' slug=thread.slug %}">{{ thread.title }}</a></li>
+    {% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

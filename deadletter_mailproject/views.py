@@ -36,6 +36,14 @@ def admin_hub(request):
             {'label': 'Topics', 'url': '/admin/topics/topic/'},
             {'label': 'Media items', 'url': '/admin/media_app/mediaitem/'},
         ]},
+        {'title': 'Spacemarches', 'links': [
+            {'label': 'Spacemarches portal', 'url': '/spacemarches/'},
+            {'label': 'Declassified archives', 'url': '/spacemarches/archives/'},
+            {'label': 'Archive entries (admin)', 'url': '/admin/spacemarches/archiveentry/'},
+            {'label': 'Forum threads (admin)', 'url': '/admin/spacemarches/forumthread/'},
+            {'label': 'Character dossiers (admin)', 'url': '/admin/spacemarches/characterdossier/'},
+            {'label': 'Operation sessions (admin)', 'url': '/admin/spacemarches/operationsession/'},
+        ]},
     ]
     account_links = []
     if can_review_participants(request.user):

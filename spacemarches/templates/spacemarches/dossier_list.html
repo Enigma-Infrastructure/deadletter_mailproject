@@ -1,0 +1,74 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}Character Dossiers | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<h1>Character Dossiers &amp; Discord Link</h1>
+<p class="text-muted">Manage your Eclipse Phase / Spacemarches narrativization dossiers and sync responses between web and Discord.</p>
+
+<div style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin: 1rem 0; background: #f8fafc;">
+  <h2 style="font-size: 1.05rem; margin-bottom: 0.4rem;">Discord Account Link</h2>
+  {% if discord_link and discord_link.discord_user_id %}
+    <p style="margin-bottom: 0.5rem;">
+      Status: <strong style="color: #059669;">Linked</strong> (Discord ID: <code>{{ discord_link.discord_user_id }}</code>,
+      linked {{ discord_link.linked_at|date:"Y-m-d H:i" }})
+    </p>
+  {% elif discord_link and discord_link.link_code %}
+    <p style="margin-bottom: 0.5rem;">
+      Pending link code: <code style="font-size: 1rem; padding: 0.2rem 0.5rem; background: #0f172a; color: #f8fafc; border-radius: 4px;">{{ discord_link.link_code }}</code>
+      — run <code>/link {{ discord_link.link_code }}</code> in Discord.
+    </p>
+  {% else %}
+    <p class="text-muted" style="margin-bottom: 0.5rem;">Not yet linked. Generate a one-time code to bind your Discord user via <code>/link &lt;code&gt;</code>.</p>
+  {% endif %}
+  <form method="post" action="{% url 'spacemarches:generate_discord_code' %}" style="margin: 0;">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-secondary" style="padding: 0.4rem 0.85rem; font-size: 0.85rem;">
+      {% if discord_link and discord_link.link_code %}Regenerate Link Code{% else %}Generate Discord Link Code{% endif %}
+    </button>
+  </form>
+</div>
+
+<details style="margin: 1rem 0; border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem;">
+  <summary style="cursor: pointer; font-weight: 600;">+ Create New Character Dossier</summary>
+  <form method="post" action="{% url 'spacemarches:dossier_list' %}" style="margin-top: 0.85rem;">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="id_character_name">Character Name / Callsign</label>
+      <input id="id_character_name" type="text" name="character_name" required maxlength="160" placeholder="e.g. Dr. Elena Vance // 'Specter'">
+    </div>
+    <div class="form-group">
+      <label for="id_narrative_voice">Narrative Voice</label>
+      <select id="id_narrative_voice" name="narrative_voice">
+        {% for val, label in voice_choices %}
+          <option value="{{ val }}">{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="btn">Initialize Dossier</button>
+  </form>
+</details>
+
+<h2 style="margin-top: 1.25rem;">Your Active Dossiers ({{ dossier_cards|length }})</h2>
+{% if dossier_cards %}
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0.75rem;">
+    {% for card in dossier_cards %}
+      <article style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem;">
+        <h3 style="margin: 0 0 0.25rem;">
+          <a href="{% url 'spacemarches:dossier_detail' slug=card.dossier.slug %}">{{ card.dossier.character_name }}</a>
+        </h3>
+        <p class="text-muted" style="margin: 0 0 0.5rem;">
+          Voice: {{ card.dossier.get_narrative_voice_display }}<br>
+          Core: {{ card.stats.core_answered }}/{{ card.stats.core_total }} &middot;
+          Total: {{ card.stats.answered_count }}/{{ card.stats.total_questions }} ({{ card.stats.completion_percent }}%)
+        </p>
+        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <a class="btn" style="padding: 0.35rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_detail' slug=card.dossier.slug %}">Open Dossier</a>
+          <a class="btn btn-secondary" style="padding: 0.35rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_export' slug=card.dossier.slug %}">Export MD</a>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">You do not have any character dossiers yet. Create one above to begin.</p>
+{% endif %}
+{% endblock %}

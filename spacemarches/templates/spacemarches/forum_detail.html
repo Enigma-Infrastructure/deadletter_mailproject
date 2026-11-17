@@ -1,0 +1,46 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ thread.title }} | Spacemarches Forums{% endblock %}
+
+{% block spacemarches_content %}
+<p><a href="{% url 'spacemarches:forum_list' %}">&larr; All Forum Threads</a></p>
+<h1 style="margin-bottom: 0.25rem;">{{ thread.title }}</h1>
+<p class="text-muted">
+  By {{ thread.author|default:"Anonymous" }} &middot; {{ thread.created_at|date:"Y-m-d H:i" }}
+  {% if thread.related_archive and thread.related_archive.is_public %}
+    &middot; Archive: <a href="{% url 'spacemarches:archive_detail' slug=thread.related_archive.slug %}">{{ thread.related_archive.title }}</a>
+  {% endif %}
+</p>
+
+<div style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin: 1rem 0; background: #f8fafc;">
+  {{ rendered_body|safe }}
+</div>
+
+<h2>Replies ({{ rendered_posts|length }})</h2>
+{% if rendered_posts %}
+  <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1.25rem;">
+    {% for item in rendered_posts %}
+      <article style="border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem;">
+        <div class="text-muted" style="margin-bottom: 0.35rem;">
+          <strong>{{ item.post.author|default:"Anonymous" }}</strong> &middot; {{ item.post.created_at|date:"Y-m-d H:i" }}
+        </div>
+        <div>{{ item.rendered_body|safe }}</div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <p class="text-muted">No replies yet.</p>
+{% endif %}
+
+{% if user.is_authenticated %}
+  <form method="post" action="{% url 'spacemarches:forum_reply' slug=thread.slug %}" style="margin-top: 1rem;">
+    {% csrf_token %}
+    <div class="form-group">
+      <label for="id_reply_body">Add Reply (Markdown supported)</label>
+      <textarea id="id_reply_body" name="body" required rows="4" placeholder="Post a field observation or reply..."></textarea>
+    </div>
+    <button type="submit" class="btn">Post Reply</button>
+  </form>
+{% else %}
+  <p><a class="btn btn-auth" href="{% url 'login' %}?next={% url 'spacemarches:forum_detail' slug=thread.slug %}">Log in to reply</a></p>
+{% endif %}
+{% endblock %}

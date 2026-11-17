@@ -1,0 +1,191 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ dossier.character_name }} | Dossier{% endblock %}
+
+{% block spacemarches_content %}
+<p><a href="{% url 'spacemarches:dossier_list' %}">&larr; All Character Dossiers</a></p>
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
+  <div>
+    <h1 style="margin-bottom: 0.2rem;">{{ dossier.character_name }}</h1>
+    <p class="text-muted" id="dossier-progress-line">
+      Voice: {{ dossier.get_narrative_voice_display }} &middot;
+      Core: <strong id="stat-core">{{ stats.core_answered }}/{{ stats.core_total }}</strong> &middot;
+      Total: <strong id="stat-total">{{ stats.answered_count }}/{{ stats.total_questions }}</strong>
+      (<span id="stat-pct">{{ stats.completion_percent }}</span>%)
+    </p>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_export' slug=dossier.slug %}">Export Markdown</a>
+    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_export' slug=dossier.slug %}?include_private=1">Export incl. GM Only</a>
+  </div>
+</div>
+
+<div style="border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin: 0.85rem 0 1.15rem; background: #f8fafc;">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
+    <div style="display: flex; align-items: center; gap: 0.5rem;">
+      <label for="global-session-tag" style="margin: 0; white-space: nowrap;">Active Session Tag:</label>
+      <select id="global-session-tag" style="width: auto; min-width: 170px; padding: 0.35rem 0.6rem; font-size: 0.88rem;">
+        {% for tag in session_tags %}
+          <option value="{{ tag }}">{{ tag }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <form method="post" action="{% url 'spacemarches:dossier_toggle_sensitive' slug=dossier.slug %}" style="margin: 0;">
+      {% csrf_token %}
+      <button type="submit" class="btn {% if dossier.show_sensitive_appendix %}btn-admin{% else %}btn-secondary{% endif %}" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
+        {% if dossier.show_sensitive_appendix %}
+          Hide Sensitive Appendix (13d1–13d6 Enabled)
+        {% else %}
+          Opt In: Reveal Sensitive Appendix (13d1–13d6)
+        {% endif %}
+      </button>
+    </form>
+  </div>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;" id="dossier-filter-pills">
+    <span class="text-muted" style="font-size: 0.82rem; margin-right: 0.25rem;">Filter:</span>
+    <button type="button" class="btn filter-pill active-pill" data-filter="all" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">All</button>
+    <button type="button" class="btn btn-secondary filter-pill" data-filter="core" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">Core Only</button>
+    <button type="button" class="btn btn-secondary filter-pill" data-filter="unanswered" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">Unanswered</button>
+    <button type="button" class="btn btn-secondary filter-pill" data-filter="gm_only" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">GM Eyes Only</button>
+    <select id="category-filter" style="width: auto; max-width: 240px; padding: 0.28rem 0.55rem; font-size: 0.8rem;">
+      <option value="">All Categories</option>
+      {% for cat in categories %}
+        <option value="{{ cat }}">{{ cat }}</option>
+      {% endfor %}
+    </select>
+  </div>
+</div>
+
+<section id="dossier-cards-container" aria-label="Questionnaire prompts">
+  {% for node in core_nodes %}
+    {% include "spacemarches/_dossier_question_card.html" with node=node dossier=dossier %}
+  {% endfor %}
+</section>
+
+<hr>
+<p class="text-muted" style="font-size: 0.8rem;">{{ attribution_notice }}</p>
+
+<script>
+  (function () {
+    const sessionSelect = document.getElementById("global-session-tag");
+    const categorySelect = document.getElementById("category-filter");
+    const filterButtons = Array.from(document.querySelectorAll(".filter-pill"));
+    let activeMode = "all";
+
+    function applyFilters() {
+      const selectedCategory = categorySelect ? categorySelect.value : "";
+      const cards = Array.from(document.querySelectorAll(".dossier-card"));
+
+      cards.forEach((card) => {
+        const tier = card.dataset.tier || "core";
+        const cat = card.dataset.category || "";
+        const answered = card.dataset.answered === "true";
+        const gmOnly = card.dataset.gmOnly === "true";
+
+        let matches = true;
+        if (activeMode === "core" && tier !== "core") matches = false;
+        if (activeMode === "unanswered" && answered) matches = false;
+        if (activeMode === "gm_only" && !gmOnly) matches = false;
+        if (selectedCategory && cat !== selectedCategory) matches = false;
+
+        const hasMatchingDescendant =
+          activeMode !== "core" &&
+          Array.from(card.querySelectorAll(".dossier-card")).some((child) => {
+            const cCat = child.dataset.category || "";
+            const cAns = child.dataset.answered === "true";
+            const cGm = child.dataset.gmOnly === "true";
+            let ok = true;
+            if (activeMode === "unanswered" && cAns) ok = false;
+            if (activeMode === "gm_only" && !cGm) ok = false;
+            if (selectedCategory && cCat !== selectedCategory) ok = false;
+            return ok;
+          });
+
+        card.style.display = (matches || hasMatchingDescendant) ? "" : "none";
+        if (hasMatchingDescendant && (activeMode !== "all" || selectedCategory)) {
+          card.querySelectorAll("details.dive-deeper").forEach((d) => { d.open = true; });
+        }
+      });
+    }
+
+    filterButtons.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeMode = btn.dataset.filter || "all";
+        filterButtons.forEach((b) => {
+          b.classList.toggle("btn-secondary", b !== btn);
+        });
+        applyFilters();
+      });
+    });
+
+    if (categorySelect) {
+      categorySelect.addEventListener("change", applyFilters);
+    }
+
+    if (sessionSelect) {
+      const syncTag = () => {
+        document.querySelectorAll(".card-session-tag-input").forEach((inp) => {
+          inp.value = sessionSelect.value;
+        });
+      };
+      sessionSelect.addEventListener("change", syncTag);
+      syncTag();
+    }
+
+    document.querySelectorAll(".dossier-answer-form").forEach((form) => {
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const card = form.closest(".dossier-card");
+        const statusBadge = card.querySelector(".card-save-status");
+        const gmBadge = card.querySelector(".card-gm-badge");
+        const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        const qid = form.querySelector('input[name="question_id"]').value;
+        const answerText = form.querySelector('textarea[name="answer_text"]').value;
+        const gmCheckbox = form.querySelector('input[name="is_gm_only"]');
+        const sessionTag = sessionSelect ? sessionSelect.value : form.querySelector('input[name="session_tag"]').value;
+
+        if (statusBadge) statusBadge.textContent = "Saving...";
+        try {
+          const resp = await fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrfInput ? csrfInput.value : "",
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+              question_id: qid,
+              answer_text: answerText,
+              session_tag: sessionTag,
+              is_gm_only: gmCheckbox ? gmCheckbox.checked : false
+            })
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || "Save failed");
+
+          card.dataset.answered = answerText.trim() ? "true" : "false";
+          card.dataset.gmOnly = data.is_gm_only ? "true" : "false";
+          if (gmBadge) gmBadge.style.display = data.is_gm_only ? "" : "none";
+          if (statusBadge) {
+            statusBadge.textContent = answerText.trim()
+              ? ("Saved (" + (sessionTag || "Updated") + ")")
+              : "Cleared";
+          }
+          const coreEl = document.getElementById("stat-core");
+          const totalEl = document.getElementById("stat-total");
+          const pctEl = document.getElementById("stat-pct");
+          if (coreEl) coreEl.textContent = data.core_answered + "/" + data.core_total;
+          if (totalEl) totalEl.textContent = data.answered_count + "/" + data.total_questions;
+          if (pctEl) pctEl.textContent = String(data.completion_percent);
+        } catch (err) {
+          if (statusBadge) statusBadge.textContent = "Error saving";
+          console.error("Dossier save failed:", err);
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}
