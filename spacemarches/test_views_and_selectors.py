@@ -184,8 +184,17 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
         self.assertTrue(summary["authenticated"])
         self.assertEqual(summary["dossier_count"], 1)
         self.assertEqual(summary["unlocked_logs"], ["LOG-009"])
+        self.assertEqual(summary["active_dossiers"][0]["character_name"], "Cassian Mire")
+
+        home_resp = self.client.get(reverse("home"))
+        self.assertEqual(home_resp.status_code, 200)
+        self.assertNotContains(home_resp, "/spacemarches/")
 
         status_resp = self.client.get(reverse("participant_status"))
         self.assertEqual(status_resp.status_code, 200)
-        self.assertContains(status_resp, "Spacemarches Agent Summary")
-        self.assertContains(status_resp, "Cassian Mire")
+        self.assertNotContains(status_resp, "/spacemarches/")
+
+        portal_resp = self.client.get(reverse("spacemarches:portal"))
+        self.assertEqual(portal_resp.status_code, 200)
+        self.assertNotContains(portal_resp, "/write/request/")
+

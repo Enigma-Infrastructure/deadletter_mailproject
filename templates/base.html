@@ -17,7 +17,6 @@
         <a class="btn" href="/letters/read/">Read</a>
         <a class="btn" href="/letters/desk/">Desk</a>
         <a class="btn btn-secondary" href="/scan/">Scan</a>
-        <a class="btn btn-secondary" href="{% url 'spacemarches:portal' %}">Spacemarches</a>
         {% if user.is_authenticated %}
           <a class="btn btn-secondary" href="{% url 'leaderboard' %}">Leaderboard</a>
           <a class="btn btn-auth" href="{% url 'participant_status' %}">Account status</a>
