@@ -98,6 +98,11 @@ class DiscordBotTests(TestCase):
         sub_names = {sub.name for sub in dossier_group.commands}
         self.assertEqual(sub_names, {"open", "swap", "list", "create"})
 
+        intake_cmd = next(cmd for cmd in client.tree.get_commands() if cmd.name == "intake")
+        cat_param = next(p for p in intake_cmd.parameters if p.name == "category")
+        self.assertGreaterEqual(len(cat_param.choices), 20)
+        self.assertIn("Campaign Hooks", [c.value for c in cat_param.choices])
+
     def test_slash_link_and_intake_and_modal_save(self):
         code = generate_discord_link_code(self.user)
         interaction = _mock_interaction("555000111")

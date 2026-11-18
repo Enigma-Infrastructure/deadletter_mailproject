@@ -1455,10 +1455,15 @@ async def handle_debrief_command(
 # --------------------------------------------------
 
 
-def build_bot() -> discord.Client:
+def build_bot(*, guild_id: int | None = None) -> discord.Client:
     intents = discord.Intents.default()
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
+
+    _category_choices = [
+        app_commands.Choice(name=cat[:100], value=cat[:100])
+        for cat in get_categories(include_sensitive=False)[:25]
+    ]
 
     async def _character_autocomplete(
         interaction: discord.Interaction,
@@ -1476,17 +1481,6 @@ def build_bot() -> discord.Client:
             value = d.slug if len(d.slug) <= 100 else str(d.pk)
             choices.append(app_commands.Choice(name=label, value=value))
         return choices[:25]
-
-    async def _category_autocomplete(
-        interaction: discord.Interaction,
-        current: str,
-    ) -> list[app_commands.Choice[str]]:
-        cur = (current or "").lower()
-        return [
-            app_commands.Choice(name=cat[:100], value=cat[:100])
-            for cat in get_categories(include_sensitive=False)
-            if cur in cat.lower()
-        ][:25]
 
     @tree.command(name="link", description="Link your Discord account to your Spacemarches account.")
     @app_commands.describe(code="One-time link code generated from /spacemarches/dossier/")
@@ -1531,7 +1525,8 @@ def build_bot() -> discord.Client:
         category="Optional category filter",
         delivery="When targeting a member: send via DM (with channel fallback) or post in channel",
     )
-    @app_commands.autocomplete(character=_character_autocomplete, category=_category_autocomplete)
+    @app_commands.autocomplete(character=_character_autocomplete)
+    @app_commands.choices(category=_category_choices)
     async def intake_cmd(
         interaction: discord.Interaction,
         member: discord.Member | None = None,
@@ -1573,7 +1568,12 @@ def build_bot() -> discord.Client:
 
     @client.event
     async def on_ready():
-        await tree.sync()
+        if guild_id:
+            guild_obj = discord.Object(id=int(guild_id))
+            tree.copy_global_to(guild=guild_obj)
+            await tree.sync(guild=guild_obj)
+        else:
+            await tree.sync()
 
     client.tree = tree
     return client
@@ -1588,6 +1588,11 @@ class Command(BaseCommand):
             default="",
             help="Discord bot token override (defaults to settings.DISCORD_BOT_TOKEN / env DISCORD_BOT_TOKEN).",
         )
+        parser.add_argument(
+            "--guild-id",
+            default="",
+            help="Optional Discord server (guild) ID for instant slash-command sync (defaults to env DISCORD_GUILD_ID).",
+        )
 
     def handle(self, *args, **options):
         token = (
@@ -1600,6 +1605,18 @@ class Command(BaseCommand):
                 "DISCORD_BOT_TOKEN is not configured. Set DISCORD_BOT_TOKEN in the environment or pass --token."
             )
 
-        bot = build_bot()
+        raw_guild_id = (
+            options.get("guild_id")
+            or getattr(settings, "DISCORD_GUILD_ID", "")
+            or os.environ.get("DISCORD_GUILD_ID", "")
+        )
+        guild_id: int | None = None
+        if str(raw_guild_id or "").strip():
+            try:
+                guild_id = int(str(raw_guild_id).strip())
+            except ValueError as err:
+                raise CommandError(f"Invalid guild ID '{raw_guild_id}': must be a numeric Discord server ID.") from err
+
+        bot = build_bot(guild_id=guild_id)
         self.stdout.write(self.style.SUCCESS("Starting Spacemarches Discord bot..."))
         bot.run(token)
