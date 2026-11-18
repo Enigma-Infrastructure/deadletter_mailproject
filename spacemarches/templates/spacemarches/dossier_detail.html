@@ -20,42 +20,116 @@
   </div>
 </div>
 
-<div style="border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin: 0.85rem 0 1.15rem; background: #f8fafc;">
-  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.75rem; margin-bottom: 0.75rem;">
-    <div style="display: flex; align-items: center; gap: 0.5rem;">
-      <label for="global-session-tag" style="margin: 0; white-space: nowrap;">Active Session Tag:</label>
-      <select id="global-session-tag" style="width: auto; min-width: 170px; padding: 0.35rem 0.6rem; font-size: 0.88rem;">
-        {% for tag in session_tags %}
-          <option value="{{ tag }}">{{ tag }}</option>
-        {% endfor %}
-      </select>
+<div style="border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin: 0.85rem 0 1rem; background: #f8fafc;">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem; margin-bottom: 0.65rem;">
+    <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;">
+      <div>
+        <label for="global-entry-kind" style="display: block; margin-bottom: 0.2rem; font-size: 0.8rem; font-weight: 600;">Tracking Mode</label>
+        <select id="global-entry-kind" style="width: auto; min-width: 195px; padding: 0.35rem 0.6rem; font-size: 0.88rem;">
+          {% for value, label in entry_kind_choices %}
+            <option value="{{ value }}" {% if value == default_entry_kind %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label for="global-stardate-era" style="display: block; margin-bottom: 0.2rem; font-size: 0.8rem; font-weight: 600;">Changes as of Stardate</label>
+        <select id="global-stardate-era" style="width: auto; min-width: 215px; padding: 0.35rem 0.6rem; font-size: 0.88rem;">
+          {% for value, label in stardate_era_choices %}
+            <option value="{{ value }}" {% if value == default_stardate_era %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div id="global-sol-date-wrap" style="{% if default_stardate_era != 'post_fall' %}display: none;{% endif %}">
+        <label for="global-sol-date" style="display: block; margin-bottom: 0.2rem; font-size: 0.8rem; font-weight: 600;">Post-Fall Sol-Date (0.000&ndash;10.000+)</label>
+        <input
+          type="text"
+          id="global-sol-date"
+          list="dossier-sol-numbers"
+          value="{{ default_sol_number }}"
+          placeholder="e.g. 0.000 or 4.250"
+          style="width: 155px; padding: 0.35rem 0.6rem; font-size: 0.88rem;"
+        >
+        <datalist id="dossier-sol-numbers">
+          {% for sol in progression.post_fall_sol_numbers %}
+            <option value="{{ sol }}"></option>
+          {% endfor %}
+        </datalist>
+      </div>
     </div>
 
     <form method="post" action="{% url 'spacemarches:dossier_toggle_sensitive' slug=dossier.slug %}" style="margin: 0;">
       {% csrf_token %}
       <button type="submit" class="btn {% if dossier.show_sensitive_appendix %}btn-admin{% else %}btn-secondary{% endif %}" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
         {% if dossier.show_sensitive_appendix %}
-          Hide Sensitive Appendix (13d1–13d6 Enabled)
+          Hide Sensitive Appendix (13d1&ndash;13d6 Enabled)
         {% else %}
-          Opt In: Reveal Sensitive Appendix (13d1–13d6)
+          Opt In: Reveal Sensitive Appendix (13d1&ndash;13d6)
         {% endif %}
       </button>
     </form>
   </div>
 
+  <p class="text-muted" style="font-size: 0.78rem; margin-bottom: 0.7rem;" id="stardate-helper-text">
+    Saving appends a versioned <code>date_v(x)</code> snapshot (<code>Pre-Fall_v1</code>, <code>Fall_v1</code>, or <code>Sol 1.250_v1</code>) and displays it by default over earlier entries without overwriting or deleting history.
+  </p>
+
   <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;" id="dossier-filter-pills">
     <span class="text-muted" style="font-size: 0.82rem; margin-right: 0.25rem;">Filter:</span>
-    <button type="button" class="btn filter-pill active-pill" data-filter="all" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">All</button>
-    <button type="button" class="btn btn-secondary filter-pill" data-filter="core" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">Core Only</button>
+    <button type="button" class="btn filter-pill active-pill" data-filter="core" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">Core Only ({{ core_question_count }})</button>
+    <button type="button" class="btn btn-secondary filter-pill" data-filter="all" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">All Prompts ({{ all_question_count }})</button>
     <button type="button" class="btn btn-secondary filter-pill" data-filter="unanswered" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">Unanswered</button>
-    <button type="button" class="btn btn-secondary filter-pill" data-filter="gm_only" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">GM Eyes Only</button>
-    <select id="category-filter" style="width: auto; max-width: 240px; padding: 0.28rem 0.55rem; font-size: 0.8rem;">
+    <button type="button" class="btn btn-secondary filter-pill" data-filter="gm_only" style="padding: 0.28rem 0.65rem; font-size: 0.8rem;">GM Eyes Only (<span id="gm-only-count">{{ stats.gm_only_count }}</span>)</button>
+    <select id="entry-kind-filter" style="width: auto; padding: 0.28rem 0.55rem; font-size: 0.8rem;">
+      <option value="">All Tracking Modes</option>
+      {% for value, label in entry_kind_choices %}
+        <option value="{{ value }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <select id="category-filter" style="width: auto; max-width: 220px; padding: 0.28rem 0.55rem; font-size: 0.8rem;">
       <option value="">All Categories</option>
       {% for cat in categories %}
         <option value="{{ cat }}">{{ cat }}</option>
       {% endfor %}
     </select>
+    <label style="display: inline-flex; align-items: center; gap: 0.3rem; margin: 0 0 0 auto; font-size: 0.8rem; cursor: pointer;">
+      <input type="checkbox" id="redact-gm-preview" style="width: auto;">
+      Preview GM Redaction
+    </label>
   </div>
+</div>
+
+{% if progression.timeline %}
+  <details style="border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 1rem; background: #ffffff;">
+    <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem;">
+      Character Progression Log ({{ progression.total_versions }} saved snapshot{{ progression.total_versions|pluralize }})
+    </summary>
+    <ul style="margin: 0.65rem 0 0; padding-left: 1.2rem; font-size: 0.83rem;">
+      {% for item in progression.timeline %}
+        <li style="margin-bottom: 0.4rem;">
+          <strong><code>[{{ item.question_id }}]</code> {{ item.version_label }}</strong>
+          &middot; {{ item.entry_kind_label }}
+          {% if item.is_current %}<span style="font-size: 0.74rem; color: #166534;">(Current Default)</span>{% endif %}
+          {% if item.is_gm_only %}<span style="font-size: 0.74rem; color: #92400e;">[GM Eyes Only]</span>{% endif %}
+          <span class="text-muted">&mdash; {{ item.prompt|truncatechars:70 }}</span>
+          <button
+            type="button"
+            class="btn btn-secondary jump-stardate-btn"
+            data-entry-kind="{{ item.entry_kind }}"
+            data-stardate-era="{{ item.stardate_era }}"
+            data-sol-number="{{ item.sol_number }}"
+            data-question-id="{{ item.question_id }}"
+            style="padding: 0.1rem 0.45rem; font-size: 0.73rem; margin-left: 0.35rem;"
+          >Load Stardate</button>
+        </li>
+      {% endfor %}
+    </ul>
+  </details>
+{% endif %}
+
+<div id="filter-empty-notice" style="display: none; border: 1px dashed var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background: #f8fafc; color: #475569; font-size: 0.9rem;">
+  No prompts match the current filter. If filtering by <strong>GM Eyes Only</strong>, check <em>"GM Eyes Only (redact from public exports)"</em> on one or more prompt cards first.
 </div>
 
 <section id="dossier-cards-container" aria-label="Questionnaire prompts">
@@ -69,82 +143,337 @@
 
 <script>
   (function () {
-    const sessionSelect = document.getElementById("global-session-tag");
+    const entryKindSelect = document.getElementById("global-entry-kind");
+    const eraSelect = document.getElementById("global-stardate-era");
+    const solWrap = document.getElementById("global-sol-date-wrap");
+    const solInput = document.getElementById("global-sol-date");
     const categorySelect = document.getElementById("category-filter");
+    const entryKindFilter = document.getElementById("entry-kind-filter");
+    const redactPreviewCheckbox = document.getElementById("redact-gm-preview");
+    const emptyNotice = document.getElementById("filter-empty-notice");
+    const gmOnlyCountEl = document.getElementById("gm-only-count");
     const filterButtons = Array.from(document.querySelectorAll(".filter-pill"));
-    let activeMode = "all";
+    let activeMode = "core";
+
+    function syncStardateControls() {
+      const era = eraSelect ? eraSelect.value : "pre_fall";
+      if (solWrap) {
+        solWrap.style.display = era === "post_fall" ? "" : "none";
+      }
+      if (solInput) {
+        solInput.disabled = era !== "post_fall";
+      }
+      document.querySelectorAll(".card-entry-kind-input").forEach((inp) => {
+        if (entryKindSelect) inp.value = entryKindSelect.value;
+      });
+      document.querySelectorAll(".card-stardate-era-input").forEach((inp) => {
+        if (eraSelect) inp.value = eraSelect.value;
+      });
+      document.querySelectorAll(".card-sol-date-input").forEach((inp) => {
+        if (solInput) inp.value = era === "post_fall" ? solInput.value : "";
+      });
+    }
+
+    function applyRedactionPreview() {
+      const redact = redactPreviewCheckbox ? redactPreviewCheckbox.checked : false;
+      document.querySelectorAll(".dossier-card").forEach((card) => {
+        const gmOnly = card.dataset.gmOnly === "true";
+        const shouldMask = redact && gmOnly;
+        const notice = card.querySelector(":scope > .card-redacted-notice");
+        const inputWrap = card.querySelector(":scope > form .dossier-answer-input-wrap");
+        const revContainer = card.querySelector(":scope > .card-revision-container");
+        if (notice) notice.style.display = shouldMask ? "" : "none";
+        if (inputWrap) inputWrap.style.display = shouldMask ? "none" : "";
+        if (revContainer) revContainer.style.display = shouldMask ? "none" : "";
+      });
+    }
+
+    function cardMatchesFilter(card) {
+      const tier = card.dataset.tier || "core";
+      const cat = card.dataset.category || "";
+      const answered = card.dataset.answered === "true";
+      const gmOnly = card.dataset.gmOnly === "true";
+      const kind = card.dataset.entryKind || "";
+      const selectedCategory = categorySelect ? categorySelect.value : "";
+      const selectedKind = entryKindFilter ? entryKindFilter.value : "";
+
+      if (activeMode === "core" && tier !== "core") return false;
+      if (activeMode === "unanswered" && answered) return false;
+      if (activeMode === "gm_only" && !gmOnly) return false;
+      if (selectedCategory && cat !== selectedCategory) return false;
+      if (selectedKind && kind !== selectedKind) return false;
+      return true;
+    }
 
     function applyFilters() {
       const selectedCategory = categorySelect ? categorySelect.value : "";
+      const selectedKind = entryKindFilter ? entryKindFilter.value : "";
       const cards = Array.from(document.querySelectorAll(".dossier-card"));
 
+      document.querySelectorAll("details.dive-deeper").forEach((d) => {
+        d.style.display = activeMode === "core" ? "none" : "";
+      });
+
+      let visibleTopCount = 0;
       cards.forEach((card) => {
-        const tier = card.dataset.tier || "core";
-        const cat = card.dataset.category || "";
-        const answered = card.dataset.answered === "true";
-        const gmOnly = card.dataset.gmOnly === "true";
-
-        let matches = true;
-        if (activeMode === "core" && tier !== "core") matches = false;
-        if (activeMode === "unanswered" && answered) matches = false;
-        if (activeMode === "gm_only" && !gmOnly) matches = false;
-        if (selectedCategory && cat !== selectedCategory) matches = false;
-
+        const matches = cardMatchesFilter(card);
+        const childCards = Array.from(card.querySelectorAll(".dossier-card"));
         const hasMatchingDescendant =
           activeMode !== "core" &&
-          Array.from(card.querySelectorAll(".dossier-card")).some((child) => {
-            const cCat = child.dataset.category || "";
-            const cAns = child.dataset.answered === "true";
-            const cGm = child.dataset.gmOnly === "true";
-            let ok = true;
-            if (activeMode === "unanswered" && cAns) ok = false;
-            if (activeMode === "gm_only" && !cGm) ok = false;
-            if (selectedCategory && cCat !== selectedCategory) ok = false;
-            return ok;
-          });
+          childCards.some((child) => cardMatchesFilter(child));
 
-        card.style.display = (matches || hasMatchingDescendant) ? "" : "none";
-        if (hasMatchingDescendant && (activeMode !== "all" || selectedCategory)) {
+        const visible = matches || hasMatchingDescendant;
+        card.style.display = visible ? "" : "none";
+        if (!card.parentElement.closest(".dossier-card") && visible) {
+          visibleTopCount += 1;
+        }
+        if (hasMatchingDescendant && (activeMode !== "all" || selectedCategory || selectedKind)) {
           card.querySelectorAll("details.dive-deeper").forEach((d) => { d.open = true; });
         }
       });
+
+      if (emptyNotice) {
+        emptyNotice.style.display = visibleTopCount === 0 ? "" : "none";
+      }
+      applyRedactionPreview();
+    }
+
+    function renderRevisionHistory(card, revisions) {
+      const container = card.querySelector(":scope > .card-revision-container");
+      const countEl = card.querySelector(":scope > form .card-revision-count");
+      if (countEl) {
+        if (revisions && revisions.length > 0) {
+          countEl.textContent = revisions.length + " prior version" + (revisions.length === 1 ? "" : "s");
+          countEl.style.display = "";
+        } else {
+          countEl.textContent = "";
+          countEl.style.display = "none";
+        }
+      }
+      if (!container) return;
+      container.innerHTML = "";
+      if (!revisions || revisions.length === 0) return;
+
+      const details = document.createElement("details");
+      details.className = "card-revision-history";
+      details.style.marginTop = "0.55rem";
+
+      const summary = document.createElement("summary");
+      summary.className = "text-muted";
+      summary.style.cursor = "pointer";
+      summary.style.fontSize = "0.8rem";
+      summary.textContent = "Progression History (" + revisions.length + " prior version" + (revisions.length === 1 ? "" : "s") + ")";
+      details.appendChild(summary);
+
+      const ul = document.createElement("ul");
+      ul.style.margin = "0.4rem 0 0";
+      ul.style.paddingLeft = "1.2rem";
+      ul.style.fontSize = "0.82rem";
+
+      revisions.forEach((rev) => {
+        const li = document.createElement("li");
+        li.style.marginBottom = "0.45rem";
+
+        const strong = document.createElement("strong");
+        strong.textContent = rev.version_label || rev.sol_date || "Prior";
+        li.appendChild(strong);
+
+        const kindSpan = document.createElement("span");
+        kindSpan.textContent = " \u00b7 " + (rev.entry_kind_label || "");
+        li.appendChild(kindSpan);
+
+        const metaSpan = document.createElement("span");
+        metaSpan.className = "text-muted";
+        metaSpan.textContent = " (" + (rev.source || "web") + " \u00b7 " + (rev.updated_at || "") + "): ";
+        li.appendChild(metaSpan);
+
+        const ansSpan = document.createElement("span");
+        ansSpan.textContent = rev.answer || "";
+        li.appendChild(ansSpan);
+
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btn btn-secondary clarify-version-btn";
+        btn.dataset.entryKind = rev.entry_kind || "character_creation";
+        btn.dataset.stardateEra = rev.stardate_era || "pre_fall";
+        btn.dataset.solNumber = rev.sol_number || "";
+        btn.dataset.answer = rev.answer || "";
+        btn.style.padding = "0.12rem 0.45rem";
+        btn.style.fontSize = "0.74rem";
+        btn.style.marginLeft = "0.35rem";
+        btn.textContent = "Clarify this Stardate";
+        li.appendChild(btn);
+
+        ul.appendChild(li);
+      });
+
+      details.appendChild(ul);
+      container.appendChild(details);
+    }
+
+    function updateCardAfterSave(card, data) {
+      const answered = Boolean(data.version_label);
+      card.dataset.answered = answered ? "true" : "false";
+      card.dataset.gmOnly = data.is_gm_only ? "true" : "false";
+      card.style.borderColor = data.is_gm_only ? "#f59e0b" : "var(--border)";
+      if (answered) {
+        card.dataset.entryKind = data.entry_kind || "";
+        card.dataset.stardateEra = data.stardate_era || "";
+        card.dataset.solDate = data.sol_date || "";
+      }
+
+      const gmBadge = card.querySelector(":scope > div .card-gm-badge");
+      if (gmBadge) gmBadge.style.display = data.is_gm_only ? "" : "none";
+
+      const verBadge = card.querySelector(":scope > div .card-version-badge");
+      if (verBadge) {
+        if (answered) {
+          verBadge.textContent = data.entry_kind_label + " \u00b7 " + data.version_label;
+          verBadge.style.display = "";
+          if (data.entry_kind === "post_action_report") {
+            verBadge.style.background = "#dcfce7";
+            verBadge.style.color = "#166534";
+          } else {
+            verBadge.style.background = "#ede9fe";
+            verBadge.style.color = "#5b21b6";
+          }
+        } else {
+          verBadge.style.display = "none";
+        }
+      }
+
+      const statusBadge = card.querySelector(":scope > div .card-save-status");
+      if (statusBadge) {
+        statusBadge.textContent = answered ? ("Saved (" + data.version_label + ")") : "Unanswered";
+      }
+
+      if (Array.isArray(data.revisions)) {
+        renderRevisionHistory(card, data.revisions);
+      }
+
+      const coreEl = document.getElementById("stat-core");
+      const totalEl = document.getElementById("stat-total");
+      const pctEl = document.getElementById("stat-pct");
+      if (coreEl) coreEl.textContent = data.core_answered + "/" + data.core_total;
+      if (totalEl) totalEl.textContent = data.answered_count + "/" + data.total_questions;
+      if (pctEl) pctEl.textContent = String(data.completion_percent);
+      if (gmOnlyCountEl && typeof data.gm_only_count === "number") {
+        gmOnlyCountEl.textContent = String(data.gm_only_count);
+      }
+
+      applyFilters();
     }
 
     filterButtons.forEach((btn) => {
       btn.addEventListener("click", () => {
-        activeMode = btn.dataset.filter || "all";
+        activeMode = btn.dataset.filter || "core";
         filterButtons.forEach((b) => {
           b.classList.toggle("btn-secondary", b !== btn);
+          b.classList.toggle("active-pill", b === btn);
         });
         applyFilters();
       });
     });
 
-    if (categorySelect) {
-      categorySelect.addEventListener("change", applyFilters);
-    }
+    if (categorySelect) categorySelect.addEventListener("change", applyFilters);
+    if (entryKindFilter) entryKindFilter.addEventListener("change", applyFilters);
+    if (redactPreviewCheckbox) redactPreviewCheckbox.addEventListener("change", applyRedactionPreview);
+    if (entryKindSelect) entryKindSelect.addEventListener("change", syncStardateControls);
+    if (eraSelect) eraSelect.addEventListener("change", syncStardateControls);
+    if (solInput) solInput.addEventListener("input", syncStardateControls);
 
-    if (sessionSelect) {
-      const syncTag = () => {
-        document.querySelectorAll(".card-session-tag-input").forEach((inp) => {
-          inp.value = sessionSelect.value;
-        });
-      };
-      sessionSelect.addEventListener("change", syncTag);
-      syncTag();
-    }
+    document.addEventListener("click", (event) => {
+      const clarifyBtn = event.target.closest(".clarify-version-btn");
+      if (clarifyBtn) {
+        if (entryKindSelect && clarifyBtn.dataset.entryKind) {
+          entryKindSelect.value = clarifyBtn.dataset.entryKind;
+        }
+        if (eraSelect && clarifyBtn.dataset.stardateEra) {
+          eraSelect.value = clarifyBtn.dataset.stardateEra;
+        }
+        if (solInput && clarifyBtn.dataset.solNumber) {
+          solInput.value = clarifyBtn.dataset.solNumber;
+        }
+        syncStardateControls();
+        const card = clarifyBtn.closest(".dossier-card");
+        const textarea = card ? card.querySelector('textarea[name="answer_text"]') : null;
+        if (textarea) {
+          textarea.value = clarifyBtn.dataset.answer || "";
+          textarea.focus();
+        }
+        return;
+      }
+
+      const jumpBtn = event.target.closest(".jump-stardate-btn");
+      if (jumpBtn) {
+        if (entryKindSelect && jumpBtn.dataset.entryKind) {
+          entryKindSelect.value = jumpBtn.dataset.entryKind;
+        }
+        if (eraSelect && jumpBtn.dataset.stardateEra) {
+          eraSelect.value = jumpBtn.dataset.stardateEra;
+        }
+        if (solInput && jumpBtn.dataset.solNumber) {
+          solInput.value = jumpBtn.dataset.solNumber;
+        }
+        syncStardateControls();
+        const qid = jumpBtn.dataset.questionId;
+        const targetCard = qid ? document.querySelector('.dossier-card[data-question-id="' + qid + '"]') : null;
+        if (targetCard) {
+          if (targetCard.dataset.tier !== "core") {
+            const allBtn = document.querySelector('.filter-pill[data-filter="all"]');
+            if (allBtn) allBtn.click();
+            const parentDetails = targetCard.closest("details.dive-deeper");
+            if (parentDetails) parentDetails.open = true;
+          }
+          targetCard.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }
+    });
 
     document.querySelectorAll(".dossier-answer-form").forEach((form) => {
+      const gmCheckbox = form.querySelector('input[name="is_gm_only"]');
+      if (gmCheckbox) {
+        gmCheckbox.addEventListener("change", async () => {
+          const card = form.closest(".dossier-card");
+          const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+          const qid = form.querySelector('input[name="question_id"]').value;
+          const statusBadge = card.querySelector(":scope > div .card-save-status");
+          try {
+            const resp = await fetch(form.action, {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfInput ? csrfInput.value : "",
+                "X-Requested-With": "XMLHttpRequest"
+              },
+              body: JSON.stringify({
+                question_id: qid,
+                privacy_only: true,
+                is_gm_only: gmCheckbox.checked
+              })
+            });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || "Privacy update failed");
+            updateCardAfterSave(card, data);
+          } catch (err) {
+            if (statusBadge) statusBadge.textContent = err.message || "Error updating privacy";
+          }
+        });
+      }
+
       form.addEventListener("submit", async (event) => {
         event.preventDefault();
         const card = form.closest(".dossier-card");
-        const statusBadge = card.querySelector(".card-save-status");
-        const gmBadge = card.querySelector(".card-gm-badge");
+        const statusBadge = card.querySelector(":scope > div .card-save-status");
         const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
         const qid = form.querySelector('input[name="question_id"]').value;
         const answerText = form.querySelector('textarea[name="answer_text"]').value;
-        const gmCheckbox = form.querySelector('input[name="is_gm_only"]');
-        const sessionTag = sessionSelect ? sessionSelect.value : form.querySelector('input[name="session_tag"]').value;
+        const entryKind = entryKindSelect ? entryKindSelect.value : form.querySelector('input[name="entry_kind"]').value;
+        const stardateEra = eraSelect ? eraSelect.value : form.querySelector('input[name="stardate_era"]').value;
+        const solDate = stardateEra === "post_fall"
+          ? (solInput ? solInput.value : form.querySelector('input[name="sol_date"]').value)
+          : "";
 
         if (statusBadge) statusBadge.textContent = "Saving...";
         try {
@@ -159,33 +488,33 @@
             body: JSON.stringify({
               question_id: qid,
               answer_text: answerText,
-              session_tag: sessionTag,
+              entry_kind: entryKind,
+              stardate_era: stardateEra,
+              sol_date: solDate,
               is_gm_only: gmCheckbox ? gmCheckbox.checked : false
             })
           });
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || "Save failed");
 
-          card.dataset.answered = answerText.trim() ? "true" : "false";
-          card.dataset.gmOnly = data.is_gm_only ? "true" : "false";
-          if (gmBadge) gmBadge.style.display = data.is_gm_only ? "" : "none";
-          if (statusBadge) {
-            statusBadge.textContent = answerText.trim()
-              ? ("Saved (" + (sessionTag || "Updated") + ")")
-              : "Cleared";
+          if (data.sol_number) {
+            const list = document.getElementById("dossier-sol-numbers");
+            if (list && !Array.from(list.options).some((o) => o.value === data.sol_number)) {
+              const opt = document.createElement("option");
+              opt.value = data.sol_number;
+              list.appendChild(opt);
+            }
           }
-          const coreEl = document.getElementById("stat-core");
-          const totalEl = document.getElementById("stat-total");
-          const pctEl = document.getElementById("stat-pct");
-          if (coreEl) coreEl.textContent = data.core_answered + "/" + data.core_total;
-          if (totalEl) totalEl.textContent = data.answered_count + "/" + data.total_questions;
-          if (pctEl) pctEl.textContent = String(data.completion_percent);
+          updateCardAfterSave(card, data);
         } catch (err) {
-          if (statusBadge) statusBadge.textContent = "Error saving";
+          if (statusBadge) statusBadge.textContent = err.message || "Error saving";
           console.error("Dossier save failed:", err);
         }
       });
     });
+
+    syncStardateControls();
+    applyFilters();
   })();
 </script>
 {% endblock %}

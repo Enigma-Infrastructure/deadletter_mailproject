@@ -10,9 +10,15 @@ from spacemarches.questionnaire import (
     get_question,
 )
 from spacemarches.services.dossier_service import (
+    ENTRY_KIND_CHARACTER_CREATION,
+    ENTRY_KIND_POST_ACTION_REPORT,
+    STARDATE_ERA_FALL,
+    STARDATE_ERA_POST_FALL,
+    STARDATE_ERA_PRE_FALL,
     complete_discord_link,
     export_dossier_markdown,
     generate_discord_link_code,
+    get_dossier_progression_summary,
     save_dossier_answer,
 )
 from spacemarches.services.game_sync_service import load_agent_save, sync_agent_save
@@ -70,47 +76,128 @@ class DossierAndSyncServiceTests(TestCase):
             slug="vesper-nine",
         )
 
-    def test_save_dossier_answer_preserves_revisions_and_privacy(self):
+    def test_save_dossier_answer_progression_date_vx_and_privacy(self):
         with self.assertRaises(ValueError):
             save_dossier_answer(self.dossier, "999z", "Invalid prompt")
 
+        # 1. Character Creation at Pre-Fall -> Pre-Fall_v1
         stats1 = save_dossier_answer(
             self.dossier,
             question_id="15a",
             answer_text="Tracking the missing shuttle from Locus.",
-            session_tag="Session 0",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_PRE_FALL,
             source="web",
             is_gm_only=True,
         )
         self.assertEqual(stats1["revision_count"], 0)
+        self.assertEqual(stats1["version_label"], "Pre-Fall_v1")
+        self.assertEqual(stats1["entry_kind"], ENTRY_KIND_CHARACTER_CREATION)
         self.assertTrue(stats1["is_gm_only"])
         self.assertIn("15a", self.dossier.private_keys)
 
+        # 2. Fall moment -> Fall_v1
         stats2 = save_dossier_answer(
             self.dossier,
             question_id="15a",
+            answer_text="Shuttle lost during the evacuations on Titan.",
+            entry_kind=ENTRY_KIND_POST_ACTION_REPORT,
+            stardate_era=STARDATE_ERA_FALL,
+            source="web",
+        )
+        self.assertEqual(stats2["revision_count"], 1)
+        self.assertEqual(stats2["version_label"], "Fall_v1")
+
+        # 3. Post-Action Report at Post-Fall user-submitted Sol-date 4.250 -> Sol 4.250_v1
+        stats3 = save_dossier_answer(
+            self.dossier,
+            question_id="15a",
             answer_text="Shuttle logs point to an exsurgent beacon on Titan.",
-            session_tag="Post-Session 1",
+            entry_kind=ENTRY_KIND_POST_ACTION_REPORT,
+            stardate_era=STARDATE_ERA_POST_FALL,
+            sol_date="4.250",
             source="discord",
             is_gm_only=None,  # keep existing GM flag
         )
-        self.assertEqual(stats2["revision_count"], 1)
-        self.assertTrue(stats2["is_gm_only"])
-        entry = self.dossier.responses["15a"]
-        self.assertEqual(entry["source"], "discord")
-        self.assertEqual(entry["session_tag"], "Post-Session 1")
-        self.assertEqual(entry["revisions"][0]["answer"], "Tracking the missing shuttle from Locus.")
-        self.assertEqual(entry["revisions"][0]["session_tag"], "Session 0")
+        self.assertEqual(stats3["revision_count"], 2)
+        self.assertEqual(stats3["version_label"], "Sol 4.250_v1")
+        self.assertTrue(stats3["is_gm_only"])
 
-        # Export respects include_private flag and attribution
-        save_dossier_answer(self.dossier, "1", "Vesper Nine", session_tag="Session 0", source="web")
+        # 4. Come back later to clarify Pre-Fall -> Pre-Fall_v2 without losing Fall_v1 or Sol 4.250_v1
+        stats4 = save_dossier_answer(
+            self.dossier,
+            question_id="15a",
+            answer_text="Clarification: shuttle was owned by an anonymous Firewall proxy.",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_PRE_FALL,
+            source="web",
+        )
+        self.assertEqual(stats4["revision_count"], 3)
+        self.assertEqual(stats4["version_label"], "Pre-Fall_v2")
+        self.assertEqual(stats4["entry_kind"], ENTRY_KIND_CHARACTER_CREATION)
+
+        entry = self.dossier.responses["15a"]
+        self.assertEqual(entry["version_label"], "Pre-Fall_v2")
+        self.assertEqual([rev["version_label"] for rev in entry["revisions"]], ["Pre-Fall_v1", "Fall_v1", "Sol 4.250_v1"])
+
+        # 5. Blank overwrite of an existing entry is rejected (never delete history)
+        with self.assertRaises(ValueError):
+            save_dossier_answer(
+                self.dossier,
+                question_id="15a",
+                answer_text="   ",
+                entry_kind=ENTRY_KIND_POST_ACTION_REPORT,
+                stardate_era=STARDATE_ERA_POST_FALL,
+                sol_date="10.500",
+            )
+
+        # 6. Invalid Post-Fall Sol-date rejected
+        with self.assertRaises(ValueError):
+            save_dossier_answer(
+                self.dossier,
+                question_id="1",
+                answer_text="Vesper Nine",
+                stardate_era=STARDATE_ERA_POST_FALL,
+                sol_date="-2.0",
+            )
+
+        # 7. privacy_only toggles GM Eyes Only without creating a revision
+        stats_priv = save_dossier_answer(
+            self.dossier,
+            question_id="15a",
+            privacy_only=True,
+            is_gm_only=False,
+        )
+        self.assertFalse(stats_priv["is_gm_only"])
+        self.assertEqual(stats_priv["revision_count"], 3)
+        save_dossier_answer(self.dossier, question_id="15a", privacy_only=True, is_gm_only=True)
+
+        # Export respects include_private flag and includes prior progression history
+        save_dossier_answer(
+            self.dossier,
+            "1",
+            "Vesper Nine",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_POST_FALL,
+            sol_date="11.250",
+            source="web",
+        )
+        progression = get_dossier_progression_summary(self.dossier)
+        self.assertIn("4.250", progression["post_fall_sol_numbers"])
+        self.assertIn("11.250", progression["post_fall_sol_numbers"])
+        self.assertEqual(progression["total_versions"], 5)
+
         public_md = export_dossier_markdown(self.dossier, include_private=False)
         self.assertIn("Vesper Nine", public_md)
+        self.assertIn("Sol 11.250_v1", public_md)
         self.assertNotIn("exsurgent beacon on Titan", public_md)
+        self.assertNotIn("Firewall proxy", public_md)
         self.assertIn("CC BY-NC-SA 3.0", public_md)
 
         full_md = export_dossier_markdown(self.dossier, include_private=True)
+        self.assertIn("Firewall proxy", full_md)
         self.assertIn("exsurgent beacon on Titan", full_md)
+        self.assertIn("Pre-Fall_v1", full_md)
         self.assertIn("[GM EYES ONLY]", full_md)
 
     def test_sensitive_appendix_gating_on_export(self):

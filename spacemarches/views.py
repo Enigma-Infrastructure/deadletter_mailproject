@@ -19,9 +19,15 @@ from .questionnaire import (
 )
 from .selectors import get_user_spacemarches_summary
 from .services.dossier_service import (
+    ENTRY_KIND_CHARACTER_CREATION,
+    ENTRY_KIND_CHOICES,
+    ENTRY_KIND_POST_ACTION_REPORT,
+    STARDATE_ERA_CHOICES,
+    _normalize_existing_record,
     compute_dossier_stats,
     export_dossier_markdown,
     generate_discord_link_code,
+    get_dossier_progression_summary,
     save_dossier_answer,
 )
 from .services.game_sync_service import load_agent_save, sync_agent_save
@@ -277,12 +283,18 @@ def generate_discord_code(request):
 
 def _build_question_node(question: dict, responses: dict, private_keys: set[str], include_sensitive: bool) -> dict:
     qid = question["id"]
-    entry = responses.get(qid) if isinstance(responses.get(qid), dict) else {}
-    answer = str(entry.get("answer", ""))
-    revisions = entry.get("revisions", []) if isinstance(entry.get("revisions"), list) else []
+    raw_entry = responses.get(qid)
+    has_entry = isinstance(raw_entry, dict) and bool(str(raw_entry.get("answer", "")).strip())
+    norm = _normalize_existing_record(raw_entry) if has_entry else {}
+
+    raw_revs = raw_entry.get("revisions", []) if isinstance(raw_entry, dict) else []
+    revisions = [
+        _normalize_existing_record(rev)
+        for rev in reversed(raw_revs)
+        if isinstance(rev, dict) and str(rev.get("answer", "")).strip()
+    ]
 
     direct_children = get_children(qid, include_sensitive=include_sensitive)
-    # Also attach sub-children when inspecting question 13 -> 13d -> 13d1..13d6
     child_nodes = []
     for child in direct_children:
         child_node = _build_question_node(child, responses, private_keys, include_sensitive)
@@ -295,11 +307,19 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
         "category": question.get("category"),
         "prompt": question.get("prompt"),
         "lore_text": question.get("lore_text"),
-        "answer": answer,
-        "is_answered": bool(answer.strip()),
-        "updated_at": entry.get("updated_at", ""),
-        "session_tag": entry.get("session_tag", ""),
-        "source": entry.get("source", ""),
+        "answer": norm.get("answer", ""),
+        "is_answered": has_entry,
+        "updated_at": norm.get("updated_at", ""),
+        "entry_kind": norm.get("entry_kind", ""),
+        "entry_kind_label": norm.get("entry_kind_label", ""),
+        "stardate_era": norm.get("stardate_era", ""),
+        "stardate_era_label": norm.get("stardate_era_label", ""),
+        "sol_number": norm.get("sol_number", ""),
+        "sol_date": norm.get("sol_date", ""),
+        "version": norm.get("version", 0),
+        "version_label": norm.get("version_label", ""),
+        "session_tag": norm.get("version_label", ""),
+        "source": norm.get("source", ""),
         "revisions": revisions,
         "revision_count": len(revisions),
         "is_gm_only": qid in private_keys,
@@ -322,6 +342,13 @@ def dossier_detail(request, slug: str):
     all_questions = get_all_questions(include_sensitive=include_sensitive)
     categories = get_categories(include_sensitive=include_sensitive)
     stats = compute_dossier_stats(dossier)
+    progression = get_dossier_progression_summary(dossier)
+
+    default_entry_kind = (
+        ENTRY_KIND_POST_ACTION_REPORT
+        if stats["answered_count"] > 0
+        else ENTRY_KIND_CHARACTER_CREATION
+    )
 
     return render(
         request,
@@ -329,10 +356,16 @@ def dossier_detail(request, slug: str):
         {
             "dossier": dossier,
             "core_nodes": core_nodes,
+            "core_question_count": len(core_nodes),
             "all_question_count": len(all_questions),
             "categories": categories,
             "stats": stats,
-            "session_tags": ["Session 0", "Post-Session 1", "Post-Session 2", "Post-Session 3", "Downtime"],
+            "progression": progression,
+            "entry_kind_choices": ENTRY_KIND_CHOICES,
+            "stardate_era_choices": STARDATE_ERA_CHOICES,
+            "default_entry_kind": default_entry_kind,
+            "default_stardate_era": progression["latest_era"],
+            "default_sol_number": progression["latest_sol_number"],
             "attribution_notice": get_attribution_notice(),
         },
     )
@@ -351,7 +384,7 @@ def dossier_toggle_sensitive(request, slug: str):
 @login_required
 @require_POST
 def dossier_answer(request, slug: str):
-    """Save an individual dossier answer (supports JSON/fetch autosave or standard form POST)."""
+    """Save an individual dossier progression update (supports JSON/fetch or standard form POST)."""
     dossier = get_object_or_404(CharacterDossier, user=request.user, slug=slug)
 
     content_type = (request.content_type or "").lower()
@@ -363,6 +396,10 @@ def dossier_answer(request, slug: str):
         question_id = payload.get("question_id", "")
         answer_text = payload.get("answer_text", "")
         session_tag = payload.get("session_tag", "")
+        entry_kind = payload.get("entry_kind", "")
+        stardate_era = payload.get("stardate_era", "")
+        sol_date = payload.get("sol_date", "")
+        privacy_only = bool(payload.get("privacy_only", False))
         raw_gm = payload.get("is_gm_only")
         is_gm_only = bool(raw_gm) if raw_gm is not None else None
         wants_json = True
@@ -370,6 +407,10 @@ def dossier_answer(request, slug: str):
         question_id = request.POST.get("question_id", "")
         answer_text = request.POST.get("answer_text", "")
         session_tag = request.POST.get("session_tag", "")
+        entry_kind = request.POST.get("entry_kind", "")
+        stardate_era = request.POST.get("stardate_era", "")
+        sol_date = request.POST.get("sol_date", "")
+        privacy_only = request.POST.get("privacy_only") in {"1", "true", "on", "yes"}
         if "is_gm_only_present" in request.POST:
             is_gm_only = request.POST.get("is_gm_only") in {"1", "true", "on", "yes"}
         elif "is_gm_only" in request.POST:
@@ -394,19 +435,35 @@ def dossier_answer(request, slug: str):
         messages.error(request, "Enable the Sensitive Appendix opt-in toggle before editing 13d questions.")
         return redirect("spacemarches:dossier_detail", slug=dossier.slug)
 
-    stats = save_dossier_answer(
-        dossier,
-        question_id=question_id,
-        answer_text=answer_text,
-        session_tag=session_tag,
-        source="web",
-        is_gm_only=is_gm_only,
-    )
+    try:
+        stats = save_dossier_answer(
+            dossier,
+            question_id=question_id,
+            answer_text=answer_text,
+            session_tag=session_tag,
+            source="web",
+            is_gm_only=is_gm_only,
+            entry_kind=entry_kind,
+            stardate_era=stardate_era,
+            sol_date=sol_date,
+            privacy_only=privacy_only,
+        )
+    except ValueError as err:
+        if wants_json:
+            return JsonResponse({"error": str(err)}, status=400)
+        messages.error(request, str(err))
+        return redirect("spacemarches:dossier_detail", slug=dossier.slug)
 
     if wants_json:
         return JsonResponse({"status": "saved", **stats})
 
-    messages.success(request, f"Saved response for [{question_id}].")
+    if privacy_only:
+        messages.success(request, f"Updated GM Eyes Only privacy for [{question_id}].")
+    else:
+        messages.success(
+            request,
+            f"Saved [{question_id}] as {stats.get('version_label') or 'updated'}.",
+        )
     return redirect("spacemarches:dossier_detail", slug=dossier.slug)
 
 

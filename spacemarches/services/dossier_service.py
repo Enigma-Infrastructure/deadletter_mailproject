@@ -1,6 +1,8 @@
 """Shared dossier & Discord-linking service layer for web views and Discord bot."""
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+import re
 from typing import Any
 
 from django.db import transaction
@@ -15,6 +17,177 @@ from spacemarches.questionnaire import (
 )
 
 LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
+
+ENTRY_KIND_CHARACTER_CREATION = "character_creation"
+ENTRY_KIND_POST_ACTION_REPORT = "post_action_report"
+ENTRY_KIND_CHOICES = [
+    (ENTRY_KIND_CHARACTER_CREATION, "Character Creation"),
+    (ENTRY_KIND_POST_ACTION_REPORT, "Post-Action Report"),
+]
+ENTRY_KIND_LABELS = dict(ENTRY_KIND_CHOICES)
+
+STARDATE_ERA_PRE_FALL = "pre_fall"
+STARDATE_ERA_FALL = "fall"
+STARDATE_ERA_POST_FALL = "post_fall"
+STARDATE_ERA_CHOICES = [
+    (STARDATE_ERA_PRE_FALL, "Pre-Fall"),
+    (STARDATE_ERA_FALL, "Fall"),
+    (STARDATE_ERA_POST_FALL, "Post-Fall (Sol 0.000–10.000+)"),
+]
+STARDATE_ERA_LABELS = {
+    STARDATE_ERA_PRE_FALL: "Pre-Fall",
+    STARDATE_ERA_FALL: "Fall",
+    STARDATE_ERA_POST_FALL: "Post-Fall",
+}
+
+DEFAULT_SOL_NUMBER = "0.000"
+DEFAULT_SOL_DATE = "Sol 0.000"
+
+_VERSION_SUFFIX_RE = re.compile(r"_v\d+$", re.IGNORECASE)
+_SOL_PREFIX_RE = re.compile(r"^(?:post[-\s]?fall\s+)?(?:sol[-\s]*)?", re.IGNORECASE)
+
+
+def normalize_entry_kind(entry_kind: str = "", session_tag: str = "") -> str:
+    """Normalize entry kind to 'character_creation' or 'post_action_report'."""
+    raw = (entry_kind or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if raw in ENTRY_KIND_LABELS:
+        return raw
+    if raw in {"creation", "concept", "baseline", "session_0"}:
+        return ENTRY_KIND_CHARACTER_CREATION
+    if raw in {"post_action", "aar", "report", "scene", "play", "downtime"}:
+        return ENTRY_KIND_POST_ACTION_REPORT
+
+    legacy = (session_tag or "").strip().lower()
+    if any(token in legacy for token in ("post", "report", "downtime", "action", "scene")):
+        return ENTRY_KIND_POST_ACTION_REPORT
+    return ENTRY_KIND_CHARACTER_CREATION
+
+
+def _parse_post_fall_sol_number(raw_sol: str) -> str:
+    """Parse and format a user-submitted Post-Fall Sol-date (0.000 - 10.000+)."""
+    cleaned = _VERSION_SUFFIX_RE.sub("", (raw_sol or "").strip()).strip()
+    cleaned = _SOL_PREFIX_RE.sub("", cleaned).strip()
+    if not cleaned:
+        raise ValueError("Post-Fall Sol-date is required (e.g. 0.000 to 10.000+).")
+
+    try:
+        dec = Decimal(cleaned)
+    except InvalidOperation as exc:
+        raise ValueError(
+            f"Invalid Post-Fall Sol-date '{raw_sol}'. Enter a numeric Sol value (0.000 - 10.000+)."
+        ) from exc
+
+    if not dec.is_finite() or dec < Decimal("0"):
+        raise ValueError("Post-Fall Sol-date must be 0.000 or greater (0.000 - 10.000+).")
+
+    # Preserve higher precision if provided, otherwise display 3 decimal places (0.000+)
+    exponent = dec.as_tuple().exponent
+    places = abs(exponent) if isinstance(exponent, int) and exponent < 0 else 0
+    if places <= 3:
+        return f"{dec:.3f}"
+    return format(dec.normalize(), "f")
+
+
+def normalize_stardate(
+    stardate_era: str = "",
+    sol_date: str = "",
+    session_tag: str = "",
+    *,
+    allow_legacy_fallback: bool = False,
+) -> tuple[str, str, str]:
+    """
+    Resolve (stardate_era, sol_number, canonical_sol_date) for Pre-Fall, Fall, or Post-Fall.
+
+    Returns:
+      - stardate_era: 'pre_fall' | 'fall' | 'post_fall'
+      - sol_number: '' for Pre-Fall/Fall, or formatted decimal string like '1.250' for Post-Fall
+      - canonical_sol_date: 'Pre-Fall' | 'Fall' | 'Sol 1.250'
+    """
+    raw_era = (stardate_era or "").strip().lower().replace("-", "_").replace(" ", "_")
+    raw_sol = (sol_date or "").strip()
+    legacy = (session_tag or "").strip()
+
+    if not raw_era:
+        probe = (raw_sol or legacy).lower()
+        stripped_probe = _VERSION_SUFFIX_RE.sub("", probe).strip()
+        if stripped_probe in {"pre-fall", "pre_fall", "prefall"}:
+            raw_era = STARDATE_ERA_PRE_FALL
+        elif stripped_probe == "fall":
+            raw_era = STARDATE_ERA_FALL
+        else:
+            raw_era = STARDATE_ERA_POST_FALL
+
+    if raw_era in {"pre_fall", "prefall"}:
+        return STARDATE_ERA_PRE_FALL, "", "Pre-Fall"
+    if raw_era == "fall":
+        return STARDATE_ERA_FALL, "", "Fall"
+    if raw_era not in {"post_fall", "postfall", "sol"}:
+        raise ValueError(f"Unknown stardate era '{stardate_era}'. Expected pre_fall, fall, or post_fall.")
+
+    candidate = raw_sol or legacy
+    if not candidate:
+        return STARDATE_ERA_POST_FALL, DEFAULT_SOL_NUMBER, DEFAULT_SOL_DATE
+
+    try:
+        sol_num = _parse_post_fall_sol_number(candidate)
+        return STARDATE_ERA_POST_FALL, sol_num, f"Sol {sol_num}"
+    except ValueError:
+        if allow_legacy_fallback:
+            clean_legacy = _VERSION_SUFFIX_RE.sub("", " ".join(candidate.split())).strip() or DEFAULT_SOL_DATE
+            return STARDATE_ERA_POST_FALL, "", clean_legacy
+        raise
+
+
+def _normalize_existing_record(record: dict[str, Any]) -> dict[str, Any]:
+    """Ensure legacy or current dict entries expose consistent stardate/version fields."""
+    stardate_era, sol_number, sol_date = normalize_stardate(
+        str(record.get("stardate_era") or ""),
+        str(record.get("sol_date") or ""),
+        str(record.get("session_tag") or ""),
+        allow_legacy_fallback=True,
+    )
+    entry_kind = normalize_entry_kind(
+        str(record.get("entry_kind") or ""),
+        str(record.get("session_tag") or ""),
+    )
+    raw_version = record.get("version")
+    try:
+        version = max(1, int(raw_version))
+    except (TypeError, ValueError):
+        version = 1
+    version_label = str(record.get("version_label") or f"{sol_date}_v{version}")
+    return {
+        "answer": str(record.get("answer", "")),
+        "updated_at": str(record.get("updated_at", "")),
+        "entry_kind": entry_kind,
+        "entry_kind_label": ENTRY_KIND_LABELS[entry_kind],
+        "stardate_era": stardate_era,
+        "stardate_era_label": STARDATE_ERA_LABELS[stardate_era],
+        "sol_number": sol_number or str(record.get("sol_number") or ""),
+        "sol_date": sol_date,
+        "version": version,
+        "version_label": version_label,
+        "session_tag": str(record.get("session_tag") or version_label),
+        "source": str(record.get("source") or "web"),
+    }
+
+
+def _next_version_for_sol_date(
+    sol_date: str,
+    revisions: list[dict[str, Any]],
+    current: dict[str, Any] | None = None,
+) -> int:
+    target = sol_date.casefold()
+    max_ver = 0
+    for rev in revisions:
+        norm = _normalize_existing_record(rev)
+        if norm["sol_date"].casefold() == target:
+            max_ver = max(max_ver, norm["version"])
+    if isinstance(current, dict) and str(current.get("answer", "")).strip():
+        norm_cur = _normalize_existing_record(current)
+        if norm_cur["sol_date"].casefold() == target:
+            max_ver = max(max_ver, norm_cur["version"])
+    return max_ver + 1
 
 
 def generate_discord_link_code(user) -> str:
@@ -87,6 +260,9 @@ def compute_dossier_stats(dossier: CharacterDossier) -> dict[str, Any]:
     total_questions = len(questions)
     completion_percent = round((answered_count / total_questions) * 100) if total_questions else 0
 
+    visible_ids = {q["id"] for q in questions}
+    gm_only_visible_count = len(private_keys & visible_ids)
+
     return {
         "answered_count": answered_count,
         "core_answered": core_answered,
@@ -97,22 +273,103 @@ def compute_dossier_stats(dossier: CharacterDossier) -> dict[str, Any]:
         "sensitive_total": len(sensitive_questions),
         "total_questions": total_questions,
         "completion_percent": completion_percent,
-        "gm_only_count": len(private_keys),
+        "gm_only_count": gm_only_visible_count,
+    }
+
+
+def get_dossier_progression_summary(dossier: CharacterDossier) -> dict[str, Any]:
+    """Summarize all recorded stardates/Sol-dates and date_v(x) entries across a dossier."""
+    responses = dossier.responses if isinstance(dossier.responses, dict) else {}
+    private_keys = set(dossier.private_keys or [])
+    questions_by_id = {
+        q["id"]: q for q in get_all_questions(include_sensitive=dossier.show_sensitive_appendix)
+    }
+
+    post_fall_sol_numbers: list[str] = [DEFAULT_SOL_NUMBER]
+    seen_sol_numbers: set[str] = {DEFAULT_SOL_NUMBER}
+    timeline: list[dict[str, Any]] = []
+
+    def _register_sol_number(sol_num: str) -> None:
+        if sol_num and sol_num not in seen_sol_numbers:
+            seen_sol_numbers.add(sol_num)
+            post_fall_sol_numbers.append(sol_num)
+
+    for qid, raw_entry in responses.items():
+        if qid not in questions_by_id or not isinstance(raw_entry, dict):
+            continue
+        question = questions_by_id[qid]
+        raw_revisions = raw_entry.get("revisions")
+        if isinstance(raw_revisions, list):
+            for rev in raw_revisions:
+                if not isinstance(rev, dict) or not str(rev.get("answer", "")).strip():
+                    continue
+                norm = _normalize_existing_record(rev)
+                if norm["stardate_era"] == STARDATE_ERA_POST_FALL:
+                    _register_sol_number(norm["sol_number"])
+                timeline.append(
+                    {
+                        "question_id": qid,
+                        "prompt": question["prompt"],
+                        "is_current": False,
+                        "is_gm_only": qid in private_keys,
+                        **norm,
+                    }
+                )
+
+        if str(raw_entry.get("answer", "")).strip():
+            norm_cur = _normalize_existing_record(raw_entry)
+            if norm_cur["stardate_era"] == STARDATE_ERA_POST_FALL:
+                _register_sol_number(norm_cur["sol_number"])
+            timeline.append(
+                {
+                    "question_id": qid,
+                    "prompt": question["prompt"],
+                    "is_current": True,
+                    "is_gm_only": qid in private_keys,
+                    **norm_cur,
+                }
+            )
+
+    timeline.sort(key=lambda item: item.get("updated_at", ""), reverse=True)
+    latest = timeline[0] if timeline else None
+
+    return {
+        "post_fall_sol_numbers": post_fall_sol_numbers,
+        "latest_era": latest["stardate_era"] if latest else STARDATE_ERA_PRE_FALL,
+        "latest_sol_number": (
+            latest["sol_number"]
+            if latest and latest["sol_number"]
+            else DEFAULT_SOL_NUMBER
+        ),
+        "latest_sol_date": latest["sol_date"] if latest else "Pre-Fall",
+        "timeline": timeline,
+        "total_versions": len(timeline),
     }
 
 
 def save_dossier_answer(
     dossier: CharacterDossier,
     question_id: str,
-    answer_text: str,
+    answer_text: str = "",
     session_tag: str = "",
     source: str = "web",
     is_gm_only: bool | None = None,
+    *,
+    entry_kind: str = "",
+    stardate_era: str = "",
+    sol_date: str = "",
+    privacy_only: bool = False,
 ) -> dict[str, Any]:
     """
-    Validate question_id, preserve any prior non-empty answer in revisions,
-    update private_keys if is_gm_only is explicitly provided, save atomically,
-    and return completion stats.
+    Append-only progression saver for a CharacterDossier prompt.
+
+    - Supports 'Pre-Fall', 'Fall', and 'Post-Fall' (with user-submitted Sol-date 0.000 - 10.000+).
+    - Never overwrites or deletes existing non-empty responses: prior entries are
+      archived into `revisions` and every new/clarified entry receives an
+      incremented `date_v(x)` label (`version_label`) and becomes the
+      current default displayed over the previous default.
+    - Supports `privacy_only=True` to toggle `GM Eyes Only` redaction without
+      altering existing answer text or generating a duplicate revision.
     """
     qid = str(question_id or "").strip()
     if get_question(qid) is None:
@@ -123,37 +380,12 @@ def save_dossier_answer(
         raise ValueError(f"Invalid answer source '{source}'; expected 'web' or 'discord'.")
 
     new_answer = "" if answer_text is None else str(answer_text)
-    normalized_tag = (session_tag or "").strip()
+    normalized_kind = normalize_entry_kind(entry_kind, session_tag=session_tag)
 
     with transaction.atomic():
         locked = CharacterDossier.objects.select_for_update().get(pk=dossier.pk)
         responses = dict(locked.responses or {})
         existing = responses.get(qid)
-
-        revisions: list[dict[str, Any]] = []
-        if isinstance(existing, dict):
-            prior_revisions = existing.get("revisions")
-            if isinstance(prior_revisions, list):
-                revisions = list(prior_revisions)
-            prior_answer = str(existing.get("answer", ""))
-            if prior_answer.strip() and prior_answer != new_answer:
-                revisions.append(
-                    {
-                        "answer": prior_answer,
-                        "updated_at": existing.get("updated_at", ""),
-                        "session_tag": existing.get("session_tag", ""),
-                        "source": existing.get("source", "web"),
-                    }
-                )
-
-        now_iso = timezone.now().isoformat()
-        responses[qid] = {
-            "answer": new_answer,
-            "updated_at": now_iso,
-            "session_tag": normalized_tag,
-            "source": normalized_source,
-            "revisions": revisions,
-        }
 
         private_keys = list(locked.private_keys or [])
         if is_gm_only is True and qid not in private_keys:
@@ -161,11 +393,146 @@ def save_dossier_answer(
         elif is_gm_only is False and qid in private_keys:
             private_keys = [k for k in private_keys if k != qid]
 
+        if privacy_only:
+            locked.private_keys = private_keys
+            locked.save(update_fields=["private_keys", "updated_at"])
+            dossier.private_keys = locked.private_keys
+            dossier.updated_at = locked.updated_at
+
+            cur_norm = (
+                _normalize_existing_record(existing)
+                if isinstance(existing, dict) and str(existing.get("answer", "")).strip()
+                else None
+            )
+            stats = compute_dossier_stats(locked)
+            stats.update(
+                {
+                    "question_id": qid,
+                    "is_gm_only": qid in private_keys,
+                    "revision_count": len(existing.get("revisions", [])) if isinstance(existing, dict) else 0,
+                    "updated_at": cur_norm["updated_at"] if cur_norm else "",
+                    "entry_kind": cur_norm["entry_kind"] if cur_norm else normalized_kind,
+                    "entry_kind_label": cur_norm["entry_kind_label"] if cur_norm else ENTRY_KIND_LABELS[normalized_kind],
+                    "stardate_era": cur_norm["stardate_era"] if cur_norm else STARDATE_ERA_PRE_FALL,
+                    "stardate_era_label": cur_norm["stardate_era_label"] if cur_norm else "Pre-Fall",
+                    "sol_number": cur_norm["sol_number"] if cur_norm else "",
+                    "sol_date": cur_norm["sol_date"] if cur_norm else "Pre-Fall",
+                    "version": cur_norm["version"] if cur_norm else 0,
+                    "version_label": cur_norm["version_label"] if cur_norm else "",
+                    "session_tag": cur_norm["version_label"] if cur_norm else "",
+                    "source": cur_norm["source"] if cur_norm else normalized_source,
+                }
+            )
+            return stats
+
+        normalized_era, normalized_sol_number, normalized_sol = normalize_stardate(
+            stardate_era,
+            sol_date,
+            session_tag=session_tag,
+        )
+
+        existing_has_answer = isinstance(existing, dict) and bool(str(existing.get("answer", "")).strip())
+        if not new_answer.strip():
+            if existing_has_answer:
+                raise ValueError(
+                    "Existing progression entries cannot be deleted or blanked out; "
+                    "add an updated or clarified response instead."
+                )
+            locked.private_keys = private_keys
+            locked.save(update_fields=["private_keys", "updated_at"])
+            dossier.private_keys = locked.private_keys
+            dossier.updated_at = locked.updated_at
+            stats = compute_dossier_stats(locked)
+            stats.update(
+                {
+                    "question_id": qid,
+                    "is_gm_only": qid in private_keys,
+                    "revision_count": 0,
+                    "updated_at": "",
+                    "entry_kind": normalized_kind,
+                    "entry_kind_label": ENTRY_KIND_LABELS[normalized_kind],
+                    "stardate_era": normalized_era,
+                    "stardate_era_label": STARDATE_ERA_LABELS[normalized_era],
+                    "sol_number": normalized_sol_number,
+                    "sol_date": normalized_sol,
+                    "version": 0,
+                    "version_label": "",
+                    "session_tag": "",
+                    "source": normalized_source,
+                }
+            )
+            return stats
+
+        revisions: list[dict[str, Any]] = []
+        if isinstance(existing, dict) and isinstance(existing.get("revisions"), list):
+            revisions = [
+                _normalize_existing_record(rev)
+                for rev in existing["revisions"]
+                if isinstance(rev, dict) and str(rev.get("answer", "")).strip()
+            ]
+
+        now_iso = timezone.now().isoformat()
+
+        if existing_has_answer:
+            cur_norm = _normalize_existing_record(existing)
+            is_identical_content = (
+                cur_norm["answer"] == new_answer
+                and cur_norm["sol_date"].casefold() == normalized_sol.casefold()
+                and cur_norm["stardate_era"] == normalized_era
+                and cur_norm["entry_kind"] == normalized_kind
+            )
+            if is_identical_content:
+                locked.private_keys = private_keys
+                locked.save(update_fields=["private_keys", "updated_at"])
+                dossier.private_keys = locked.private_keys
+                dossier.updated_at = locked.updated_at
+                stats = compute_dossier_stats(locked)
+                stats.update(
+                    {
+                        "question_id": qid,
+                        "is_gm_only": qid in private_keys,
+                        "revision_count": len(revisions),
+                        "updated_at": cur_norm["updated_at"],
+                        "entry_kind": cur_norm["entry_kind"],
+                        "entry_kind_label": cur_norm["entry_kind_label"],
+                        "stardate_era": cur_norm["stardate_era"],
+                        "stardate_era_label": cur_norm["stardate_era_label"],
+                        "sol_number": cur_norm["sol_number"],
+                        "sol_date": cur_norm["sol_date"],
+                        "version": cur_norm["version"],
+                        "version_label": cur_norm["version_label"],
+                        "session_tag": cur_norm["version_label"],
+                        "source": cur_norm["source"],
+                        "revisions": list(reversed(revisions)),
+                    }
+                )
+                return stats
+
+            revisions.append(cur_norm)
+
+        next_version = _next_version_for_sol_date(normalized_sol, revisions)
+        version_label = f"{normalized_sol}_v{next_version}"
+
+        responses[qid] = {
+            "answer": new_answer,
+            "updated_at": now_iso,
+            "entry_kind": normalized_kind,
+            "entry_kind_label": ENTRY_KIND_LABELS[normalized_kind],
+            "stardate_era": normalized_era,
+            "stardate_era_label": STARDATE_ERA_LABELS[normalized_era],
+            "sol_number": normalized_sol_number,
+            "sol_date": normalized_sol,
+            "version": next_version,
+            "version_label": version_label,
+            "session_tag": version_label,
+            "source": normalized_source,
+            "revisions": revisions,
+        }
+
         locked.responses = responses
         locked.private_keys = private_keys
         locked.save(update_fields=["responses", "private_keys", "updated_at"])
 
-        # Keep passed instance in sync for callers inspecting attributes right away
         dossier.responses = locked.responses
         dossier.private_keys = locked.private_keys
         dossier.updated_at = locked.updated_at
@@ -177,8 +544,17 @@ def save_dossier_answer(
                 "is_gm_only": qid in private_keys,
                 "revision_count": len(revisions),
                 "updated_at": now_iso,
-                "session_tag": normalized_tag,
+                "entry_kind": normalized_kind,
+                "entry_kind_label": ENTRY_KIND_LABELS[normalized_kind],
+                "stardate_era": normalized_era,
+                "stardate_era_label": STARDATE_ERA_LABELS[normalized_era],
+                "sol_number": normalized_sol_number,
+                "sol_date": normalized_sol,
+                "version": next_version,
+                "version_label": version_label,
+                "session_tag": version_label,
                 "source": normalized_source,
+                "revisions": list(reversed(revisions)),
             }
         )
         return stats
@@ -219,13 +595,27 @@ def export_dossier_markdown(dossier: CharacterDossier, include_private: bool = F
             lines.append("")
             for question, entry in items:
                 qid = question["id"]
+                norm = _normalize_existing_record(entry)
                 badge = " `[GM EYES ONLY]`" if (include_private and qid in private_keys) else ""
-                tag = entry.get("session_tag")
-                tag_text = f" _(Session: {tag})_" if tag else ""
+                tag_text = f" _({norm['entry_kind_label']} · {norm['version_label']})_"
                 lines.append(f"### [{qid}] {question['prompt']}{badge}{tag_text}")
                 lines.append("")
-                lines.append(str(entry["answer"]).strip())
+                lines.append(norm["answer"].strip())
                 lines.append("")
+                raw_revs = entry.get("revisions") if isinstance(entry.get("revisions"), list) else []
+                clean_revs = [
+                    _normalize_existing_record(rev)
+                    for rev in raw_revs
+                    if isinstance(rev, dict) and str(rev.get("answer", "")).strip()
+                ]
+                if clean_revs:
+                    lines.append("**Prior progression history:**")
+                    for rev in clean_revs:
+                        lines.append(
+                            f"- `{rev['version_label']}` ({rev['entry_kind_label']} · {rev['source']}): "
+                            f"{rev['answer'].strip()}"
+                        )
+                    lines.append("")
 
     attribution = get_attribution_notice()
     if attribution:

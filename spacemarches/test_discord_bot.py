@@ -57,7 +57,14 @@ class DiscordBotTests(TestCase):
         self.assertEqual(link.discord_user_id, "555000111")
 
         # Seed an answer on web, then test /dossier ephemeral embed + view
-        save_dossier_answer(self.dossier, "15a", "Investigating Pandora Gate 4", session_tag="Session 0", source="web")
+        save_dossier_answer(
+            self.dossier,
+            "15a",
+            "Investigating Pandora Gate 4",
+            entry_kind="character_creation",
+            stardate_era="pre_fall",
+            source="web",
+        )
         dossier_interaction = _mock_interaction("555000111")
         async_to_sync(handle_dossier_command)(dossier_interaction, category="Campaign Hooks")
         dossier_interaction.response.send_message.assert_awaited_once()
@@ -65,15 +72,16 @@ class DiscordBotTests(TestCase):
         self.assertTrue(kwargs.get("ephemeral"))
         self.assertIn("Echo Seven", kwargs["embed"].title)
 
-        # Simulate submitting a Discord Modal edit
+        # Simulate submitting a Discord Modal edit with a Post-Fall Sol-date
         async def _submit_modal():
             q = get_question("15a")
             modal = DossierAnswerModal(
                 dossier_id=self.dossier.pk,
                 question=q,
                 current_answer="Investigating Pandora Gate 4",
-                session_tag="Post-Session 1",
+                sol_date="3.750",
             )
+            modal.stardate_input._value = "3.750"
             modal.answer_input._value = "Gate 4 was sabotaged from inside."
             modal_interaction = _mock_interaction("555000111")
             await modal.on_submit(modal_interaction)
@@ -85,7 +93,7 @@ class DiscordBotTests(TestCase):
         entry = self.dossier.responses["15a"]
         self.assertEqual(entry["answer"], "Gate 4 was sabotaged from inside.")
         self.assertEqual(entry["source"], "discord")
-        self.assertEqual(entry["session_tag"], "Post-Session 1")
+        self.assertEqual(entry["version_label"], "Sol 3.750_v1")
         self.assertEqual(len(entry["revisions"]), 1)
 
     def test_slash_debrief_dms_player_interactive_buttons(self):
@@ -99,12 +107,12 @@ class DiscordBotTests(TestCase):
         async_to_sync(handle_debrief_command)(
             gm_interaction,
             member=member,
-            session_tag="Post-Session 2",
+            stardate="5.125",
             question_ids="15a,15b,6.1d",
         )
         member.send.assert_awaited_once()
         dm_kwargs = member.send.call_args.kwargs
-        self.assertIn("Post-Session 2", dm_kwargs["embed"].title)
+        self.assertIn("Sol 5.125", dm_kwargs["embed"].title)
         self.assertEqual(len(dm_kwargs["view"].children), 3)
         gm_interaction.response.send_message.assert_awaited_once()
         self.assertTrue(gm_interaction.response.send_message.call_args.kwargs.get("ephemeral"))

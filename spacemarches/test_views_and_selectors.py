@@ -115,6 +115,10 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
         )
         self.assertEqual(detail_resp.status_code, 200)
         self.assertContains(detail_resp, "Dive Deeper")
+        self.assertContains(detail_resp, 'class="btn filter-pill active-pill" data-filter="core"')
+        self.assertContains(detail_resp, "Post-Fall Sol-Date")
+        self.assertContains(detail_resp, "Preview GM Redaction")
+        self.assertNotContains(detail_resp, "Active Session Tag")
         self.assertNotContains(detail_resp, 'data-question-id="13d1"')
 
         # Sensitive appendix rejected until opted in
@@ -136,13 +140,15 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
         )
         self.assertContains(revealed_resp, 'data-question-id="13d1"')
 
+        # Save Character Creation at Pre-Fall, then Post-Action Report at Post-Fall Sol 2.500
         ans_resp = self.client.post(
             reverse("spacemarches:dossier_answer", kwargs={"slug": self.dossier.slug}),
             data=json.dumps(
                 {
                     "question_id": "1",
                     "answer_text": "Cassian Mire / Agent Glass",
-                    "session_tag": "Session 0",
+                    "entry_kind": "character_creation",
+                    "stardate_era": "pre_fall",
                     "is_gm_only": False,
                 }
             ),
@@ -150,12 +156,61 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
         )
         self.assertEqual(ans_resp.status_code, 200)
         self.assertEqual(ans_resp.json()["core_answered"], 1)
+        self.assertEqual(ans_resp.json()["version_label"], "Pre-Fall_v1")
+
+        # Clarify Pre-Fall -> Pre-Fall_v2
+        clarify_resp = self.client.post(
+            reverse("spacemarches:dossier_answer", kwargs={"slug": self.dossier.slug}),
+            data=json.dumps(
+                {
+                    "question_id": "1",
+                    "answer_text": "Cassian Mire (Backup Fork: Glass)",
+                    "entry_kind": "post_action_report",
+                    "stardate_era": "post_fall",
+                    "sol_date": "2.500",
+                    "is_gm_only": True,
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(clarify_resp.status_code, 200)
+        self.assertEqual(clarify_resp.json()["version_label"], "Sol 2.500_v1")
+        self.assertEqual(clarify_resp.json()["revision_count"], 1)
+        self.assertTrue(clarify_resp.json()["is_gm_only"])
+
+        # Blank overwrite is blocked (400)
+        blank_resp = self.client.post(
+            reverse("spacemarches:dossier_answer", kwargs={"slug": self.dossier.slug}),
+            data=json.dumps(
+                {
+                    "question_id": "1",
+                    "answer_text": "",
+                    "entry_kind": "post_action_report",
+                    "stardate_era": "post_fall",
+                    "sol_date": "3.000",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(blank_resp.status_code, 400)
+
+        # privacy_only toggle sets GM-only False without disturbing answer/revisions
+        priv_resp = self.client.post(
+            reverse("spacemarches:dossier_answer", kwargs={"slug": self.dossier.slug}),
+            data=json.dumps({"question_id": "1", "privacy_only": True, "is_gm_only": False}),
+            content_type="application/json",
+        )
+        self.assertEqual(priv_resp.status_code, 200)
+        self.assertFalse(priv_resp.json()["is_gm_only"])
+        self.assertEqual(priv_resp.json()["revision_count"], 1)
 
         export_resp = self.client.get(
             reverse("spacemarches:dossier_export", kwargs={"slug": self.dossier.slug})
         )
         self.assertEqual(export_resp.status_code, 200)
-        self.assertContains(export_resp, "Cassian Mire / Agent Glass")
+        self.assertContains(export_resp, "Cassian Mire (Backup Fork: Glass)")
+        self.assertContains(export_resp, "Sol 2.500_v1")
+        self.assertContains(export_resp, "Pre-Fall_v1")
 
         # Another user cannot view or edit this dossier
         self.client.force_login(self.other)

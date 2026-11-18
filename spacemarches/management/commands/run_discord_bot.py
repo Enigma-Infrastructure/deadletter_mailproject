@@ -14,8 +14,11 @@ from discord import app_commands
 from spacemarches.models import CharacterDossier, DiscordLink
 from spacemarches.questionnaire import get_all_questions, get_categories, get_question
 from spacemarches.services.dossier_service import (
+    ENTRY_KIND_CHARACTER_CREATION,
+    ENTRY_KIND_POST_ACTION_REPORT,
     complete_discord_link,
     compute_dossier_stats,
+    normalize_stardate,
     save_dossier_answer,
 )
 
@@ -57,6 +60,9 @@ def _save_dossier_answer_async(
     question_id: str,
     answer_text: str,
     session_tag: str = "",
+    entry_kind: str = "",
+    stardate_era: str = "",
+    sol_date: str = "",
 ) -> dict[str, Any]:
     dossier = CharacterDossier.objects.get(pk=dossier_id)
     return save_dossier_answer(
@@ -65,6 +71,9 @@ def _save_dossier_answer_async(
         answer_text=answer_text,
         session_tag=session_tag,
         source="discord",
+        entry_kind=entry_kind,
+        stardate_era=stardate_era,
+        sol_date=sol_date,
     )
 
 
@@ -74,7 +83,7 @@ def _save_dossier_answer_async(
 
 
 class DossierAnswerModal(discord.ui.Modal):
-    """Modal pre-filled with the character's current answer for a specific prompt."""
+    """Modal pre-filled with the character's current answer and stardate for a prompt."""
 
     def __init__(
         self,
@@ -83,12 +92,32 @@ class DossierAnswerModal(discord.ui.Modal):
         question: dict[str, Any],
         current_answer: str = "",
         session_tag: str = "",
+        entry_kind: str = "",
+        stardate_era: str = "",
+        sol_date: str = "",
     ):
         qid = question["id"]
         super().__init__(title=f"Dossier [{qid}]"[:45])
         self.dossier_id = dossier_id
         self.question_id = qid
         self.session_tag = session_tag
+        self.entry_kind = entry_kind or (
+            ENTRY_KIND_POST_ACTION_REPORT
+            if (current_answer or "").strip()
+            else ENTRY_KIND_CHARACTER_CREATION
+        )
+        self.stardate_era = stardate_era
+
+        default_stardate = (sol_date or session_tag or "Pre-Fall").strip()[:60]
+        self.stardate_input = discord.ui.TextInput(
+            label="Stardate (Pre-Fall, Fall, or Sol 0.000+)",
+            style=discord.TextStyle.short,
+            default=default_stardate,
+            required=True,
+            max_length=60,
+            placeholder="Pre-Fall, Fall, or 1.250",
+        )
+        self.add_item(self.stardate_input)
 
         prompt_label = question["prompt"]
         if len(prompt_label) > 45:
@@ -105,15 +134,24 @@ class DossierAnswerModal(discord.ui.Modal):
         self.add_item(self.answer_input)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        stats = await _save_dossier_answer_async(
-            dossier_id=self.dossier_id,
-            question_id=self.question_id,
-            answer_text=self.answer_input.value,
-            session_tag=self.session_tag,
-        )
-        tag_note = f" ({self.session_tag})" if self.session_tag else ""
+        raw_stardate = (self.stardate_input.value or "").strip()
+        try:
+            stats = await _save_dossier_answer_async(
+                dossier_id=self.dossier_id,
+                question_id=self.question_id,
+                answer_text=self.answer_input.value,
+                session_tag=self.session_tag,
+                entry_kind=self.entry_kind,
+                stardate_era=self.stardate_era,
+                sol_date=raw_stardate,
+            )
+        except ValueError as err:
+            await interaction.response.send_message(f"Could not save [{self.question_id}]: {err}", ephemeral=True)
+            return
+
+        ver_note = f" ({stats['entry_kind_label']} · {stats['version_label']})" if stats.get("version_label") else ""
         await interaction.response.send_message(
-            f"Saved **[{self.question_id}]**{tag_note}. Progress: "
+            f"Saved **[{self.question_id}]**{ver_note}. Progress: "
             f"{stats['answered_count']}/{stats['total_questions']} ({stats['completion_percent']}%).",
             ephemeral=True,
         )
@@ -159,11 +197,15 @@ class DossierQuestionSelect(discord.ui.Select):
         responses = self.dossier.responses if isinstance(self.dossier.responses, dict) else {}
         existing = responses.get(qid)
         current_answer = str(existing.get("answer", "")) if isinstance(existing, dict) else ""
+        current_sol = str(existing.get("sol_date", "")) if isinstance(existing, dict) else ""
+        current_era = str(existing.get("stardate_era", "")) if isinstance(existing, dict) else ""
         modal = DossierAnswerModal(
             dossier_id=self.dossier.pk,
             question=question,
             current_answer=current_answer,
             session_tag=self.session_tag,
+            stardate_era=current_era,
+            sol_date=current_sol,
         )
         await interaction.response.send_modal(modal)
 
@@ -189,7 +231,7 @@ class DossierSelectView(discord.ui.View):
 
 
 class DebriefQuestionButton(discord.ui.Button):
-    """Interactive prompt button sent via DM for post-session updates."""
+    """Interactive prompt button sent via DM for post-action report updates."""
 
     def __init__(
         self,
@@ -197,7 +239,7 @@ class DebriefQuestionButton(discord.ui.Button):
         dossier_id: int,
         question: dict[str, Any],
         current_answer: str,
-        session_tag: str,
+        sol_date: str,
     ):
         qid = question["id"]
         super().__init__(
@@ -208,14 +250,15 @@ class DebriefQuestionButton(discord.ui.Button):
         self.dossier_id = dossier_id
         self.question = question
         self.current_answer = current_answer
-        self.session_tag = session_tag
+        self.sol_date = sol_date
 
     async def callback(self, interaction: discord.Interaction) -> None:
         modal = DossierAnswerModal(
             dossier_id=self.dossier_id,
             question=self.question,
             current_answer=self.current_answer,
-            session_tag=self.session_tag,
+            entry_kind=ENTRY_KIND_POST_ACTION_REPORT,
+            sol_date=self.sol_date,
         )
         await interaction.response.send_modal(modal)
 
@@ -226,7 +269,7 @@ class DebriefPromptView(discord.ui.View):
         *,
         dossier: CharacterDossier,
         questions: list[dict[str, Any]],
-        session_tag: str,
+        sol_date: str,
         timeout: float = 900,
     ):
         super().__init__(timeout=timeout)
@@ -240,7 +283,7 @@ class DebriefPromptView(discord.ui.View):
                     dossier_id=dossier.pk,
                     question=q,
                     current_answer=current_answer,
-                    session_tag=session_tag,
+                    sol_date=sol_date,
                 )
             )
 
@@ -309,9 +352,18 @@ async def handle_dossier_command(
 async def handle_debrief_command(
     interaction: discord.Interaction,
     member: discord.Member | discord.User,
-    session_tag: str,
-    question_ids: str,
+    stardate: str = "",
+    question_ids: str = "",
+    *,
+    session_tag: str = "",
 ) -> None:
+    raw_stardate = (stardate or session_tag or "").strip()
+    try:
+        _era, _sol_num, canonical_sol = normalize_stardate("", raw_stardate)
+    except ValueError as err:
+        await interaction.response.send_message(f"Invalid stardate: {err}", ephemeral=True)
+        return
+
     raw_ids = [item.strip() for item in (question_ids or "").split(",") if item.strip()]
     if not raw_ids:
         await interaction.response.send_message(
@@ -358,17 +410,17 @@ async def handle_debrief_command(
 
     prompt_lines = "\n".join(f"- **[{q['id']}]** {q['prompt']}" for q in visible_questions)
     dm_embed = discord.Embed(
-        title=f"Post-Session Debrief: {session_tag}",
+        title=f"Post-Action Report: {canonical_sol}",
         description=(
             f"Character: **{dossier.character_name}**\n"
-            f"Your GM requested updates for the following prompts:\n\n{prompt_lines}"
+            f"Requested progression updates as of **{canonical_sol}**:\n\n{prompt_lines}"
         ),
         color=discord.Color.teal(),
     )
     view = DebriefPromptView(
         dossier=dossier,
         questions=visible_questions,
-        session_tag=session_tag,
+        sol_date=canonical_sol,
     )
 
     try:
@@ -381,7 +433,7 @@ async def handle_debrief_command(
         return
 
     await interaction.response.send_message(
-        f"Sent debrief prompt ({session_tag}) for {', '.join(q['id'] for q in visible_questions)} to {member.display_name}.",
+        f"Sent Post-Action Report debrief ({canonical_sol}) for {', '.join(q['id'] for q in visible_questions)} to {member.display_name}.",
         ephemeral=True,
     )
 
@@ -396,7 +448,7 @@ def build_bot() -> discord.Client:
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
 
-    @tree.command(name="link", description="Link your Discord account to your Deadletter/Spacemarches account.")
+    @tree.command(name="link", description="Link your Discord account to your Spacemarches account.")
     @app_commands.describe(code="One-time link code generated from /spacemarches/dossier/")
     async def link_cmd(interaction: discord.Interaction, code: str):
         await handle_link_command(interaction, code)
@@ -418,19 +470,19 @@ def build_bot() -> discord.Client:
             if cur in cat.lower()
         ][:25]
 
-    @tree.command(name="debrief", description="GM: DM a linked player interactive post-session dossier prompts.")
+    @tree.command(name="debrief", description="GM: DM a linked player interactive post-action report prompts.")
     @app_commands.describe(
         member="Target Discord member",
-        session_tag="Session tag label (e.g. Post-Session 1)",
+        stardate="Pre-Fall, Fall, or Post-Fall Sol-date (e.g. 2.450)",
         question_ids="Comma-separated question IDs (e.g. 15a,15b,6.1d)",
     )
     async def debrief_cmd(
         interaction: discord.Interaction,
         member: discord.Member,
-        session_tag: str,
+        stardate: str,
         question_ids: str,
     ):
-        await handle_debrief_command(interaction, member, session_tag, question_ids)
+        await handle_debrief_command(interaction, member, stardate=stardate, question_ids=question_ids)
 
     @client.event
     async def on_ready():

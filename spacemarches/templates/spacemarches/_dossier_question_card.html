@@ -5,22 +5,31 @@
   data-category="{{ node.category }}"
   data-answered="{% if node.is_answered %}true{% else %}false{% endif %}"
   data-gm-only="{% if node.is_gm_only %}true{% else %}false{% endif %}"
-  style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 0.85rem; background: {% if node.tier == 'sensitive_appendix' %}#fff8f8{% elif node.tier == 'deep' %}#f8fafc{% else %}#ffffff{% endif %};"
+  data-entry-kind="{{ node.entry_kind|default:'' }}"
+  data-stardate-era="{{ node.stardate_era|default:'' }}"
+  data-sol-date="{{ node.sol_date|default:'' }}"
+  style="border: 1px solid {% if node.is_gm_only %}#f59e0b{% else %}var(--border){% endif %}; border-radius: 10px; padding: 1rem; margin-bottom: 0.85rem; background: {% if node.tier == 'sensitive_appendix' %}#fff8f8{% elif node.tier == 'deep' %}#f8fafc{% else %}#ffffff{% endif %};"
 >
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.4rem; margin-bottom: 0.4rem;">
     <div>
       <code style="font-weight: 700; background: #0f172a; color: #f8fafc; padding: 0.15rem 0.45rem; border-radius: 4px;">[{{ node.id }}]</code>
       <span class="text-muted" style="font-size: 0.8rem; margin-left: 0.35rem;">{{ node.category }}</span>
     </div>
-    <div style="display: flex; gap: 0.35rem; align-items: center;">
+    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
       <span style="font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: {% if node.tier == 'sensitive_appendix' %}#fee2e2; color: #991b1b;{% elif node.tier == 'deep' %}#e2e8f0; color: #334155;{% else %}#dbeafe; color: #1e40af;{% endif %}">
         {% if node.tier == 'sensitive_appendix' %}Sensitive Appendix{% elif node.tier == 'deep' %}Dive Deeper{% else %}Core{% endif %}
+      </span>
+      <span
+        class="card-version-badge"
+        style="font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 4px; {% if node.entry_kind == 'post_action_report' %}background: #dcfce7; color: #166534;{% else %}background: #ede9fe; color: #5b21b6;{% endif %} {% if not node.is_answered %}display: none;{% endif %}"
+      >
+        {% if node.is_answered %}{{ node.entry_kind_label }} &middot; {{ node.version_label }}{% endif %}
       </span>
       <span class="card-gm-badge" style="font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: #fef3c7; color: #92400e; {% if not node.is_gm_only %}display: none;{% endif %}">
         GM Eyes Only
       </span>
       <span class="card-save-status text-muted" style="font-size: 0.78rem;">
-        {% if node.is_answered %}Saved{% if node.session_tag %} ({{ node.session_tag }}){% endif %}{% else %}Unanswered{% endif %}
+        {% if node.is_answered %}Saved ({{ node.version_label }}){% else %}Unanswered{% endif %}
       </span>
     </div>
   </div>
@@ -30,45 +39,65 @@
     <p class="text-muted" style="font-size: 0.84rem; margin-bottom: 0.65rem;">{{ node.lore_text }}</p>
   {% endif %}
 
+  <div class="card-redacted-notice" style="display: none; border: 1px dashed #d97706; background: #fffbeb; color: #92400e; padding: 0.75rem 0.9rem; border-radius: 8px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.84rem; margin-bottom: 0.5rem;">
+    [REDACTED &mdash; GM EYES ONLY] Turn off "Preview GM Redaction" to view or edit this entry.
+  </div>
+
   <form class="dossier-answer-form" method="post" action="{% url 'spacemarches:dossier_answer' slug=dossier.slug %}" style="margin: 0;">
     {% csrf_token %}
     <input type="hidden" name="question_id" value="{{ node.id }}">
-    <input type="hidden" name="session_tag" class="card-session-tag-input" value="{{ node.session_tag|default:'Session 0' }}">
+    <input type="hidden" name="entry_kind" class="card-entry-kind-input" value="{{ node.entry_kind|default:'character_creation' }}">
+    <input type="hidden" name="stardate_era" class="card-stardate-era-input" value="{{ node.stardate_era|default:'pre_fall' }}">
+    <input type="hidden" name="sol_date" class="card-sol-date-input" value="{{ node.sol_number|default:'0.000' }}">
     <input type="hidden" name="is_gm_only_present" value="1">
-    <textarea
-      name="answer_text"
-      rows="3"
-      style="min-height: 5.5rem;"
-      placeholder="Write your character's response for [{{ node.id }}]..."
-    >{{ node.answer }}</textarea>
+    <div class="dossier-answer-input-wrap">
+      <textarea
+        name="answer_text"
+        rows="3"
+        style="min-height: 5.5rem;"
+        placeholder="Write your character's response for [{{ node.id }}]..."
+      >{{ node.answer }}</textarea>
+    </div>
     <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.5rem;">
       <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.85rem; cursor: pointer;">
         <input type="checkbox" name="is_gm_only" value="1" {% if node.is_gm_only %}checked{% endif %} style="width: auto;">
         GM Eyes Only (redact from public exports)
       </label>
       <div style="display: flex; align-items: center; gap: 0.5rem;">
-        {% if node.revision_count %}
-          <span class="text-muted" style="font-size: 0.8rem;">{{ node.revision_count }} prior revision{{ node.revision_count|pluralize }}</span>
-        {% endif %}
-        <button type="submit" class="btn" style="padding: 0.35rem 0.85rem; font-size: 0.85rem;">Save Response</button>
+        <span class="text-muted card-revision-count" style="font-size: 0.8rem; {% if not node.revision_count %}display: none;{% endif %}">
+          {% if node.revision_count %}{{ node.revision_count }} prior version{{ node.revision_count|pluralize }}{% endif %}
+        </span>
+        <button type="submit" class="btn" style="padding: 0.35rem 0.85rem; font-size: 0.85rem;">Save Update</button>
       </div>
     </div>
   </form>
 
-  {% if node.revisions %}
-    <details style="margin-top: 0.55rem;">
-      <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">Revision History ({{ node.revisions|length }})</summary>
-      <ul style="margin: 0.4rem 0 0; padding-left: 1.2rem; font-size: 0.82rem;">
-        {% for rev in node.revisions %}
-          <li style="margin-bottom: 0.35rem;">
-            <strong>{{ rev.session_tag|default:"Prior entry" }}</strong>
-            <span class="text-muted">({{ rev.source|default:"web" }} &middot; {{ rev.updated_at }})</span>:
-            {{ rev.answer }}
-          </li>
-        {% endfor %}
-      </ul>
-    </details>
-  {% endif %}
+  <div class="card-revision-container">
+    {% if node.revisions %}
+      <details class="card-revision-history" style="margin-top: 0.55rem;">
+        <summary class="text-muted" style="cursor: pointer; font-size: 0.8rem;">Progression History ({{ node.revisions|length }} prior version{{ node.revisions|length|pluralize }})</summary>
+        <ul style="margin: 0.4rem 0 0; padding-left: 1.2rem; font-size: 0.82rem;">
+          {% for rev in node.revisions %}
+            <li style="margin-bottom: 0.45rem;">
+              <strong>{{ rev.version_label }}</strong>
+              <span>&middot; {{ rev.entry_kind_label }}</span>
+              <span class="text-muted">({{ rev.source|default:"web" }} &middot; {{ rev.updated_at }})</span>:
+              <span>{{ rev.answer }}</span>
+              <button
+                type="button"
+                class="btn btn-secondary clarify-version-btn"
+                data-entry-kind="{{ rev.entry_kind }}"
+                data-stardate-era="{{ rev.stardate_era }}"
+                data-sol-number="{{ rev.sol_number }}"
+                data-answer="{{ rev.answer }}"
+                style="padding: 0.12rem 0.45rem; font-size: 0.74rem; margin-left: 0.35rem;"
+              >Clarify this Stardate</button>
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  </div>
 
   {% if node.children %}
     <details class="dive-deeper" style="margin-top: 0.85rem; border-top: 1px dashed var(--border); padding-top: 0.75rem;">
