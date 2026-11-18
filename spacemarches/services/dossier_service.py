@@ -14,6 +14,7 @@ from spacemarches.questionnaire import (
     get_all_questions,
     get_attribution_notice,
     get_question,
+    get_question_temporal_defaults,
 )
 
 LINK_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"
@@ -26,10 +27,12 @@ ENTRY_KIND_CHOICES = [
 ]
 ENTRY_KIND_LABELS = dict(ENTRY_KIND_CHOICES)
 
+STARDATE_ERA_AUTO = "auto"
 STARDATE_ERA_PRE_FALL = "pre_fall"
 STARDATE_ERA_FALL = "fall"
 STARDATE_ERA_POST_FALL = "post_fall"
 STARDATE_ERA_CHOICES = [
+    (STARDATE_ERA_AUTO, "Auto by Prompt (Pre-Fall Origin / Fall / 10.000 AF Now)"),
     (STARDATE_ERA_PRE_FALL, "Pre-Fall"),
     (STARDATE_ERA_FALL, "Fall"),
     (STARDATE_ERA_POST_FALL, "Post-Fall (Sol 0.000–10.000+)"),
@@ -40,8 +43,8 @@ STARDATE_ERA_LABELS = {
     STARDATE_ERA_POST_FALL: "Post-Fall",
 }
 
-DEFAULT_SOL_NUMBER = "0.000"
-DEFAULT_SOL_DATE = "Sol 0.000"
+DEFAULT_SOL_NUMBER = "10.000"
+DEFAULT_SOL_DATE = "Sol 10.000"
 
 _VERSION_SUFFIX_RE = re.compile(r"_v\d+$", re.IGNORECASE)
 _SOL_PREFIX_RE = re.compile(r"^(?:post[-\s]?fall\s+)?(?:sol[-\s]*)?", re.IGNORECASE)
@@ -93,19 +96,32 @@ def normalize_stardate(
     sol_date: str = "",
     session_tag: str = "",
     *,
+    question_id: str = "",
     allow_legacy_fallback: bool = False,
 ) -> tuple[str, str, str]:
     """
     Resolve (stardate_era, sol_number, canonical_sol_date) for Pre-Fall, Fall, or Post-Fall.
 
-    Returns:
-      - stardate_era: 'pre_fall' | 'fall' | 'post_fall'
-      - sol_number: '' for Pre-Fall/Fall, or formatted decimal string like '1.250' for Post-Fall
-      - canonical_sol_date: 'Pre-Fall' | 'Fall' | 'Sol 1.250'
+    When stardate_era is 'auto' (or empty alongside empty sol_date/session_tag),
+    falls back to the prompt's natural temporal attribution (Pre-Fall for origin
+    questions like [4], Fall for Fall-era questions like [6.1g], and nominal
+    10.000 AF Post-Fall for present-state questions like [3]).
     """
     raw_era = (stardate_era or "").strip().lower().replace("-", "_").replace(" ", "_")
     raw_sol = (sol_date or "").strip()
     legacy = (session_tag or "").strip()
+
+    if raw_era == STARDATE_ERA_AUTO or (not raw_era and not raw_sol and not legacy):
+        if question_id:
+            q_defaults = get_question_temporal_defaults(question_id)
+            raw_era = q_defaults["default_stardate_era"]
+            if raw_era == STARDATE_ERA_POST_FALL:
+                raw_sol = q_defaults["default_sol_number"] or DEFAULT_SOL_NUMBER
+            else:
+                raw_sol = ""
+        else:
+            raw_era = STARDATE_ERA_POST_FALL
+            raw_sol = DEFAULT_SOL_NUMBER
 
     if not raw_era:
         probe = (raw_sol or legacy).lower()
@@ -122,7 +138,7 @@ def normalize_stardate(
     if raw_era == "fall":
         return STARDATE_ERA_FALL, "", "Fall"
     if raw_era not in {"post_fall", "postfall", "sol"}:
-        raise ValueError(f"Unknown stardate era '{stardate_era}'. Expected pre_fall, fall, or post_fall.")
+        raise ValueError(f"Unknown stardate era '{stardate_era}'. Expected auto, pre_fall, fall, or post_fall.")
 
     candidate = raw_sol or legacy
     if not candidate:
@@ -335,13 +351,13 @@ def get_dossier_progression_summary(dossier: CharacterDossier) -> dict[str, Any]
 
     return {
         "post_fall_sol_numbers": post_fall_sol_numbers,
-        "latest_era": latest["stardate_era"] if latest else STARDATE_ERA_PRE_FALL,
+        "latest_era": latest["stardate_era"] if latest else STARDATE_ERA_AUTO,
         "latest_sol_number": (
             latest["sol_number"]
             if latest and latest["sol_number"]
             else DEFAULT_SOL_NUMBER
         ),
-        "latest_sol_date": latest["sol_date"] if latest else "Pre-Fall",
+        "latest_sol_date": latest["sol_date"] if latest else DEFAULT_SOL_DATE,
         "timeline": timeline,
         "total_versions": len(timeline),
     }
@@ -404,6 +420,7 @@ def save_dossier_answer(
                 if isinstance(existing, dict) and str(existing.get("answer", "")).strip()
                 else None
             )
+            q_defaults = get_question_temporal_defaults(qid)
             stats = compute_dossier_stats(locked)
             stats.update(
                 {
@@ -413,10 +430,18 @@ def save_dossier_answer(
                     "updated_at": cur_norm["updated_at"] if cur_norm else "",
                     "entry_kind": cur_norm["entry_kind"] if cur_norm else normalized_kind,
                     "entry_kind_label": cur_norm["entry_kind_label"] if cur_norm else ENTRY_KIND_LABELS[normalized_kind],
-                    "stardate_era": cur_norm["stardate_era"] if cur_norm else STARDATE_ERA_PRE_FALL,
-                    "stardate_era_label": cur_norm["stardate_era_label"] if cur_norm else "Pre-Fall",
-                    "sol_number": cur_norm["sol_number"] if cur_norm else "",
-                    "sol_date": cur_norm["sol_date"] if cur_norm else "Pre-Fall",
+                    "stardate_era": cur_norm["stardate_era"] if cur_norm else q_defaults["default_stardate_era"],
+                    "stardate_era_label": (
+                        cur_norm["stardate_era_label"]
+                        if cur_norm
+                        else STARDATE_ERA_LABELS[q_defaults["default_stardate_era"]]
+                    ),
+                    "sol_number": cur_norm["sol_number"] if cur_norm else q_defaults["default_sol_number"],
+                    "sol_date": (
+                        cur_norm["sol_date"]
+                        if cur_norm
+                        else (f"Sol {q_defaults['default_sol_number']}" if q_defaults["default_sol_number"] else STARDATE_ERA_LABELS[q_defaults["default_stardate_era"]])
+                    ),
                     "version": cur_norm["version"] if cur_norm else 0,
                     "version_label": cur_norm["version_label"] if cur_norm else "",
                     "session_tag": cur_norm["version_label"] if cur_norm else "",
@@ -429,6 +454,7 @@ def save_dossier_answer(
             stardate_era,
             sol_date,
             session_tag=session_tag,
+            question_id=qid,
         )
 
         existing_has_answer = isinstance(existing, dict) and bool(str(existing.get("answer", "")).strip())

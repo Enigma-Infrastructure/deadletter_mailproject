@@ -48,7 +48,7 @@
           id="global-sol-date"
           list="dossier-sol-numbers"
           value="{{ default_sol_number }}"
-          placeholder="e.g. 0.000 or 4.250"
+          placeholder="e.g. 10.000 or 10.250"
           style="width: 155px; padding: 0.35rem 0.6rem; font-size: 0.88rem;"
         >
         <datalist id="dossier-sol-numbers">
@@ -72,7 +72,7 @@
   </div>
 
   <p class="text-muted" style="font-size: 0.78rem; margin-bottom: 0.7rem;" id="stardate-helper-text">
-    Saving appends a versioned <code>date_v(x)</code> snapshot (<code>Pre-Fall_v1</code>, <code>Fall_v1</code>, or <code>Sol 1.250_v1</code>) and displays it by default over earlier entries without overwriting or deleting history.
+    <strong>Auto by Prompt</strong> maps Origin prompts (e.g. <code>[4]</code>) to <code>Pre-Fall</code>, Fall prompts (<code>[6.1g]</code>) to <code>Fall</code>, and Now prompts (<code>[3]</code>) to nominal <code>Sol 10.000</code> (10 AF). Post-Fall Uplifts, AGIs, or Simulspace children can switch to <code>Post-Fall</code> to stamp origin questions with their Sol-date (<code>0.000&ndash;10.000+</code>). Every save adds a <code>date_v(x)</code> snapshot without overwriting history.
   </p>
 
   <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;" id="dossier-filter-pills">
@@ -378,7 +378,14 @@
     if (categorySelect) categorySelect.addEventListener("change", applyFilters);
     if (entryKindFilter) entryKindFilter.addEventListener("change", applyFilters);
     if (redactPreviewCheckbox) redactPreviewCheckbox.addEventListener("change", applyRedactionPreview);
-    if (entryKindSelect) entryKindSelect.addEventListener("change", syncStardateControls);
+    if (entryKindSelect) {
+      entryKindSelect.addEventListener("change", () => {
+        if (entryKindSelect.value === "post_action_report" && eraSelect && eraSelect.value === "auto") {
+          eraSelect.value = "post_fall";
+        }
+        syncStardateControls();
+      });
+    }
     if (eraSelect) eraSelect.addEventListener("change", syncStardateControls);
     if (solInput) solInput.addEventListener("input", syncStardateControls);
 

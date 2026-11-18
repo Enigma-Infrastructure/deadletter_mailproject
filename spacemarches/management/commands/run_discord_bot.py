@@ -12,7 +12,12 @@ import discord
 from discord import app_commands
 
 from spacemarches.models import CharacterDossier, DiscordLink
-from spacemarches.questionnaire import get_all_questions, get_categories, get_question
+from spacemarches.questionnaire import (
+    get_all_questions,
+    get_categories,
+    get_question,
+    get_question_temporal_defaults,
+)
 from spacemarches.services.dossier_service import (
     ENTRY_KIND_CHARACTER_CREATION,
     ENTRY_KIND_POST_ACTION_REPORT,
@@ -108,14 +113,20 @@ class DossierAnswerModal(discord.ui.Modal):
         )
         self.stardate_era = stardate_era
 
-        default_stardate = (sol_date or session_tag or "Pre-Fall").strip()[:60]
+        q_defaults = get_question_temporal_defaults(qid)
+        fallback_stardate = (
+            q_defaults["default_sol_number"]
+            if q_defaults["default_stardate_era"] == "post_fall"
+            else ("Fall" if q_defaults["default_stardate_era"] == "fall" else "Pre-Fall")
+        )
+        default_stardate = (sol_date or session_tag or fallback_stardate).strip()[:60]
         self.stardate_input = discord.ui.TextInput(
             label="Stardate (Pre-Fall, Fall, or Sol 0.000+)",
             style=discord.TextStyle.short,
             default=default_stardate,
             required=True,
             max_length=60,
-            placeholder="Pre-Fall, Fall, or 1.250",
+            placeholder="Pre-Fall, Fall, or 10.000",
         )
         self.add_item(self.stardate_input)
 
@@ -142,7 +153,7 @@ class DossierAnswerModal(discord.ui.Modal):
                 answer_text=self.answer_input.value,
                 session_tag=self.session_tag,
                 entry_kind=self.entry_kind,
-                stardate_era=self.stardate_era,
+                stardate_era="",
                 sol_date=raw_stardate,
             )
         except ValueError as err:

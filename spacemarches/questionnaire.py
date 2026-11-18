@@ -92,3 +92,32 @@ def get_categories(include_sensitive: bool = True) -> list[str]:
             seen.add(cat)
             categories.append(cat)
     return categories
+
+
+TEMPORAL_SCOPE_LABELS = {
+    "origin": "Origin (Pre-Fall Default; Post-Fall if AGI/Uplift/Lost)",
+    "fall": "Fall Era",
+    "present": "Now (Nominal 10.000 AF)",
+    "timeless": "Voice & OOC",
+}
+
+
+def get_question_temporal_defaults(question_id: str) -> dict[str, str]:
+    """Return the prompt's natural temporal scope and default (era, sol_number)."""
+    q = get_question(question_id)
+    if q is None:
+        return {
+            "temporal_scope": "present",
+            "temporal_scope_label": TEMPORAL_SCOPE_LABELS["present"],
+            "default_stardate_era": "post_fall",
+            "default_sol_number": "10.000",
+        }
+    scope = str(q.get("temporal_scope") or "present")
+    era = str(q.get("default_stardate_era") or "post_fall")
+    sol_number = str(q.get("default_sol_number") or ("10.000" if era == "post_fall" else ""))
+    return {
+        "temporal_scope": scope,
+        "temporal_scope_label": TEMPORAL_SCOPE_LABELS.get(scope, TEMPORAL_SCOPE_LABELS["present"]),
+        "default_stardate_era": era,
+        "default_sol_number": sol_number,
+    }

@@ -10,7 +10,10 @@
       "tier": "core",
       "category": "Identity & Registry",
       "prompt": "What are your legal ego name, operational callsign, and known mesh aliases?",
-      "lore_text": "In the solar system after the Fall, identity is layered across SIN registries, anonymous mesh handles, and Firewall cell callsigns."
+      "lore_text": "In the solar system after the Fall, identity is layered across SIN registries, anonymous mesh handles, and Firewall cell callsigns.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "2",
@@ -18,7 +21,10 @@
       "tier": "core",
       "category": "Identity & Registry",
       "prompt": "How old is your ego (chronologically vs. subjectively), and were you instantiated pre-Fall or post-Fall?",
-      "lore_text": "Time dilation, egocast latency, cold storage, and fork merges mean two people born the same year rarely share the same subjective age."
+      "lore_text": "Time dilation, egocast latency, cold storage, and fork merges mean two people born the same year rarely share the same subjective age.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "3",
@@ -26,7 +32,10 @@
       "tier": "core",
       "category": "Identity & Registry",
       "prompt": "What morph or sleeve do you currently inhabit, and how long have you been wearing it?",
-      "lore_text": "From baseline splicers and Olympic biomorphs to neo-avian uplifts and synthetic cyberbrains, your shell shapes every sensation."
+      "lore_text": "From baseline splicers and Olympic biomorphs to neo-avian uplifts and synthetic cyberbrains, your shell shapes every sensation.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "4",
@@ -34,7 +43,10 @@
       "tier": "core",
       "category": "Background & Faction",
       "prompt": "What is your origin background (Earth survivor, habitat-born, hypercorp, autonomist, uplift, AGI, lost generation) and primary faction alignment?",
-      "lore_text": "Your formative culture determines whether you trust corporate credit, gift-economy mutual aid, or secretive containment protocols."
+      "lore_text": "Your formative culture determines whether you trust corporate credit, gift-economy mutual aid, or secretive containment protocols.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "5",
@@ -42,7 +54,10 @@
       "tier": "core",
       "category": "Background & Faction",
       "prompt": "What is your primary operational specialty or cover occupation?",
-      "lore_text": "Even covert operatives maintain plausible trade skills: xenobiologists, mesh forensics specialists, gatecrashers, or zero-g riggers."
+      "lore_text": "Even covert operatives maintain plausible trade skills: xenobiologists, mesh forensics specialists, gatecrashers, or zero-g riggers.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6",
@@ -50,7 +65,10 @@
       "tier": "core",
       "category": "Life History",
       "prompt": "Summarize your life story across the Fall, your past origins (6.1), and your current post-Fall routine (6.2).",
-      "lore_text": "Almost every transhuman carries a fault line dividing who they were before the TITANs from who survived afterward."
+      "lore_text": "Almost every transhuman carries a fault line dividing who they were before the TITANs from who survived afterward.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "7",
@@ -58,7 +76,10 @@
       "tier": "core",
       "category": "Presence & Presentation",
       "prompt": "Give a concise overview of your current physical appearance, demeanor, and immediate first impression.",
-      "lore_text": "Although morphs can be customized or swapped, posture, scars, and habits tend to survive resleeving."
+      "lore_text": "Although morphs can be customized or swapped, posture, scars, and habits tend to survive resleeving.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "8",
@@ -66,7 +87,10 @@
       "tier": "core",
       "category": "Operations & Habitat",
       "prompt": "Where do you currently reside or keep your primary berth, and which orbital/planetary sectors do you know best?",
-      "lore_text": "Whether docked in Titanian habitats, Martian domes, or scavenger tin cans in the Belt, location dictates survival."
+      "lore_text": "Whether docked in Titanian habitats, Martian domes, or scavenger tin cans in the Belt, location dictates survival.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "9",
@@ -74,7 +98,10 @@
       "tier": "core",
       "category": "Psychology & Motivation",
       "prompt": "Why do you risk continuity loss on containment, reconnaissance, or deep-space operations instead of living safely inside a simspace?",
-      "lore_text": "Safe virtual comfort is cheap; stepping into existential hazards requires curiosity, guilt, duty, or desperation."
+      "lore_text": "Safe virtual comfort is cheap; stepping into existential hazards requires curiosity, guilt, duty, or desperation.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "10",
@@ -82,7 +109,10 @@
       "tier": "core",
       "category": "Secrets & Complications",
       "prompt": "What major secrets, bounties, legal complications, or hidden anomalies shadow your file?",
-      "lore_text": "Redacted entries in a dossier are often the exact levers hostile factions—or your own proxy—will pull."
+      "lore_text": "Redacted entries in a dossier are often the exact levers hostile factions—or your own proxy—will pull.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11",
@@ -90,7 +120,10 @@
       "tier": "core",
       "category": "Psychology & Ethics",
       "prompt": "Describe your core personality, ethical boundaries, and transhuman philosophy (expands into 11a–11x).",
-      "lore_text": "Forking, psychosurgery, and ubiquitous surveillance force every agent to decide what remains sacred."
+      "lore_text": "Forking, psychosurgery, and ubiquitous surveillance force every agent to decide what remains sacred.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "12",
@@ -98,7 +131,10 @@
       "tier": "core",
       "category": "Presence & Presentation",
       "prompt": "Detail your physical silhouette, distinctive marks, gear aesthetics, and vocal mannerisms (expands into 12A–12D).",
-      "lore_text": "Fine-grained physical and behavioral tells anchor an ego in the real world—or betray a covert infiltration."
+      "lore_text": "Fine-grained physical and behavioral tells anchor an ego in the real world—or betray a covert infiltration.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13",
@@ -106,7 +142,10 @@
       "tier": "core",
       "category": "Bonds & Trauma",
       "prompt": "Who are the most important people, mentors, or threats in your life, and what bonds define you (expands into 13a–13e)?",
-      "lore_text": "Connections across light-minute lag require deliberate effort—and give enemies targets to exploit."
+      "lore_text": "Connections across light-minute lag require deliberate effort—and give enemies targets to exploit.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14",
@@ -114,7 +153,10 @@
       "tier": "core",
       "category": "Tradecraft & Capabilities",
       "prompt": "How do you approach combat, infosec, investigation, and team survival in the field (expands into 14a–14h)?",
-      "lore_text": "Surviving an exsurgent outbreak or covert op relies on habits drilled long before alarms go off."
+      "lore_text": "Surviving an exsurgent outbreak or covert op relies on habits drilled long before alarms go off.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15",
@@ -122,7 +164,10 @@
       "tier": "core",
       "category": "Campaign Hooks",
       "prompt": "What unresolved mysteries, immediate goals, and breaking-point hooks drive your campaign arc (expands into 15a–15f)?",
-      "lore_text": "Great dossiers live across sessions—tracking how missions alter convictions, scars, and ambitions."
+      "lore_text": "Great dossiers live across sessions—tracking how missions alter convictions, scars, and ambitions.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "16",
@@ -130,7 +175,10 @@
       "tier": "core",
       "category": "Voice & GM Notes",
       "prompt": "Capture your character's voice, inspirational touchstones, and any out-of-character notes for the GM (expands into 16a–16c).",
-      "lore_text": "Tone alignment keeps grim transhuman horror and tense tabletop espionage cohesive for the entire table."
+      "lore_text": "Tone alignment keeps grim transhuman horror and tense tabletop espionage cohesive for the entire table.",
+      "temporal_scope": "timeless",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.1a",
@@ -138,7 +186,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "Where were you born or instantiated—Earth, Luna, Mars, orbital habitat, asteroid, or post-Fall laboratory?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1b",
@@ -146,7 +197,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "What was your childhood or early developmental period like?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1c",
@@ -154,7 +208,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "Who raised, created, or mentored you, and do any family members, siblings, or lineage forks still survive?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1d",
@@ -162,7 +219,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "What single pre-Fall or early-life turning point permanently reshaped your trajectory?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1e",
@@ -170,7 +230,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "What formal schooling, apprenticeship, corporate track, or street education formed your worldview?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1f",
@@ -178,7 +241,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "What profession or hustle did you practice before entering covert or high-risk operations?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1g",
@@ -186,7 +252,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "How did you survive the Fall of Earth—physical shuttle, emergency egocast, infugee compression, or off-world distance?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "fall",
+      "default_stardate_era": "fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1h",
@@ -194,7 +263,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "Describe your very first resleeving experience and how smoothly your ego adapted to a new body.",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "fall",
+      "default_stardate_era": "fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1i",
@@ -202,7 +274,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "Who did you lose during the Fall or along the way, and do any cold backups or partial logs remain?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "fall",
+      "default_stardate_era": "fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1j",
@@ -210,7 +285,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "Which past faction, syndicate, or habitat did you belong to—and why did you leave, defect, or maintain silent ties?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.1k",
@@ -218,7 +296,10 @@
       "tier": "deep",
       "category": "Life History: Past & Fall (6.1)",
       "prompt": "What unresolved debt, vendetta, or promise from your earlier life can still catch up with you?",
-      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements."
+      "lore_text": "Part 6.1 traces the ego's formative roots, Fall trauma, and lingering historical entanglements.",
+      "temporal_scope": "origin",
+      "default_stardate_era": "pre_fall",
+      "default_sol_number": ""
     },
     {
       "id": "6.2a",
@@ -226,7 +307,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "Which morph class do you prefer (biomorph, pod, synthmorph, infomorph, or uplift), and why?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2b",
@@ -234,7 +318,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What body modifications, ware, sensory tweaks, or cosmetic markers do you routinely install?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2c",
@@ -242,7 +329,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What does your public AR/mesh icon look like, and how paranoid is your PAN security posture?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2d",
@@ -250,7 +340,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "Describe your personal living quarters, berth, or virtual simulspace when off-duty.",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2e",
@@ -258,7 +351,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What daily habits or grounding rituals keep your sense of self intact across long deployments?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2f",
@@ -266,7 +362,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What is your relationship with your muse—strictly software assistant, trusted confidant, or sharp-tongued critic?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2g",
@@ -274,7 +373,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "Which reputation networks (@-rep, c-rep, f-rep, g-rep, i-rep, r-rep) do you lean on most, and how did you earn standing?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2h",
@@ -282,7 +384,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "How do you manage wealth and survival—autonomist mutual aid, hypercorp credit, black-market barter, or clandestine stipends?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2i",
@@ -290,7 +395,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What hobbies, creative pursuits, or quiet obsessions occupy your downtime?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2j",
@@ -298,7 +406,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What comforts, vices, XP feeds, chems, or nostalgic artifacts do you rely on when stressed?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2k",
@@ -306,7 +417,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "How strictly do you keep ego backups, who holds custody of your cortical stack/archive, and how do you use forks?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2l",
@@ -314,7 +428,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "Do you prefer zero-G, lunar, Martian, or 1G spin environments, and how do you handle long-haul space travel?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2m",
@@ -322,7 +439,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "Who in the system will shelter you, scrub your bioprints, or supply forged credentials with minimal questions?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2n",
@@ -330,7 +450,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "Who distrusts, monitors, or holds a simmering grudge against you without actively shooting on sight?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "6.2o",
@@ -338,7 +461,10 @@
       "tier": "deep",
       "category": "Life History: Current Life (6.2)",
       "prompt": "What public cover identity explains your income, gear, and inexplicable orbital itineraries?",
-      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks."
+      "lore_text": "Part 6.2 explores day-to-day transhuman existence, mesh hygiene, morph preference, and social networks.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11a",
@@ -346,7 +472,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What singular driving motivation gets you out of your bunk or restores you from backup?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11b",
@@ -354,7 +483,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What is your deepest existential dread—egocide, basilisk hacks, exsurgent infection, or becoming unrecognizable?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11c",
@@ -362,7 +494,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What recurring character flaw or blind spot reliably puts you or your squad in danger?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11d",
@@ -370,7 +505,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What defining virtue or dependability do teammates count on when everything goes sideways?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11e",
@@ -378,7 +516,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What moral red line will you refuse to cross even if mission containment hangs in the balance?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11f",
@@ -386,7 +527,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "How do you view transhumanity's future—ascending toward something greater or fracturing beyond repair?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11g",
@@ -394,7 +538,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What is your genuine attitude toward AGIs, uplifted animals, and emergent non-human minds?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11h",
@@ -402,7 +549,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "If you spin up a beta or alpha fork for 48 hours, is that fork still 'you'—and how do you handle reintegration?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11i",
@@ -410,7 +560,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "How do you react under acute containment crisis—cold hyper-focus, dark humor, frantic improvising, or taking command?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11j",
@@ -418,7 +571,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What does someone have to prove to earn your real trust in a world of psychosurgery and sleeper forks?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11k",
@@ -426,7 +582,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What secret shame or past failure have you never admitted to your current operational team?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11l",
@@ -434,7 +593,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What quiet survival feat or moral victory are you secretly proudest of?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11m",
@@ -442,7 +604,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "Has easy backup restoration made mortality trivial to you, or made each lost memory gap heavier?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11n",
@@ -450,7 +615,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "Where do you stand on Radical Information Freedom versus strict Foundation/Firewall censorship of X-risks?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11o",
@@ -458,7 +626,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What is your typical sense of humor and social mask when meeting strangers?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11p",
@@ -466,7 +637,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "Do you hold any irrational superstitions, lucky talismans, or idiosyncratic rituals despite scientific training?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11q",
@@ -474,7 +648,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "How do you respond to authority—hypercorp executives, military command, or mysterious proxy handlers?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11r",
@@ -482,7 +659,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What specific insult, cruelty, or incompetence triggers your temper fastest?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11s",
@@ -490,7 +670,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What person, creature, or situation reliably pierces your cynicism and evokes compassion?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11t",
@@ -498,7 +681,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "If a trusted ally compromises the cell or turns traitor, do you favor rehabilitation, isolation, or quiet erasure?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11u",
@@ -506,7 +692,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "How has potential biological/digital immortality altered your patience and sense of urgency?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11v",
@@ -514,7 +703,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "Have you ever undergone psychosurgical trauma editing—or refused it out of fear of altering who you are?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11w",
@@ -522,7 +714,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "Do you naturally take leadership, thrive as an autonomous specialist, or anchor a team from the back?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "11x",
@@ -530,7 +725,10 @@
       "tier": "deep",
       "category": "Psychology, Ethics & Identity (11)",
       "prompt": "What condition or resolution would convince you to finally retire from field operations?",
-      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines."
+      "lore_text": "Section 11 examines psychological resilience, transhuman ethics, forking philosophy, and internal fault lines.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "12A",
@@ -538,7 +736,10 @@
       "tier": "deep",
       "category": "Appearance & Mannerisms (12)",
       "prompt": "Describe your current morph's silhouette, build, posture, and immediate visual presence.",
-      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs."
+      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "12B",
@@ -546,7 +747,10 @@
       "tier": "deep",
       "category": "Appearance & Mannerisms (12)",
       "prompt": "Detail your facial features, eyes, scars, tattoos, synthetic seams, or subtle visual tells.",
-      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs."
+      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "12C",
@@ -554,7 +758,10 @@
       "tier": "deep",
       "category": "Appearance & Mannerisms (12)",
       "prompt": "What everyday attire, armored rigs, insignia, and signature pocket items do you always wear or carry?",
-      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs."
+      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "12D",
@@ -562,7 +769,10 @@
       "tier": "deep",
       "category": "Appearance & Mannerisms (12)",
       "prompt": "Describe your vocal cadence, accent, nervous gestures, and how you move in your sleeve.",
-      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs."
+      "lore_text": "Section 12 captures tactile visual details and physical tells observable across the table or in surveillance logs.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13a",
@@ -570,7 +780,10 @@
       "tier": "deep",
       "category": "Relationships & Bonds (13)",
       "prompt": "Who is your closest living bond, and how do you shield them from blowback?",
-      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities."
+      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13b",
@@ -578,7 +791,10 @@
       "tier": "deep",
       "category": "Relationships & Bonds (13)",
       "prompt": "Who recruited, mentored, or serves as your current handler/proxy—and do you still trust their motives?",
-      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities."
+      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13c",
@@ -586,7 +802,10 @@
       "tier": "deep",
       "category": "Relationships & Bonds (13)",
       "prompt": "How have light-speed lag, resleeving, or operational secrecy shaped your romantic or intimate history?",
-      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities."
+      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d",
@@ -594,7 +813,10 @@
       "tier": "deep",
       "category": "Relationships & Bonds (13)",
       "prompt": "What deep psychological wounds, traumatic ruptures, or haunting experiences linger beneath your surface composure?",
-      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities."
+      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13e",
@@ -602,7 +824,10 @@
       "tier": "deep",
       "category": "Relationships & Bonds (13)",
       "prompt": "How do you privately regard the rest of your current squad or cell?",
-      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities."
+      "lore_text": "Section 13 maps interpersonal anchors, handlers, squad dynamics, and emotional vulnerabilities.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d1",
@@ -610,7 +835,10 @@
       "tier": "sensitive_appendix",
       "category": "Sensitive Appendix: Trauma & Table Safety (13d)",
       "prompt": "Egocide & Continuity Loss: Have you ever lost a fork violently, suffered corrupt backup restoration, or witnessed another ego erased permanently?",
-      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries."
+      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d2",
@@ -618,7 +846,10 @@
       "tier": "sensitive_appendix",
       "category": "Sensitive Appendix: Trauma & Table Safety (13d)",
       "prompt": "Body Autonomy & Coerced Resleeving: Has your ego ever been involuntarily resleeved, indentured in a restricted morph, or held in cold storage?",
-      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries."
+      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d3",
@@ -626,7 +857,10 @@
       "tier": "sensitive_appendix",
       "category": "Sensitive Appendix: Trauma & Table Safety (13d)",
       "prompt": "Psychosurgery & Conditioning: Have you discovered hidden behavioral triggers, excised memories, or unauthorized neural edits in your mind-state?",
-      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries."
+      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d4",
@@ -634,7 +868,10 @@
       "tier": "sensitive_appendix",
       "category": "Sensitive Appendix: Trauma & Table Safety (13d)",
       "prompt": "Exsurgent & Basilisk Exposure: Describe any direct brush with exsurgent contamination, anomalous phenomena, or cognitohazard infections.",
-      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries."
+      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d5",
@@ -642,7 +879,10 @@
       "tier": "sensitive_appendix",
       "category": "Sensitive Appendix: Trauma & Table Safety (13d)",
       "prompt": "Moral Injury & Covert Atrocities: What mission compromise, collateral sacrifice, or containment quarantine decision still haunts you?",
-      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries."
+      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "13d6",
@@ -650,7 +890,10 @@
       "tier": "sensitive_appendix",
       "category": "Sensitive Appendix: Trauma & Table Safety (13d)",
       "prompt": "Player Safety Calibration (Lines & Veils): Note any sensitive themes from 13d1–13d5 that you want veiled, handled off-screen, or spotlighted carefully.",
-      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries."
+      "lore_text": "Content-gated appendix exploring Eclipse Phase horror themes and explicit GM/player safety boundaries.",
+      "temporal_scope": "timeless",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14a",
@@ -658,7 +901,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "What is your signature technical, investigative, social, or combat specialty?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14b",
@@ -666,7 +912,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "Name your most trusted piece of physical kit, drone, weapon, or custom software suite.",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14c",
@@ -674,7 +923,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "What is your infosec hygiene routine—burner PANs, air-gapped storage, encryption protocols, or counter-intrusion habits?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14d",
@@ -682,7 +934,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "When violence erupts, what is your tactical posture (surgical neutralization, kinetic suppression, tactical withdrawal, or non-lethal restraint)?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14e",
@@ -690,7 +945,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "What glaring skill gap or operational blind spot leaves you dependent on teammates?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14f",
@@ -698,7 +956,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "How do you respond to unknown anomalous artifacts or exhuman threats—quarantine and study, scorched-earth destruction, or extraction?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14g",
@@ -706,7 +967,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "How do you exchange classified intel when mesh infrastructure is actively monitored or jammed?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "14h",
@@ -714,7 +978,10 @@
       "tier": "deep",
       "category": "Tradecraft & Capabilities (14)",
       "prompt": "What final gear, cortical stack, and team checks do you perform before crossing an airlock or Pandora gate?",
-      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes."
+      "lore_text": "Section 14 translates mechanical skills into concrete field habits, tradecraft, and crisis reflexes.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15a",
@@ -722,7 +989,10 @@
       "tier": "deep",
       "category": "Campaign Hooks & Session Evolution (15)",
       "prompt": "What unresolved mystery, missing contact, or encrypted shard keeps pulling you into the next operation?",
-      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning."
+      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15b",
@@ -730,7 +1000,10 @@
       "tier": "deep",
       "category": "Campaign Hooks & Session Evolution (15)",
       "prompt": "What hard lesson from your most recent session or past mission visibly changed how you operate?",
-      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning."
+      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15c",
@@ -738,7 +1011,10 @@
       "tier": "deep",
       "category": "Campaign Hooks & Session Evolution (15)",
       "prompt": "What concrete short-term goal do you want to accomplish within the next one or two operations?",
-      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning."
+      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15d",
@@ -746,7 +1022,10 @@
       "tier": "deep",
       "category": "Campaign Hooks & Session Evolution (15)",
       "prompt": "What grand long-term campaign arc or transformation could define this character's endgame?",
-      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning."
+      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15e",
@@ -754,7 +1033,10 @@
       "tier": "deep",
       "category": "Campaign Hooks & Session Evolution (15)",
       "prompt": "GM Lever: What dilemma, moral bait, or endangered contact will reliably force your character off the sidelines?",
-      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning."
+      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "15f",
@@ -762,7 +1044,10 @@
       "tier": "deep",
       "category": "Campaign Hooks & Session Evolution (15)",
       "prompt": "Breaking Point: What catastrophic discovery or betrayal would push your character to defect, burn their cell, or go rogue?",
-      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning."
+      "lore_text": "Section 15 provides living campaign hooks ideal for post-session debriefs and GM spotlight planning.",
+      "temporal_scope": "present",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "16a",
@@ -770,7 +1055,10 @@
       "tier": "deep",
       "category": "Voice & GM Notes (16)",
       "prompt": "Write a 3–5 sentence audio log, mesh message, or personal journal fragment directly in your character's voice.",
-      "lore_text": "Section 16 anchors voice tone and collaborative expectations at the table."
+      "lore_text": "Section 16 anchors voice tone and collaborative expectations at the table.",
+      "temporal_scope": "timeless",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "16b",
@@ -778,7 +1066,10 @@
       "tier": "deep",
       "category": "Voice & GM Notes (16)",
       "prompt": "List 2–4 films, books, SCP files, or music tracks that capture this character's aesthetic and emotional tone.",
-      "lore_text": "Section 16 anchors voice tone and collaborative expectations at the table."
+      "lore_text": "Section 16 anchors voice tone and collaborative expectations at the table.",
+      "temporal_scope": "timeless",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     },
     {
       "id": "16c",
@@ -786,7 +1077,10 @@
       "tier": "deep",
       "category": "Voice & GM Notes (16)",
       "prompt": "Share any final out-of-character notes, pacing preferences, or cool moments you hope to explore with the GM.",
-      "lore_text": "Section 16 anchors voice tone and collaborative expectations at the table."
+      "lore_text": "Section 16 anchors voice tone and collaborative expectations at the table.",
+      "temporal_scope": "timeless",
+      "default_stardate_era": "post_fall",
+      "default_sol_number": "10.000"
     }
   ]
 }

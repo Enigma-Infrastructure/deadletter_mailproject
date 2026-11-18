@@ -3,6 +3,7 @@
   data-question-id="{{ node.id }}"
   data-tier="{{ node.tier }}"
   data-category="{{ node.category }}"
+  data-temporal-scope="{{ node.temporal_scope|default:'present' }}"
   data-answered="{% if node.is_answered %}true{% else %}false{% endif %}"
   data-gm-only="{% if node.is_gm_only %}true{% else %}false{% endif %}"
   data-entry-kind="{{ node.entry_kind|default:'' }}"
@@ -18,6 +19,12 @@
     <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
       <span style="font-size: 0.75rem; padding: 0.15rem 0.45rem; border-radius: 4px; background: {% if node.tier == 'sensitive_appendix' %}#fee2e2; color: #991b1b;{% elif node.tier == 'deep' %}#e2e8f0; color: #334155;{% else %}#dbeafe; color: #1e40af;{% endif %}">
         {% if node.tier == 'sensitive_appendix' %}Sensitive Appendix{% elif node.tier == 'deep' %}Dive Deeper{% else %}Core{% endif %}
+      </span>
+      <span
+        title="{{ node.temporal_scope_label }}"
+        style="font-size: 0.74rem; padding: 0.15rem 0.45rem; border-radius: 4px; {% if node.temporal_scope == 'origin' %}background: #fef9c3; color: #854d0e;{% elif node.temporal_scope == 'fall' %}background: #ffedd5; color: #9a3412;{% elif node.temporal_scope == 'timeless' %}background: #f1f5f9; color: #475569;{% else %}background: #e0f2fe; color: #075985;{% endif %}"
+      >
+        {% if node.temporal_scope == 'origin' %}Origin &middot; Pre-Fall Default{% elif node.temporal_scope == 'fall' %}Fall Era{% elif node.temporal_scope == 'timeless' %}Voice &amp; OOC{% else %}Now &middot; 10 AF+{% endif %}
       </span>
       <span
         class="card-version-badge"
@@ -47,8 +54,8 @@
     {% csrf_token %}
     <input type="hidden" name="question_id" value="{{ node.id }}">
     <input type="hidden" name="entry_kind" class="card-entry-kind-input" value="{{ node.entry_kind|default:'character_creation' }}">
-    <input type="hidden" name="stardate_era" class="card-stardate-era-input" value="{{ node.stardate_era|default:'pre_fall' }}">
-    <input type="hidden" name="sol_date" class="card-sol-date-input" value="{{ node.sol_number|default:'0.000' }}">
+    <input type="hidden" name="stardate_era" class="card-stardate-era-input" value="{{ node.stardate_era|default:node.default_stardate_era }}">
+    <input type="hidden" name="sol_date" class="card-sol-date-input" value="{{ node.sol_number|default:node.default_sol_number }}">
     <input type="hidden" name="is_gm_only_present" value="1">
     <div class="dossier-answer-input-wrap">
       <textarea

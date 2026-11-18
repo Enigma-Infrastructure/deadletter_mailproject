@@ -8,10 +8,12 @@ from spacemarches.questionnaire import (
     get_children,
     get_core_questions,
     get_question,
+    get_question_temporal_defaults,
 )
 from spacemarches.services.dossier_service import (
     ENTRY_KIND_CHARACTER_CREATION,
     ENTRY_KIND_POST_ACTION_REPORT,
+    STARDATE_ERA_AUTO,
     STARDATE_ERA_FALL,
     STARDATE_ERA_POST_FALL,
     STARDATE_ERA_PRE_FALL,
@@ -58,6 +60,16 @@ class QuestionnaireSchemaTests(TestCase):
             self.assertNotIn(sid, non_sensitive_ids)
         self.assertEqual(len(get_children("13d", include_sensitive=True)), 6)
         self.assertEqual(len(get_children("13d", include_sensitive=False)), 0)
+
+        # Verify temporal_scope attributions across all questions
+        valid_scopes = {"origin", "fall", "present", "timeless"}
+        for q in all_qs:
+            self.assertIn(q.get("temporal_scope"), valid_scopes)
+        self.assertEqual(get_question_temporal_defaults("3")["default_stardate_era"], "post_fall")
+        self.assertEqual(get_question_temporal_defaults("3")["default_sol_number"], "10.000")
+        self.assertEqual(get_question_temporal_defaults("4")["default_stardate_era"], "pre_fall")
+        self.assertEqual(get_question_temporal_defaults("6.1g")["default_stardate_era"], "fall")
+        self.assertEqual(get_question_temporal_defaults("16")["temporal_scope"], "timeless")
 
         # Attribution notice
         notice = get_attribution_notice()
@@ -199,6 +211,51 @@ class DossierAndSyncServiceTests(TestCase):
         self.assertIn("exsurgent beacon on Titan", full_md)
         self.assertIn("Pre-Fall_v1", full_md)
         self.assertIn("[GM EYES ONLY]", full_md)
+
+    def test_auto_temporal_attribution_and_post_fall_origin_override(self):
+        # Standard Character Creation with 'auto': [3] -> 10.000 AF Now, [4] -> Pre-Fall Origin, [6.1g] -> Fall
+        s3 = save_dossier_answer(
+            self.dossier,
+            "3",
+            "Sylph biomorph sleeved on Locus.",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_AUTO,
+        )
+        self.assertEqual(s3["version_label"], "Sol 10.000_v1")
+
+        s4 = save_dossier_answer(
+            self.dossier,
+            "4",
+            "Hypercorp orbital researcher before the evacuation.",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_AUTO,
+        )
+        self.assertEqual(s4["version_label"], "Pre-Fall_v1")
+
+        s61g = save_dossier_answer(
+            self.dossier,
+            "6.1g",
+            "Emergency orbital egocast out of Luna.",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_AUTO,
+        )
+        self.assertEqual(s61g["version_label"], "Fall_v1")
+
+        # Post-Fall origin character (AGI / Uplift / Lost child) overrides [4] to Post-Fall Sol-date
+        agi_dossier = CharacterDossier.objects.create(
+            user=self.other_user,
+            character_name="Kestrel-AGI",
+            slug="kestrel-agi",
+        )
+        s_agi = save_dossier_answer(
+            agi_dossier,
+            "4",
+            "Instantiated as an emergent AGI in a Titanian server farm.",
+            entry_kind=ENTRY_KIND_CHARACTER_CREATION,
+            stardate_era=STARDATE_ERA_POST_FALL,
+            sol_date="4.500",
+        )
+        self.assertEqual(s_agi["version_label"], "Sol 4.500_v1")
 
     def test_sensitive_appendix_gating_on_export(self):
         save_dossier_answer(self.dossier, "13d1", "Lost beta fork during farcast.", source="web")

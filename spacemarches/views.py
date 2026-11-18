@@ -16,13 +16,16 @@ from .questionnaire import (
     get_children,
     get_core_questions,
     get_question,
+    get_question_temporal_defaults,
 )
 from .selectors import get_user_spacemarches_summary
 from .services.dossier_service import (
     ENTRY_KIND_CHARACTER_CREATION,
     ENTRY_KIND_CHOICES,
     ENTRY_KIND_POST_ACTION_REPORT,
+    STARDATE_ERA_AUTO,
     STARDATE_ERA_CHOICES,
+    STARDATE_ERA_POST_FALL,
     _normalize_existing_record,
     compute_dossier_stats,
     export_dossier_markdown,
@@ -286,6 +289,7 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
     raw_entry = responses.get(qid)
     has_entry = isinstance(raw_entry, dict) and bool(str(raw_entry.get("answer", "")).strip())
     norm = _normalize_existing_record(raw_entry) if has_entry else {}
+    temporal_defaults = get_question_temporal_defaults(qid)
 
     raw_revs = raw_entry.get("revisions", []) if isinstance(raw_entry, dict) else []
     revisions = [
@@ -307,6 +311,10 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
         "category": question.get("category"),
         "prompt": question.get("prompt"),
         "lore_text": question.get("lore_text"),
+        "temporal_scope": temporal_defaults["temporal_scope"],
+        "temporal_scope_label": temporal_defaults["temporal_scope_label"],
+        "default_stardate_era": temporal_defaults["default_stardate_era"],
+        "default_sol_number": temporal_defaults["default_sol_number"],
         "answer": norm.get("answer", ""),
         "is_answered": has_entry,
         "updated_at": norm.get("updated_at", ""),
@@ -349,6 +357,11 @@ def dossier_detail(request, slug: str):
         if stats["answered_count"] > 0
         else ENTRY_KIND_CHARACTER_CREATION
     )
+    default_stardate_era = (
+        STARDATE_ERA_POST_FALL
+        if stats["answered_count"] > 0
+        else STARDATE_ERA_AUTO
+    )
 
     return render(
         request,
@@ -364,7 +377,7 @@ def dossier_detail(request, slug: str):
             "entry_kind_choices": ENTRY_KIND_CHOICES,
             "stardate_era_choices": STARDATE_ERA_CHOICES,
             "default_entry_kind": default_entry_kind,
-            "default_stardate_era": progression["latest_era"],
+            "default_stardate_era": default_stardate_era,
             "default_sol_number": progression["latest_sol_number"],
             "attribution_notice": get_attribution_notice(),
         },
