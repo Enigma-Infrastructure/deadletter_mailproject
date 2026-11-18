@@ -1,8 +1,8 @@
-"""Django management command running the Spacemarches Discord dossier bot."""
+"""Django management command running the Spacemarches Discord dossier & intake bot."""
 from __future__ import annotations
 
 import os
-from typing import Any
+from typing import Any, Literal
 
 from asgiref.sync import sync_to_async
 from django.conf import settings
@@ -23,8 +23,12 @@ from spacemarches.services.dossier_service import (
     ENTRY_KIND_POST_ACTION_REPORT,
     complete_discord_link,
     compute_dossier_stats,
+    create_character_dossier_for_discord,
+    get_user_dossiers_for_discord,
     normalize_stardate,
+    resolve_discord_dossier,
     save_dossier_answer,
+    set_active_discord_dossier,
 )
 
 
@@ -40,23 +44,58 @@ def _complete_link_async(code: str, discord_user_id: str) -> tuple[str, str]:
 
 
 @sync_to_async
-def _get_active_dossier_for_discord(discord_user_id: str) -> tuple[CharacterDossier | None, dict[str, Any] | None]:
-    link = (
-        DiscordLink.objects.select_related("user")
-        .filter(discord_user_id=str(discord_user_id))
-        .first()
+def _resolve_dossier_async(
+    discord_user_id: str,
+    character_identifier: str = "",
+    *,
+    activate: bool = False,
+) -> tuple[CharacterDossier | None, dict[str, Any] | None]:
+    return resolve_discord_dossier(
+        discord_user_id,
+        character_identifier=character_identifier,
+        activate=activate,
     )
+
+
+@sync_to_async
+def _list_dossiers_async(discord_user_id: str) -> tuple[DiscordLink | None, list[dict[str, Any]]]:
+    link, dossiers = get_user_dossiers_for_discord(discord_user_id)
     if link is None:
-        return None, None
-    dossier = (
-        CharacterDossier.objects.filter(user=link.user)
-        .order_by("-updated_at")
-        .first()
-    )
-    if dossier is None:
-        return None, {"linked": True, "username": str(link.user)}
+        return None, []
+    active_id = link.active_dossier_id
+    if active_id is None and dossiers:
+        active_id = dossiers[0].pk
+    items = [
+        {
+            "dossier": d,
+            "stats": compute_dossier_stats(d),
+            "is_active": d.pk == active_id,
+        }
+        for d in dossiers
+    ]
+    return link, items
+
+
+@sync_to_async
+def _swap_active_dossier_async(discord_user_id: str, character_identifier: str) -> tuple[CharacterDossier, dict[str, Any]]:
+    dossier = set_active_discord_dossier(discord_user_id, character_identifier)
     stats = compute_dossier_stats(dossier)
-    return dossier, {"linked": True, "username": str(link.user), "stats": stats}
+    return dossier, stats
+
+
+@sync_to_async
+def _create_dossier_async(
+    discord_user_id: str,
+    character_name: str,
+    narrative_voice: str = "",
+) -> tuple[CharacterDossier, dict[str, Any]]:
+    dossier = create_character_dossier_for_discord(
+        discord_user_id,
+        character_name=character_name,
+        narrative_voice=narrative_voice,
+    )
+    stats = compute_dossier_stats(dossier)
+    return dossier, stats
 
 
 @sync_to_async
@@ -88,8 +127,195 @@ def _save_dossier_answer_async(
 
 
 # --------------------------------------------------
-# Discord UI Components (Modals, Select, Debrief Buttons)
+# Shared Embed & Intake Builders
 # --------------------------------------------------
+
+
+def _filter_intake_questions(
+    dossier: CharacterDossier,
+    *,
+    scope: str = "core",
+    category: str | None = None,
+) -> tuple[list[dict[str, Any]], str]:
+    questions = get_all_questions(include_sensitive=dossier.show_sensitive_appendix)
+    responses = dossier.responses if isinstance(dossier.responses, dict) else {}
+
+    normalized_scope = (scope or "").strip().lower()
+    if normalized_scope not in {"core", "all", "unanswered"}:
+        normalized_scope = "all" if category else "core"
+
+    if category:
+        cat_lower = category.strip().lower()
+        filtered = [q for q in questions if cat_lower in q.get("category", "").lower()]
+        if filtered:
+            questions = filtered
+
+    if normalized_scope == "core":
+        questions = [q for q in questions if q.get("tier") == "core"]
+    elif normalized_scope == "unanswered":
+        questions = [
+            q
+            for q in questions
+            if not (
+                isinstance(responses.get(q["id"]), dict)
+                and bool(str(responses[q["id"]].get("answer", "")).strip())
+            )
+        ]
+
+    return questions, normalized_scope
+
+
+def _build_intake_overview_embed(
+    dossier: CharacterDossier,
+    stats: dict[str, Any],
+    *,
+    scope: str = "core",
+    category: str | None = None,
+    shown_count: int = 0,
+) -> discord.Embed:
+    scope_labels = {
+        "core": "Core Prompts",
+        "all": "All Prompts",
+        "unanswered": "Unanswered Prompts",
+    }
+    embed = discord.Embed(
+        title=f"Intake: {dossier.character_name}"[:256],
+        description=(
+            f"Voice: **{dossier.get_narrative_voice_display()}**\n"
+            f"Core: **{stats['core_answered']}/{stats['core_total']}** | "
+            f"Total: **{stats['answered_count']}/{stats['total_questions']}** "
+            f"({stats['completion_percent']}%)\n"
+            f"Filter: **{scope_labels.get(scope, 'Core Prompts')}**"
+            + (f" · Category: `{category}`" if category else "")
+        ),
+        color=discord.Color.blue(),
+    )
+    if shown_count > 25:
+        embed.set_footer(text=f"Showing first 25 of {shown_count} matching prompts · Filter by category to narrow")
+    else:
+        embed.set_footer(text="Select a prompt below to read it in full before editing.")
+    return embed
+
+
+def _build_dossier_overview_embed(
+    dossier: CharacterDossier,
+    stats: dict[str, Any],
+    *,
+    total_characters: int = 1,
+) -> discord.Embed:
+    embed = discord.Embed(
+        title=f"Active Dossier: {dossier.character_name}"[:256],
+        description=(
+            f"Slug: `{dossier.slug}`\n"
+            f"Narrative Voice: **{dossier.get_narrative_voice_display()}**\n"
+            f"Core Prompts: **{stats['core_answered']}/{stats['core_total']}**\n"
+            f"Deep Prompts: **{stats['deep_answered']}/{stats['deep_total']}**\n"
+            f"Total Completion: **{stats['answered_count']}/{stats['total_questions']}** "
+            f"({stats['completion_percent']}%)"
+        ),
+        color=discord.Color.teal(),
+    )
+    embed.set_footer(
+        text=(
+            f"{total_characters} character(s) on account · "
+            "Use the buttons below to start /intake, create a character, or swap active dossiers."
+        )[:2048]
+    )
+    return embed
+
+
+def _build_question_detail_embed(dossier: CharacterDossier, question: dict[str, Any]) -> discord.Embed:
+    """Render the full, unclipped question prompt, lore note, and current answer."""
+    qid = question["id"]
+    category = question.get("category") or "Dossier Prompt"
+
+    desc_parts = [f"**{question['prompt']}**"]
+    lore = (question.get("lore_text") or "").strip()
+    if lore:
+        desc_parts.append(f"*{lore}*")
+
+    embed = discord.Embed(
+        title=f"[{qid}] {category}"[:256],
+        description="\n\n".join(desc_parts)[:4096],
+        color=discord.Color.blue(),
+    )
+
+    responses = dossier.responses if isinstance(dossier.responses, dict) else {}
+    existing = responses.get(qid)
+    if isinstance(existing, dict) and str(existing.get("answer", "")).strip():
+        ver = existing.get("version_label") or existing.get("sol_date") or "Saved"
+        answer_text = str(existing.get("answer", "")).strip()
+        if len(answer_text) > 1000:
+            answer_text = answer_text[:997] + "..."
+        embed.add_field(name=f"Current Response ({ver})", value=answer_text, inline=False)
+    else:
+        era = str(question.get("default_stardate_era") or "post_fall")
+        sol_num = str(question.get("default_sol_number") or "10.000")
+        default_era = (
+            f"Sol {sol_num}"
+            if era == "post_fall"
+            else ("Fall" if era == "fall" else "Pre-Fall")
+        )
+        embed.add_field(
+            name="Status",
+            value=f"Unanswered · Default Stardate: **{default_era}**",
+            inline=False,
+        )
+
+    scope = str(question.get("temporal_scope") or "").strip()
+    footer_parts = [dossier.character_name]
+    if scope:
+        footer_parts.append(scope.replace("_", " ").title())
+    footer_parts.append("Click Answer / Edit below")
+    embed.set_footer(text=" · ".join(footer_parts)[:2048])
+    return embed
+
+
+# --------------------------------------------------
+# Discord UI Components (Modals, Selects, Archive & Debrief Views)
+# --------------------------------------------------
+
+
+class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier"):
+    """Modal creating a new CharacterDossier and setting it active for Discord."""
+
+    def __init__(self):
+        super().__init__()
+        self.character_name_input = discord.ui.TextInput(
+            label="Character Name / Callsign",
+            style=discord.TextStyle.short,
+            required=True,
+            max_length=160,
+            placeholder="e.g. Dr. Elena Vance // 'Specter'",
+        )
+        self.add_item(self.character_name_input)
+
+        self.narrative_voice_input = discord.ui.TextInput(
+            label="Narrative Voice (first or omniscient)",
+            style=discord.TextStyle.short,
+            default="first",
+            required=False,
+            max_length=32,
+            placeholder="first (agent log) or omniscient (Foundation)",
+        )
+        self.add_item(self.narrative_voice_input)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            dossier, stats = await _create_dossier_async(
+                str(interaction.user.id),
+                character_name=self.character_name_input.value,
+                narrative_voice=self.narrative_voice_input.value,
+            )
+        except ValueError as err:
+            await interaction.response.send_message(f"Could not create dossier: {err}", ephemeral=True)
+            return
+
+        _link, items = await _list_dossiers_async(str(interaction.user.id))
+        embed = _build_dossier_overview_embed(dossier, stats, total_characters=max(len(items), 1))
+        embed.title = f"Initialized & Active: {dossier.character_name}"[:256]
+        view = DossierArchiveView(items=items, active_dossier=dossier)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 class DossierAnswerModal(discord.ui.Modal):
@@ -173,51 +399,105 @@ class DossierAnswerModal(discord.ui.Modal):
         )
 
 
-def _build_question_detail_embed(dossier: CharacterDossier, question: dict[str, Any]) -> discord.Embed:
-    """Render the full, unclipped question prompt, lore note, and current answer."""
-    qid = question["id"]
-    category = question.get("category") or "Dossier Prompt"
+class LaunchIntakeButton(discord.ui.Button):
+    """Transitions from a dossier overview directly into the /intake questionnaire."""
 
-    desc_parts = [f"**{question['prompt']}**"]
-    lore = (question.get("lore_text") or "").strip()
-    if lore:
-        desc_parts.append(f"*{lore}*")
-
-    embed = discord.Embed(
-        title=f"[{qid}] {category}"[:256],
-        description="\n\n".join(desc_parts)[:4096],
-        color=discord.Color.blue(),
-    )
-
-    responses = dossier.responses if isinstance(dossier.responses, dict) else {}
-    existing = responses.get(qid)
-    if isinstance(existing, dict) and str(existing.get("answer", "")).strip():
-        ver = existing.get("version_label") or existing.get("sol_date") or "Saved"
-        answer_text = str(existing.get("answer", "")).strip()
-        if len(answer_text) > 1000:
-            answer_text = answer_text[:997] + "..."
-        embed.add_field(name=f"Current Response ({ver})", value=answer_text, inline=False)
-    else:
-        era = str(question.get("default_stardate_era") or "post_fall")
-        sol_num = str(question.get("default_sol_number") or "10.000")
-        default_era = (
-            f"Sol {sol_num}"
-            if era == "post_fall"
-            else ("Fall" if era == "fall" else "Pre-Fall")
+    def __init__(self, *, dossier: CharacterDossier, scope: str = "core", row: int = 0):
+        super().__init__(
+            label="Start / Continue Intake",
+            style=discord.ButtonStyle.primary,
+            row=row,
         )
-        embed.add_field(
-            name="Status",
-            value=f"Unanswered · Default Stardate: **{default_era}**",
-            inline=False,
+        self.dossier = dossier
+        self.scope = scope
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        fresh_dossier = await _get_dossier_by_id_async(self.dossier.pk)
+        stats = compute_dossier_stats(fresh_dossier)
+        questions, resolved_scope = _filter_intake_questions(fresh_dossier, scope=self.scope)
+        embed = _build_intake_overview_embed(
+            fresh_dossier,
+            stats,
+            scope=resolved_scope,
+            shown_count=len(questions),
+        )
+        view = DossierSelectView(dossier=fresh_dossier, questions=questions)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class CreateDossierButton(discord.ui.Button):
+    """Opens CreateDossierModal to start a brand-new character narrative."""
+
+    def __init__(self, *, label: str = "+ New Character", row: int = 0):
+        super().__init__(label=label[:80], style=discord.ButtonStyle.secondary, row=row)
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_modal(CreateDossierModal())
+
+
+class CharacterSelect(discord.ui.Select):
+    """Dropdown switching which CharacterDossier is active for the Discord user."""
+
+    def __init__(self, *, items: list[dict[str, Any]], row: int = 1):
+        options: list[discord.SelectOption] = []
+        for entry in items[:25]:
+            d = entry["dossier"]
+            stats = entry["stats"]
+            is_active = bool(entry.get("is_active"))
+            marker = "★" if is_active else "○"
+            label = f"{marker} {d.character_name}"[:100]
+            desc = (
+                f"{d.get_narrative_voice_display()} · "
+                f"Core {stats['core_answered']}/{stats['core_total']} · "
+                f"Total {stats['answered_count']}/{stats['total_questions']}"
+            )[:100]
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=str(d.pk),
+                    description=desc,
+                    default=is_active,
+                )
+            )
+
+        super().__init__(
+            placeholder="Swap active character dossier...",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=row,
         )
 
-    scope = str(question.get("temporal_scope") or "").strip()
-    footer_parts = [dossier.character_name]
-    if scope:
-        footer_parts.append(scope.replace("_", " ").title())
-    footer_parts.append("Click Answer / Edit below")
-    embed.set_footer(text=" · ".join(footer_parts)[:2048])
-    return embed
+    async def callback(self, interaction: discord.Interaction) -> None:
+        selected_pk = self.values[0]
+        try:
+            dossier, stats = await _swap_active_dossier_async(str(interaction.user.id), selected_pk)
+        except ValueError as err:
+            await interaction.response.send_message(f"Swap failed: {err}", ephemeral=True)
+            return
+
+        _link, items = await _list_dossiers_async(str(interaction.user.id))
+        embed = _build_dossier_overview_embed(dossier, stats, total_characters=len(items))
+        view = DossierArchiveView(items=items, active_dossier=dossier)
+        await interaction.response.edit_message(embed=embed, view=view)
+
+
+class DossierArchiveView(discord.ui.View):
+    """Archive view for /dossier open, /dossier list, and /dossier swap."""
+
+    def __init__(
+        self,
+        *,
+        items: list[dict[str, Any]],
+        active_dossier: CharacterDossier | None = None,
+        timeout: float = 300,
+    ):
+        super().__init__(timeout=timeout)
+        if active_dossier is not None:
+            self.add_item(LaunchIntakeButton(dossier=active_dossier, row=0))
+        self.add_item(CreateDossierButton(row=0))
+        if items:
+            self.add_item(CharacterSelect(items=items, row=1))
 
 
 class DossierEditButton(discord.ui.Button):
@@ -429,11 +709,140 @@ async def handle_link_command(interaction: discord.Interaction, code: str) -> No
     )
 
 
-async def handle_dossier_command(
+async def handle_dossier_open_command(
+    interaction: discord.Interaction,
+    character: str | None = None,
+) -> None:
+    """Open the character dossier hub with character switcher, intake launcher, and new-character button."""
+    try:
+        dossier, meta = await _resolve_dossier_async(
+            str(interaction.user.id),
+            character_identifier=character or "",
+            activate=bool(character),
+        )
+    except ValueError as err:
+        await interaction.response.send_message(str(err), ephemeral=True)
+        return
+
+    if meta is None:
+        await interaction.response.send_message(
+            "Your Discord account is not linked yet. Generate a link code on the website and run `/link <code>`.",
+            ephemeral=True,
+        )
+        return
+
+    if dossier is None:
+        embed = discord.Embed(
+            title="No Character Dossiers Found",
+            description=(
+                f"Linked to **{meta['username']}**, but you have not initialized a character narrative yet.\n"
+                "Click **+ New Character** below (or run `/dossier create`) to start one."
+            ),
+            color=discord.Color.blue(),
+        )
+        view = DossierArchiveView(items=[], active_dossier=None)
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        return
+
+    _link, items = await _list_dossiers_async(str(interaction.user.id))
+    embed = _build_dossier_overview_embed(dossier, meta["stats"], total_characters=len(items))
+    view = DossierArchiveView(items=items, active_dossier=dossier)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def handle_dossier_swap_command(
+    interaction: discord.Interaction,
+    character: str,
+) -> None:
+    """Switch the linked user's active CharacterDossier."""
+    try:
+        dossier, stats = await _swap_active_dossier_async(str(interaction.user.id), character)
+    except ValueError as err:
+        await interaction.response.send_message(str(err), ephemeral=True)
+        return
+
+    _link, items = await _list_dossiers_async(str(interaction.user.id))
+    embed = _build_dossier_overview_embed(dossier, stats, total_characters=len(items))
+    embed.title = f"Swapped Active Dossier: {dossier.character_name}"[:256]
+    view = DossierArchiveView(items=items, active_dossier=dossier)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def handle_dossier_list_command(interaction: discord.Interaction) -> None:
+    """List all character dossiers on the user's linked account and allow swapping."""
+    link, items = await _list_dossiers_async(str(interaction.user.id))
+    if link is None:
+        await interaction.response.send_message(
+            "Your Discord account is not linked yet. Generate a link code on the website and run `/link <code>`.",
+            ephemeral=True,
+        )
+        return
+
+    if not items:
+        embed = discord.Embed(
+            title="Your Character Dossiers (0)",
+            description="No dossiers created yet. Click **+ New Character** below or run `/dossier create`.",
+            color=discord.Color.blue(),
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=DossierArchiveView(items=[], active_dossier=None),
+            ephemeral=True,
+        )
+        return
+
+    lines: list[str] = []
+    active_dossier = items[0]["dossier"]
+    for entry in items:
+        d = entry["dossier"]
+        stats = entry["stats"]
+        tag = "**[ACTIVE]** " if entry["is_active"] else ""
+        if entry["is_active"]:
+            active_dossier = d
+        lines.append(
+            f"- {tag}**{d.character_name}** (`{d.slug}`) · {d.get_narrative_voice_display()} · "
+            f"Core {stats['core_answered']}/{stats['core_total']}, Total {stats['answered_count']}/{stats['total_questions']}"
+        )
+
+    embed = discord.Embed(
+        title=f"Character Dossiers ({len(items)})",
+        description="\n".join(lines)[:4096],
+        color=discord.Color.teal(),
+    )
+    embed.set_footer(text="Use the dropdown below or `/dossier swap <character>` to switch active narrative.")
+    view = DossierArchiveView(items=items, active_dossier=active_dossier)
+    await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def handle_dossier_create_command(interaction: discord.Interaction) -> None:
+    """Open the modal to create a new CharacterDossier if the Discord account is linked."""
+    link, _items = await _list_dossiers_async(str(interaction.user.id))
+    if link is None:
+        await interaction.response.send_message(
+            "Your Discord account is not linked yet. Generate a link code on the website and run `/link <code>`.",
+            ephemeral=True,
+        )
+        return
+    await interaction.response.send_modal(CreateDossierModal())
+
+
+async def handle_intake_command(
     interaction: discord.Interaction,
     category: str | None = None,
+    character: str | None = None,
+    scope: str | None = None,
 ) -> None:
-    dossier, meta = await _get_active_dossier_for_discord(str(interaction.user.id))
+    """Start or continue the thematic ego intake questionnaire for the active/selected character."""
+    try:
+        dossier, meta = await _resolve_dossier_async(
+            str(interaction.user.id),
+            character_identifier=character or "",
+            activate=bool(character),
+        )
+    except ValueError as err:
+        await interaction.response.send_message(str(err), ephemeral=True)
+        return
+
     if meta is None:
         await interaction.response.send_message(
             "Your Discord account is not linked yet. Generate a link code on the website and run `/link <code>`.",
@@ -441,35 +850,56 @@ async def handle_dossier_command(
         )
         return
     if dossier is None:
+        embed = discord.Embed(
+            title="Initialize Your First Character First",
+            description=(
+                f"Linked to **{meta['username']}**, but you don't have any Character Dossier yet.\n"
+                "Click **Create First Character** below to start your narrative, then jump right into `/intake`."
+            ),
+            color=discord.Color.blue(),
+        )
+        view = discord.ui.View(timeout=300)
+        view.add_item(CreateDossierButton(label="Create First Character"))
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        return
+
+    effective_scope = scope or ("all" if category else "core")
+    questions, resolved_scope = _filter_intake_questions(
+        dossier,
+        scope=effective_scope,
+        category=category,
+    )
+    if not questions:
         await interaction.response.send_message(
-            f"Linked to **{meta['username']}**, but no Character Dossier exists yet. Create one at `/spacemarches/dossier/`.",
+            f"No prompts match that filter for **{dossier.character_name}**.",
             ephemeral=True,
         )
         return
 
-    questions = get_all_questions(include_sensitive=dossier.show_sensitive_appendix)
-    if category:
-        cat_lower = category.strip().lower()
-        filtered = [q for q in questions if cat_lower in q.get("category", "").lower()]
-        if filtered:
-            questions = filtered
-
     stats = meta["stats"]
-    embed = discord.Embed(
-        title=f"Dossier: {dossier.character_name}",
-        description=(
-            f"Voice: **{dossier.get_narrative_voice_display()}**\n"
-            f"Core: **{stats['core_answered']}/{stats['core_total']}** | "
-            f"Total: **{stats['answered_count']}/{stats['total_questions']}** "
-            f"({stats['completion_percent']}%)"
-        ),
-        color=discord.Color.blue(),
+    embed = _build_intake_overview_embed(
+        dossier,
+        stats,
+        scope=resolved_scope,
+        category=category,
+        shown_count=len(questions),
     )
-    if category:
-        embed.set_footer(text=f"Filtered by category matching: {category}")
-
     view = DossierSelectView(dossier=dossier, questions=questions)
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+
+async def handle_dossier_command(
+    interaction: discord.Interaction,
+    category: str | None = None,
+    character: str | None = None,
+) -> None:
+    """Compatibility helper mapping directly to the interactive intake questionnaire."""
+    await handle_intake_command(
+        interaction,
+        category=category,
+        character=character,
+        scope="all" if category else "core",
+    )
 
 
 async def handle_debrief_command(
@@ -478,6 +908,7 @@ async def handle_debrief_command(
     stardate: str = "",
     question_ids: str = "",
     *,
+    character: str = "",
     session_tag: str = "",
 ) -> None:
     raw_stardate = (stardate or session_tag or "").strip()
@@ -511,7 +942,16 @@ async def handle_debrief_command(
         )
         return
 
-    dossier, meta = await _get_active_dossier_for_discord(str(member.id))
+    try:
+        dossier, meta = await _resolve_dossier_async(
+            str(member.id),
+            character_identifier=character,
+            activate=False,
+        )
+    except ValueError as err:
+        await interaction.response.send_message(str(err), ephemeral=True)
+        return
+
     if meta is None or dossier is None:
         await interaction.response.send_message(
             f"Target user {member.display_name} does not have a linked Character Dossier.",
@@ -556,7 +996,8 @@ async def handle_debrief_command(
         return
 
     await interaction.response.send_message(
-        f"Sent Post-Action Report debrief ({canonical_sol}) for {', '.join(q['id'] for q in visible_questions)} to {member.display_name}.",
+        f"Sent Post-Action Report debrief ({canonical_sol}) for {', '.join(q['id'] for q in visible_questions)} "
+        f"({dossier.character_name}) to {member.display_name}.",
         ephemeral=True,
     )
 
@@ -571,18 +1012,24 @@ def build_bot() -> discord.Client:
     client = discord.Client(intents=intents)
     tree = app_commands.CommandTree(client)
 
-    @tree.command(name="link", description="Link your Discord account to your Spacemarches account.")
-    @app_commands.describe(code="One-time link code generated from /spacemarches/dossier/")
-    async def link_cmd(interaction: discord.Interaction, code: str):
-        await handle_link_command(interaction, code)
+    async def _character_autocomplete(
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        _link, items = await _list_dossiers_async(str(interaction.user.id))
+        cur = (current or "").strip().lower()
+        choices: list[app_commands.Choice[str]] = []
+        for entry in items:
+            d = entry["dossier"]
+            if cur and cur not in d.character_name.lower() and cur not in d.slug.lower():
+                continue
+            prefix = "★ " if entry["is_active"] else ""
+            label = f"{prefix}{d.character_name}"[:100]
+            value = d.slug if len(d.slug) <= 100 else str(d.pk)
+            choices.append(app_commands.Choice(name=label, value=value))
+        return choices[:25]
 
-    @tree.command(name="dossier", description="Open your private character dossier progress & prompt editor.")
-    @app_commands.describe(category="Optional category filter")
-    async def dossier_cmd(interaction: discord.Interaction, category: str | None = None):
-        await handle_dossier_command(interaction, category=category)
-
-    @dossier_cmd.autocomplete("category")
-    async def dossier_category_autocomplete(
+    async def _category_autocomplete(
         interaction: discord.Interaction,
         current: str,
     ) -> list[app_commands.Choice[str]]:
@@ -593,19 +1040,82 @@ def build_bot() -> discord.Client:
             if cur in cat.lower()
         ][:25]
 
+    @tree.command(name="link", description="Link your Discord account to your Spacemarches account.")
+    @app_commands.describe(code="One-time link code generated from /spacemarches/dossier/")
+    async def link_cmd(interaction: discord.Interaction, code: str):
+        await handle_link_command(interaction, code)
+
+    dossier_group = app_commands.Group(
+        name="dossier",
+        description="Select, swap, or initialize your character dossiers.",
+    )
+
+    @dossier_group.command(name="open", description="Open your character dossier overview and switcher.")
+    @app_commands.describe(character="Optional character name or slug to open and make active")
+    @app_commands.autocomplete(character=_character_autocomplete)
+    async def dossier_open_cmd(interaction: discord.Interaction, character: str | None = None):
+        await handle_dossier_open_command(interaction, character=character)
+
+    @dossier_group.command(name="swap", description="Switch which character dossier is currently active.")
+    @app_commands.describe(character="Character name or slug to activate")
+    @app_commands.autocomplete(character=_character_autocomplete)
+    async def dossier_swap_cmd(interaction: discord.Interaction, character: str):
+        await handle_dossier_swap_command(interaction, character=character)
+
+    @dossier_group.command(name="list", description="List all your character dossiers and active status.")
+    async def dossier_list_cmd(interaction: discord.Interaction):
+        await handle_dossier_list_command(interaction)
+
+    @dossier_group.command(name="create", description="Initialize a new character dossier narrative.")
+    async def dossier_create_cmd(interaction: discord.Interaction):
+        await handle_dossier_create_command(interaction)
+
+    tree.add_command(dossier_group)
+
+    @tree.command(
+        name="intake",
+        description="Begin or continue the ego intake questionnaire for your active character.",
+    )
+    @app_commands.describe(
+        character="Optional character name or slug (activates if provided)",
+        scope="Prompt tier filter (defaults to Core Prompts unless a category is picked)",
+        category="Optional category filter",
+    )
+    @app_commands.autocomplete(character=_character_autocomplete, category=_category_autocomplete)
+    async def intake_cmd(
+        interaction: discord.Interaction,
+        character: str | None = None,
+        scope: Literal["core", "all", "unanswered"] | None = None,
+        category: str | None = None,
+    ):
+        await handle_intake_command(
+            interaction,
+            category=category,
+            character=character,
+            scope=scope,
+        )
+
     @tree.command(name="debrief", description="GM: DM a linked player interactive post-action report prompts.")
     @app_commands.describe(
         member="Target Discord member",
         stardate="Pre-Fall, Fall, or Post-Fall Sol-date (e.g. 2.450)",
         question_ids="Comma-separated question IDs (e.g. 15a,15b,6.1d)",
+        character="Optional player character name/slug (defaults to their active dossier)",
     )
     async def debrief_cmd(
         interaction: discord.Interaction,
         member: discord.Member,
         stardate: str,
         question_ids: str,
+        character: str | None = None,
     ):
-        await handle_debrief_command(interaction, member, stardate=stardate, question_ids=question_ids)
+        await handle_debrief_command(
+            interaction,
+            member,
+            stardate=stardate,
+            question_ids=question_ids,
+            character=character or "",
+        )
 
     @client.event
     async def on_ready():

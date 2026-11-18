@@ -256,6 +256,151 @@ def complete_discord_link(code: str, discord_user_id: str) -> DiscordLink:
         return link
 
 
+def _normalize_narrative_voice(raw_voice: str = "") -> str:
+    cleaned = (raw_voice or "").strip().lower().replace("-", "_").replace(" ", "_")
+    if cleaned in {"", "first", "first_person", "1st", "agent", "log"}:
+        return CharacterDossier.VOICE_FIRST_PERSON
+    if cleaned in {"omni", "omniscient", "third", "3rd", "foundation", "dossier"}:
+        return CharacterDossier.VOICE_OMNISCIENT
+    if cleaned.upper() in {CharacterDossier.VOICE_FIRST_PERSON, CharacterDossier.VOICE_OMNISCIENT}:
+        return cleaned.upper()
+    raise ValueError(
+        "Unknown narrative voice. Use 'first' (First-person agent log) or 'omniscient' (Foundation dossier)."
+    )
+
+
+def _resolve_user_dossier(user, identifier: str) -> CharacterDossier:
+    ident = (identifier or "").strip()
+    if not ident:
+        raise ValueError("Character name or slug is required.")
+
+    qs = CharacterDossier.objects.filter(user=user).order_by("-updated_at")
+    if ident.isdigit():
+        by_pk = qs.filter(pk=int(ident)).first()
+        if by_pk is not None:
+            return by_pk
+
+    by_slug = qs.filter(slug__iexact=ident).first()
+    if by_slug is not None:
+        return by_slug
+
+    by_name = qs.filter(character_name__iexact=ident).first()
+    if by_name is not None:
+        return by_name
+
+    partial = list(qs.filter(character_name__icontains=ident)[:5])
+    if len(partial) == 1:
+        return partial[0]
+    if len(partial) > 1:
+        names = ", ".join(d.character_name for d in partial)
+        raise ValueError(f"Multiple characters match '{ident}': {names}. Be more specific.")
+
+    raise ValueError(f"No Character Dossier matching '{ident}' found on your account.")
+
+
+def get_user_dossiers_for_discord(
+    discord_user_id: str,
+) -> tuple[DiscordLink | None, list[CharacterDossier]]:
+    link = (
+        DiscordLink.objects.select_related("user", "active_dossier")
+        .filter(discord_user_id=str(discord_user_id))
+        .first()
+    )
+    if link is None:
+        return None, []
+    dossiers = list(CharacterDossier.objects.filter(user=link.user).order_by("-updated_at"))
+    return link, dossiers
+
+
+def resolve_discord_dossier(
+    discord_user_id: str,
+    character_identifier: str = "",
+    *,
+    activate: bool = False,
+) -> tuple[CharacterDossier | None, dict[str, Any] | None]:
+    """Return active or requested CharacterDossier and summary metadata for a Discord user."""
+    link, dossiers = get_user_dossiers_for_discord(discord_user_id)
+    if link is None:
+        return None, None
+
+    if not dossiers:
+        if (character_identifier or "").strip():
+            raise ValueError("You have no Character Dossiers yet. Run /dossier create first.")
+        return None, {"linked": True, "username": str(link.user), "dossiers": []}
+
+    chosen: CharacterDossier | None = None
+    if (character_identifier or "").strip():
+        chosen = _resolve_user_dossier(link.user, character_identifier)
+        if activate and link.active_dossier_id != chosen.pk:
+            link.active_dossier = chosen
+            link.save(update_fields=["active_dossier"])
+    elif link.active_dossier is not None and link.active_dossier.user_id == link.user_id:
+        chosen = link.active_dossier
+    else:
+        chosen = dossiers[0]
+        if link.active_dossier_id != chosen.pk:
+            link.active_dossier = chosen
+            link.save(update_fields=["active_dossier"])
+
+    stats = compute_dossier_stats(chosen)
+    return chosen, {
+        "linked": True,
+        "username": str(link.user),
+        "active_dossier_id": chosen.pk,
+        "dossiers": dossiers,
+        "stats": stats,
+    }
+
+
+def set_active_discord_dossier(discord_user_id: str, character_identifier: str) -> CharacterDossier:
+    """Switch the linked Discord user's active CharacterDossier."""
+    link = (
+        DiscordLink.objects.select_related("user")
+        .filter(discord_user_id=str(discord_user_id))
+        .first()
+    )
+    if link is None:
+        raise ValueError("Your Discord account is not linked yet. Generate a link code and run `/link <code>`.")
+
+    dossier = _resolve_user_dossier(link.user, character_identifier)
+    if link.active_dossier_id != dossier.pk:
+        link.active_dossier = dossier
+        link.save(update_fields=["active_dossier"])
+    return dossier
+
+
+def create_character_dossier_for_discord(
+    discord_user_id: str,
+    character_name: str,
+    narrative_voice: str = "",
+) -> CharacterDossier:
+    """Create a new CharacterDossier for a linked Discord user and make it active."""
+    clean_name = (character_name or "").strip()
+    if not clean_name:
+        raise ValueError("Character Name / Callsign cannot be empty.")
+
+    voice = _normalize_narrative_voice(narrative_voice)
+
+    with transaction.atomic():
+        link = (
+            DiscordLink.objects.select_for_update()
+            .select_related("user")
+            .filter(discord_user_id=str(discord_user_id))
+            .first()
+        )
+        if link is None:
+            raise ValueError("Your Discord account is not linked yet. Generate a link code and run `/link <code>`.")
+
+        dossier = CharacterDossier.objects.create(
+            user=link.user,
+            character_name=clean_name[:160],
+            narrative_voice=voice,
+        )
+        link.active_dossier = dossier
+        link.save(update_fields=["active_dossier"])
+        return dossier
+
+
 def compute_dossier_stats(dossier: CharacterDossier) -> dict[str, Any]:
     responses = dossier.responses if isinstance(dossier.responses, dict) else {}
     private_keys = set(dossier.private_keys or [])

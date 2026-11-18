@@ -184,6 +184,13 @@ class DiscordLink(models.Model):
     )
     discord_user_id = models.CharField(max_length=64, unique=True, null=True, blank=True)
     link_code = models.CharField(max_length=32, unique=True, null=True, blank=True)
+    active_dossier = models.ForeignKey(
+        "CharacterDossier",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="active_discord_links",
+    )
     linked_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 

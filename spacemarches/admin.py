@@ -57,8 +57,8 @@ class ForumPostAdmin(admin.ModelAdmin):
 
 @admin.register(DiscordLink)
 class DiscordLinkAdmin(admin.ModelAdmin):
-    list_display = ("user", "discord_user_id", "link_code", "linked_at")
-    search_fields = ("user__username", "discord_user_id", "link_code")
+    list_display = ("user", "discord_user_id", "active_dossier", "link_code", "linked_at")
+    search_fields = ("user__username", "discord_user_id", "link_code", "active_dossier__character_name")
 
 
 @admin.register(CharacterDossier)
