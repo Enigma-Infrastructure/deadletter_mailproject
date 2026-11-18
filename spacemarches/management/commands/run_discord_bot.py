@@ -60,6 +60,11 @@ def _get_active_dossier_for_discord(discord_user_id: str) -> tuple[CharacterDoss
 
 
 @sync_to_async
+def _get_dossier_by_id_async(dossier_id: int) -> CharacterDossier:
+    return CharacterDossier.objects.get(pk=dossier_id)
+
+
+@sync_to_async
 def _save_dossier_answer_async(
     dossier_id: int,
     question_id: str,
@@ -132,7 +137,7 @@ class DossierAnswerModal(discord.ui.Modal):
 
         prompt_label = question["prompt"]
         if len(prompt_label) > 45:
-            prompt_label = prompt_label[:42] + "..."
+            prompt_label = f"Response for [{qid}]"
 
         self.answer_input = discord.ui.TextInput(
             label=prompt_label,
@@ -140,7 +145,7 @@ class DossierAnswerModal(discord.ui.Modal):
             default=(current_answer or "")[:4000],
             required=False,
             max_length=4000,
-            placeholder=f"Response for [{qid}]...",
+            placeholder=question["prompt"][:100] if len(question["prompt"]) > 45 else f"Response for [{qid}]...",
         )
         self.add_item(self.answer_input)
 
@@ -168,8 +173,95 @@ class DossierAnswerModal(discord.ui.Modal):
         )
 
 
+def _build_question_detail_embed(dossier: CharacterDossier, question: dict[str, Any]) -> discord.Embed:
+    """Render the full, unclipped question prompt, lore note, and current answer."""
+    qid = question["id"]
+    category = question.get("category") or "Dossier Prompt"
+
+    desc_parts = [f"**{question['prompt']}**"]
+    lore = (question.get("lore_text") or "").strip()
+    if lore:
+        desc_parts.append(f"*{lore}*")
+
+    embed = discord.Embed(
+        title=f"[{qid}] {category}"[:256],
+        description="\n\n".join(desc_parts)[:4096],
+        color=discord.Color.blue(),
+    )
+
+    responses = dossier.responses if isinstance(dossier.responses, dict) else {}
+    existing = responses.get(qid)
+    if isinstance(existing, dict) and str(existing.get("answer", "")).strip():
+        ver = existing.get("version_label") or existing.get("sol_date") or "Saved"
+        answer_text = str(existing.get("answer", "")).strip()
+        if len(answer_text) > 1000:
+            answer_text = answer_text[:997] + "..."
+        embed.add_field(name=f"Current Response ({ver})", value=answer_text, inline=False)
+    else:
+        era = str(question.get("default_stardate_era") or "post_fall")
+        sol_num = str(question.get("default_sol_number") or "10.000")
+        default_era = (
+            f"Sol {sol_num}"
+            if era == "post_fall"
+            else ("Fall" if era == "fall" else "Pre-Fall")
+        )
+        embed.add_field(
+            name="Status",
+            value=f"Unanswered · Default Stardate: **{default_era}**",
+            inline=False,
+        )
+
+    scope = str(question.get("temporal_scope") or "").strip()
+    footer_parts = [dossier.character_name]
+    if scope:
+        footer_parts.append(scope.replace("_", " ").title())
+    footer_parts.append("Click Answer / Edit below")
+    embed.set_footer(text=" · ".join(footer_parts)[:2048])
+    return embed
+
+
+class DossierEditButton(discord.ui.Button):
+    """Opens the answer modal while keeping the unclipped prompt visible above."""
+
+    def __init__(
+        self,
+        *,
+        dossier: CharacterDossier,
+        question: dict[str, Any],
+        session_tag: str = "",
+        row: int = 0,
+    ):
+        qid = question["id"]
+        super().__init__(
+            label=f"Answer / Edit [{qid}]"[:80],
+            style=discord.ButtonStyle.primary,
+            row=row,
+        )
+        self.dossier = dossier
+        self.question = question
+        self.session_tag = session_tag
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        fresh_dossier = await _get_dossier_by_id_async(self.dossier.pk)
+        qid = self.question["id"]
+        responses = fresh_dossier.responses if isinstance(fresh_dossier.responses, dict) else {}
+        existing = responses.get(qid)
+        current_answer = str(existing.get("answer", "")) if isinstance(existing, dict) else ""
+        current_sol = str(existing.get("sol_date", "")) if isinstance(existing, dict) else ""
+        current_era = str(existing.get("stardate_era", "")) if isinstance(existing, dict) else ""
+        modal = DossierAnswerModal(
+            dossier_id=fresh_dossier.pk,
+            question=self.question,
+            current_answer=current_answer,
+            session_tag=self.session_tag,
+            stardate_era=current_era,
+            sol_date=current_sol,
+        )
+        await interaction.response.send_modal(modal)
+
+
 class DossierQuestionSelect(discord.ui.Select):
-    """Dropdown selecting a questionnaire prompt to view or edit in a Modal."""
+    """Dropdown selecting a questionnaire prompt to preview in full before editing."""
 
     def __init__(
         self,
@@ -177,8 +269,11 @@ class DossierQuestionSelect(discord.ui.Select):
         dossier: CharacterDossier,
         questions: list[dict[str, Any]],
         session_tag: str = "",
+        selected_id: str = "",
+        row: int = 0,
     ):
         self.dossier = dossier
+        self.questions = questions
         self.session_tag = session_tag
         responses = dossier.responses if isinstance(dossier.responses, dict) else {}
 
@@ -187,16 +282,24 @@ class DossierQuestionSelect(discord.ui.Select):
             qid = q["id"]
             existing = responses.get(qid)
             is_answered = isinstance(existing, dict) and bool(str(existing.get("answer", "")).strip())
-            prefix = "[✓]" if is_answered else "[ ]"
-            label = f"{prefix} {qid}: {q['prompt']}"[:100]
+            marker = "✓" if is_answered else "○"
+            label = f"{marker} [{qid}] {q['prompt']}"[:100]
             desc = (q.get("category") or "")[:100]
-            options.append(discord.SelectOption(label=label, value=qid, description=desc))
+            options.append(
+                discord.SelectOption(
+                    label=label,
+                    value=qid,
+                    description=desc,
+                    default=(qid == selected_id),
+                )
+            )
 
         super().__init__(
-            placeholder="Choose a dossier question to edit...",
+            placeholder="Choose a dossier question to read or edit...",
             min_values=1,
             max_values=1,
             options=options,
+            row=row,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
@@ -205,20 +308,15 @@ class DossierQuestionSelect(discord.ui.Select):
         if question is None:
             await interaction.response.send_message(f"Unknown question ID: {qid}", ephemeral=True)
             return
-        responses = self.dossier.responses if isinstance(self.dossier.responses, dict) else {}
-        existing = responses.get(qid)
-        current_answer = str(existing.get("answer", "")) if isinstance(existing, dict) else ""
-        current_sol = str(existing.get("sol_date", "")) if isinstance(existing, dict) else ""
-        current_era = str(existing.get("stardate_era", "")) if isinstance(existing, dict) else ""
-        modal = DossierAnswerModal(
-            dossier_id=self.dossier.pk,
-            question=question,
-            current_answer=current_answer,
+        fresh_dossier = await _get_dossier_by_id_async(self.dossier.pk)
+        embed = _build_question_detail_embed(fresh_dossier, question)
+        view = DossierSelectView(
+            dossier=fresh_dossier,
+            questions=self.questions,
             session_tag=self.session_tag,
-            stardate_era=current_era,
-            sol_date=current_sol,
+            selected_question=question,
         )
-        await interaction.response.send_modal(modal)
+        await interaction.response.edit_message(embed=embed, view=view)
 
 
 class DossierSelectView(discord.ui.View):
@@ -228,15 +326,29 @@ class DossierSelectView(discord.ui.View):
         dossier: CharacterDossier,
         questions: list[dict[str, Any]],
         session_tag: str = "",
+        selected_question: dict[str, Any] | None = None,
         timeout: float = 300,
     ):
         super().__init__(timeout=timeout)
+        select_row = 0
+        if selected_question is not None:
+            self.add_item(
+                DossierEditButton(
+                    dossier=dossier,
+                    question=selected_question,
+                    session_tag=session_tag,
+                    row=0,
+                )
+            )
+            select_row = 1
         if questions:
             self.add_item(
                 DossierQuestionSelect(
                     dossier=dossier,
                     questions=questions,
                     session_tag=session_tag,
+                    selected_id=selected_question["id"] if selected_question else "",
+                    row=select_row,
                 )
             )
 

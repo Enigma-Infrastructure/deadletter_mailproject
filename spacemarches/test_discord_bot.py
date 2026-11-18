@@ -1,5 +1,5 @@
 from io import StringIO
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
@@ -8,6 +8,8 @@ from django.test import TestCase
 
 from spacemarches.management.commands.run_discord_bot import (
     DossierAnswerModal,
+    DossierEditButton,
+    DossierQuestionSelect,
     handle_debrief_command,
     handle_dossier_command,
     handle_link_command,
@@ -26,6 +28,7 @@ def _mock_interaction(discord_user_id: str):
     interaction.user.display_name = "TestAgent"
     interaction.response = MagicMock()
     interaction.response.send_message = AsyncMock()
+    interaction.response.edit_message = AsyncMock()
     interaction.response.send_modal = AsyncMock()
     return interaction
 
@@ -95,6 +98,33 @@ class DiscordBotTests(TestCase):
         self.assertEqual(entry["source"], "discord")
         self.assertEqual(entry["version_label"], "Sol 3.750_v1")
         self.assertEqual(len(entry["revisions"]), 1)
+
+        # Verify select formatting avoids collapsing [ ] and renders full unclipped prompt on selection
+        async def _select_and_open_modal():
+            q_long = get_question("1")
+            view = kwargs["view"]
+            select = next(item for item in view.children if isinstance(item, DossierQuestionSelect))
+            for opt in select.options:
+                self.assertNotIn("[ ]", opt.label)
+                self.assertRegex(opt.label, r"^(?:✓|○) \[[^\]]+\] ")
+
+            q1_select = DossierQuestionSelect(dossier=self.dossier, questions=[q_long])
+            select_interaction = _mock_interaction("555000111")
+            with patch.object(DossierQuestionSelect, "values", new_callable=PropertyMock, return_value=["1"]):
+                await q1_select.callback(select_interaction)
+            select_interaction.response.edit_message.assert_awaited_once()
+            edit_kwargs = select_interaction.response.edit_message.call_args.kwargs
+            self.assertIn(q_long["prompt"], edit_kwargs["embed"].description)
+            self.assertIn(q_long["lore_text"], edit_kwargs["embed"].description)
+
+            edit_btn = next(item for item in edit_kwargs["view"].children if isinstance(item, DossierEditButton))
+            btn_interaction = _mock_interaction("555000111")
+            await edit_btn.callback(btn_interaction)
+            btn_interaction.response.send_modal.assert_awaited_once()
+            opened_modal = btn_interaction.response.send_modal.call_args.args[0]
+            self.assertEqual(opened_modal.answer_input.label, "Response for [1]")
+
+        async_to_sync(_select_and_open_modal)()
 
     def test_slash_debrief_dms_player_interactive_buttons(self):
         DiscordLink.objects.create(user=self.user, discord_user_id="777888999")
