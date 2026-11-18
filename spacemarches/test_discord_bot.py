@@ -325,7 +325,7 @@ class DiscordBotTests(TestCase):
         self.assertTrue(opened_modal.allow_unlinked)
         self.assertTrue(opened_modal.start_intake_on_create)
 
-        async def _submit_new_char_and_answer():
+        async def _submit_new_char():
             opened_modal.character_name_input._value = "Nova Drift"
             opened_modal.narrative_voice_input._value = "first"
             submit_inter = _mock_member_interaction("333444555", display_name="NewPlayer")
@@ -337,7 +337,10 @@ class DiscordBotTests(TestCase):
             q_select = next(item for item in s_kwargs["view"].children if isinstance(item, DossierQuestionSelect))
             self.assertEqual(len(q_select.options), 16)
 
-            unclaimed = CharacterDossier.objects.get(user__isnull=True, discord_owner_id="333444555")
+        async_to_sync(_submit_new_char)()
+        unclaimed = CharacterDossier.objects.get(user__isnull=True, discord_owner_id="333444555")
+
+        async def _submit_answer():
             modal = DossierAnswerModal(
                 dossier_id=unclaimed.pk,
                 question=get_question("1"),
@@ -349,7 +352,7 @@ class DiscordBotTests(TestCase):
             await modal.on_submit(ans_inter)
             ans_inter.response.send_message.assert_awaited_once()
 
-        async_to_sync(_submit_new_char_and_answer)()
+        async_to_sync(_submit_answer)()
 
         # 4. Unlinked player can run /dossier list and ST can run /debrief against unclaimed dossier
         list_inter = _mock_member_interaction("333444555", display_name="NewPlayer")
