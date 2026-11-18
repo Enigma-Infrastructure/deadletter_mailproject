@@ -50,7 +50,7 @@
     [REDACTED &mdash; GM EYES ONLY] Turn off "Preview GM Redaction" to view or edit this entry.
   </div>
 
-  <form class="dossier-answer-form" method="post" action="{% url 'spacemarches:dossier_answer' slug=dossier.slug %}" style="margin: 0;">
+  <form class="dossier-answer-form" method="post" action="{{ dossier_answer_url }}" style="margin: 0;">
     {% csrf_token %}
     <input type="hidden" name="question_id" value="{{ node.id }}">
     <input type="hidden" name="entry_kind" class="card-entry-kind-input" value="{{ node.entry_kind|default:'character_creation' }}">
@@ -113,7 +113,7 @@
       </summary>
       <div style="margin-top: 0.75rem; padding-left: 0.75rem; border-left: 2px solid #cbd5e1;">
         {% for child in node.children %}
-          {% include "spacemarches/_dossier_question_card.html" with node=child dossier=dossier %}
+          {% include "spacemarches/_dossier_question_card.html" with node=child dossier=dossier dossier_answer_url=dossier_answer_url %}
         {% endfor %}
       </div>
     </details>

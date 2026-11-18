@@ -2,6 +2,7 @@ from io import StringIO
 from unittest.mock import AsyncMock, MagicMock, PropertyMock, patch
 
 from asgiref.sync import async_to_sync
+import discord
 from django.contrib.auth import get_user_model
 from django.core.management import call_command
 from django.test import TestCase
@@ -14,6 +15,7 @@ from spacemarches.management.commands.run_discord_bot import (
     DossierEditButton,
     DossierQuestionSelect,
     LaunchIntakeButton,
+    OnboardingInviteView,
     build_bot,
     handle_debrief_command,
     handle_dossier_command,
@@ -24,22 +26,48 @@ from spacemarches.management.commands.run_discord_bot import (
     handle_intake_command,
     handle_link_command,
 )
-from spacemarches.models import CharacterDossier, DiscordLink
+from spacemarches.models import CharacterDossier, DiscordIntakeInvite, DiscordLink
 from spacemarches.questionnaire import get_question
 from spacemarches.services.dossier_service import generate_discord_link_code, save_dossier_answer
 
 User = get_user_model()
 
 
-def _mock_interaction(discord_user_id: str):
+def _mock_interaction(discord_user_id: str, *, channel=None):
     interaction = MagicMock()
     interaction.user = MagicMock()
     interaction.user.id = discord_user_id
     interaction.user.display_name = "TestAgent"
+    interaction.channel = channel
     interaction.response = MagicMock()
     interaction.response.send_message = AsyncMock()
     interaction.response.edit_message = AsyncMock()
     interaction.response.send_modal = AsyncMock()
+    return interaction
+
+
+def _mock_member_interaction(
+    discord_user_id: str,
+    *,
+    manage_guild: bool = False,
+    role_names: list[str] | None = None,
+    display_name: str = "MemberAgent",
+    channel=None,
+):
+    interaction = _mock_interaction(discord_user_id, channel=channel)
+    member = MagicMock(spec=discord.Member)
+    member.id = discord_user_id
+    member.display_name = display_name
+    member.mention = f"<@{discord_user_id}>"
+    member.guild_permissions = discord.Permissions(manage_guild=manage_guild)
+    roles = []
+    for rname in role_names or []:
+        role = MagicMock()
+        role.name = rname
+        roles.append(role)
+    member.roles = roles
+    member.send = AsyncMock()
+    interaction.user = member
     return interaction
 
 
@@ -244,3 +272,128 @@ class DiscordBotTests(TestCase):
         self.assertEqual(len(dm_kwargs["view"].children), 3)
         gm_interaction.response.send_message.assert_awaited_once()
         self.assertTrue(gm_interaction.response.send_message.call_args.kwargs.get("ephemeral"))
+
+    def test_unlinked_intake_onboarding_dm_channel_fallback_and_claim_on_link(self):
+        # 1. Cold unlinked non-ST member is rejected on self /intake, /dossier open, and targeting another member
+        cold_interaction = _mock_member_interaction("333444555", manage_guild=False, display_name="NewPlayer")
+        async_to_sync(handle_intake_command)(cold_interaction)
+        self.assertIn("not linked yet", cold_interaction.response.send_message.call_args.args[0])
+
+        cold_open = _mock_member_interaction("333444555", manage_guild=False, display_name="NewPlayer")
+        async_to_sync(handle_dossier_open_command)(cold_open)
+        self.assertIn("not linked yet", cold_open.response.send_message.call_args.args[0])
+
+        other_target = MagicMock(spec=discord.Member)
+        other_target.id = "999888777"
+        other_target.display_name = "Bystander"
+        other_target.mention = "<@999888777>"
+        other_target.send = AsyncMock()
+        cold_target_attempt = _mock_member_interaction("333444555", manage_guild=False)
+        async_to_sync(handle_intake_command)(cold_target_attempt, member=other_target)
+        self.assertIn("Only linked users or Storytellers/Admins", cold_target_attempt.response.send_message.call_args.args[0])
+        other_target.send.assert_not_called()
+
+        # 2. ST member (even without website DiscordLink) prompts unlinked NewPlayer via /intake member:@NewPlayer
+        st_interaction = _mock_member_interaction("111222333", role_names=["Storyteller"], display_name="GM-Ari")
+        new_player = MagicMock(spec=discord.Member)
+        new_player.id = "333444555"
+        new_player.display_name = "NewPlayer"
+        new_player.mention = "<@333444555>"
+        new_player.send = AsyncMock()
+
+        async_to_sync(handle_intake_command)(st_interaction, member=new_player)
+        new_player.send.assert_awaited_once()
+        invite = DiscordIntakeInvite.objects.get(discord_user_id="333444555")
+        self.assertIsNotNone(invite)
+
+        dm_kwargs = new_player.send.call_args.kwargs
+        onboarding_view = dm_kwargs["view"]
+        self.assertIsInstance(onboarding_view, OnboardingInviteView)
+
+        # Wrong actor clicking the onboarding button is blocked
+        bystander_click = _mock_interaction("999888777")
+        btn = next(item for item in onboarding_view.children if isinstance(item, CreateDossierButton))
+        async_to_sync(btn.callback)(bystander_click)
+        self.assertIn("belongs to another player", bystander_click.response.send_message.call_args.args[0])
+
+        # 3. Unlinked NewPlayer clicks Create Character & Start Intake -> creates unclaimed dossier & starts intake
+        new_player_click = _mock_member_interaction("333444555", display_name="NewPlayer")
+        async_to_sync(btn.callback)(new_player_click)
+        new_player_click.response.send_modal.assert_awaited_once()
+        opened_modal = new_player_click.response.send_modal.call_args.args[0]
+        self.assertIsInstance(opened_modal, CreateDossierModal)
+        self.assertTrue(opened_modal.allow_unlinked)
+        self.assertTrue(opened_modal.start_intake_on_create)
+
+        async def _submit_new_char_and_answer():
+            opened_modal.character_name_input._value = "Nova Drift"
+            opened_modal.narrative_voice_input._value = "first"
+            submit_inter = _mock_member_interaction("333444555", display_name="NewPlayer")
+            await opened_modal.on_submit(submit_inter)
+            submit_inter.response.send_message.assert_awaited_once()
+            s_kwargs = submit_inter.response.send_message.call_args.kwargs
+            self.assertIn("Created & Starting Intake: Nova Drift", s_kwargs["embed"].title)
+            self.assertIn("Unclaimed Onboarding Sheet", s_kwargs["embed"].description)
+            q_select = next(item for item in s_kwargs["view"].children if isinstance(item, DossierQuestionSelect))
+            self.assertEqual(len(q_select.options), 16)
+
+            unclaimed = CharacterDossier.objects.get(user__isnull=True, discord_owner_id="333444555")
+            modal = DossierAnswerModal(
+                dossier_id=unclaimed.pk,
+                question=get_question("1"),
+                sol_date="10.000",
+            )
+            modal.stardate_input._value = "10.000"
+            modal.answer_input._value = "Nova Drift // Callsign Relay"
+            ans_inter = _mock_member_interaction("333444555", display_name="NewPlayer")
+            await modal.on_submit(ans_inter)
+            ans_inter.response.send_message.assert_awaited_once()
+
+        async_to_sync(_submit_new_char_and_answer)()
+
+        # 4. Unlinked player can run /dossier list and ST can run /debrief against unclaimed dossier
+        list_inter = _mock_member_interaction("333444555", display_name="NewPlayer")
+        async_to_sync(handle_dossier_list_command)(list_inter)
+        self.assertIn("Unclaimed", list_inter.response.send_message.call_args.kwargs["embed"].description)
+
+        new_player.send.reset_mock()
+        async_to_sync(handle_debrief_command)(
+            st_interaction,
+            member=new_player,
+            stardate="10.250",
+            question_ids="1",
+        )
+        new_player.send.assert_awaited_once()
+        self.assertIn("Nova Drift", new_player.send.call_args.kwargs["embed"].description)
+
+        # 5. Later, player makes a website account and runs /link <code> -> claims Nova Drift automatically
+        late_user = User.objects.create_user(username="late-joiner")
+        link_code = generate_discord_link_code(late_user)
+        link_inter = _mock_member_interaction("333444555", display_name="NewPlayer")
+        async_to_sync(handle_link_command)(link_inter, link_code)
+        reply_msg = link_inter.response.send_message.call_args.args[0]
+        self.assertIn("Nova Drift", reply_msg)
+        self.assertIn("Claimed 1 onboarded character dossier(s)", reply_msg)
+
+        claimed = CharacterDossier.objects.get(character_name="Nova Drift")
+        self.assertEqual(claimed.user, late_user)
+        self.assertFalse(DiscordIntakeInvite.objects.filter(discord_user_id="333444555").exists())
+
+        # 6. DM Forbidden falls back to channel post when channel.send is async, and explicit delivery='channel' works
+        DiscordLink.objects.create(user=self.user, discord_user_id="222111000")
+        linked_invoker = _mock_member_interaction("222111000", manage_guild=False, display_name="LinkedFriend")
+        channel_mock = MagicMock()
+        channel_mock.send = AsyncMock()
+        linked_invoker.channel = channel_mock
+
+        closed_dm_target = MagicMock(spec=discord.Member)
+        closed_dm_target.id = "444555666"
+        closed_dm_target.display_name = "ClosedDMs"
+        closed_dm_target.mention = "<@444555666>"
+        closed_dm_target.send = AsyncMock(side_effect=discord.Forbidden(MagicMock(), "Cannot send messages"))
+
+        async_to_sync(handle_intake_command)(linked_invoker, member=closed_dm_target)
+        channel_mock.send.assert_awaited_once()
+        self.assertIn("DMs are closed", channel_mock.send.call_args.kwargs["content"])
+        self.assertIn("instead", linked_invoker.response.send_message.call_args.args[0])
+

@@ -201,9 +201,12 @@ class DiscordLink(models.Model):
             self.link_code = None
         super().save(*args, **kwargs)
 
+    @property
+    def active_or_latest_status(self) -> str:
+        return self.discord_user_id or f"pending:{self.link_code}"
+
     def __str__(self) -> str:
-        status = self.discord_user_id or f"pending:{self.link_code}"
-        return f"{self.user} ({status})"
+        return f"{self.user} ({self.active_or_latest_status})"
 
 
 class CharacterDossier(models.Model):
@@ -218,8 +221,18 @@ class CharacterDossier(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
         on_delete=models.CASCADE,
         related_name="character_dossiers",
+    )
+    discord_owner_id = models.CharField(max_length=64, blank=True, db_index=True)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="invited_character_dossiers",
     )
     character_name = models.CharField(max_length=160)
     slug = models.SlugField(max_length=160)
@@ -238,16 +251,66 @@ class CharacterDossier(models.Model):
         unique_together = (("user", "slug"),)
         ordering = ["-updated_at"]
 
+    @property
+    def is_claimed(self) -> bool:
+        return self.user_id is not None
+
+    @property
+    def owner_display(self) -> str:
+        if self.user_id is not None:
+            return str(self.user)
+        if self.discord_owner_id:
+            return f"Unclaimed (Discord:{self.discord_owner_id})"
+        return "Unclaimed"
+
     def save(self, *args, **kwargs):
         if not self.slug and self.character_name:
             base = slugify(self.character_name)[:140] or "character"
             candidate = base
             counter = 1
-            while CharacterDossier.objects.filter(user=self.user, slug=candidate).exclude(pk=self.pk).exists():
+            if self.user_id is not None:
+                qs = CharacterDossier.objects.filter(user=self.user)
+            elif self.discord_owner_id:
+                qs = CharacterDossier.objects.filter(
+                    user__isnull=True,
+                    discord_owner_id=self.discord_owner_id,
+                )
+            else:
+                qs = CharacterDossier.objects.filter(user__isnull=True)
+            while qs.filter(slug=candidate).exclude(pk=self.pk).exists():
                 counter += 1
                 candidate = f"{base[:140]}-{counter}"
             self.slug = candidate
         super().save(*args, **kwargs)
 
     def __str__(self) -> str:
-        return f"{self.character_name} ({self.user})"
+        return f"{self.character_name} ({self.owner_display})"
+
+
+class DiscordIntakeInvite(models.Model):
+    """Authorizes an unlinked Discord user to create and edit character dossiers after ST/linked-user /intake."""
+
+    discord_user_id = models.CharField(max_length=64, unique=True)
+    invited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sent_discord_intake_invites",
+    )
+    active_dossier = models.ForeignKey(
+        CharacterDossier,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="active_intake_invites",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        inviter = str(self.invited_by) if self.invited_by_id else "Discord ST"
+        return f"IntakeInvite(discord:{self.discord_user_id}, by={inviter})"

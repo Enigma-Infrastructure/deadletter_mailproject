@@ -6,7 +6,13 @@ from django.urls import reverse
 
 from spacemarches.models import ArchiveEntry, CharacterDossier, ForumPost, ForumThread
 from spacemarches.selectors import get_user_spacemarches_summary
-from spacemarches.services.dossier_service import save_dossier_answer
+from spacemarches.services.dossier_service import (
+    complete_discord_link,
+    create_character_dossier_for_discord,
+    generate_discord_link_code,
+    register_discord_intake_invite,
+    save_dossier_answer,
+)
 from spacemarches.services.game_sync_service import sync_agent_save
 
 User = get_user_model()
@@ -16,6 +22,7 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(username="player1")
         self.other = User.objects.create_user(username="player2")
+        self.admin = User.objects.create_user(username="st-admin", is_staff=True)
         self.public_archive = ArchiveEntry.objects.create(
             slug="incident-zero",
             title="Incident Zero",
@@ -255,4 +262,97 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
         portal_resp = self.client.get(reverse("spacemarches:portal"))
         self.assertEqual(portal_resp.status_code, 200)
         self.assertNotContains(portal_resp, "/write/request/")
+
+    def test_admin_roster_unclaimed_and_player_control_override(self):
+        register_discord_intake_invite("444555666", invited_by_user=self.admin)
+        unclaimed = create_character_dossier_for_discord(
+            "444555666",
+            "Ghost Signal",
+            invited_by_user=self.admin,
+        )
+        save_dossier_answer(unclaimed, "1", "Ghost Signal", source="discord")
+
+        # Non-staff user cannot access unclaimed or another player's dossiers and sees no GM Roster
+        self.client.force_login(self.other)
+        list_other = self.client.get(reverse("spacemarches:dossier_list"))
+        self.assertEqual(list_other.status_code, 200)
+        self.assertNotContains(list_other, "GM / Admin Roster")
+        self.assertEqual(
+            self.client.get(
+                reverse("spacemarches:dossier_detail_by_id", kwargs={"pk": unclaimed.pk})
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.get(
+                reverse("spacemarches:dossier_detail_by_id", kwargs={"pk": self.dossier.pk})
+            ).status_code,
+            404,
+        )
+
+        # Staff admin sees unclaimed onboarding dossiers and player dossiers in GM / Admin Roster
+        self.client.force_login(self.admin)
+        list_admin = self.client.get(reverse("spacemarches:dossier_list"))
+        self.assertEqual(list_admin.status_code, 200)
+        self.assertContains(list_admin, "GM / Admin Roster")
+        self.assertContains(list_admin, "Ghost Signal")
+        self.assertContains(list_admin, "Unclaimed (Discord:444555666)")
+        self.assertContains(list_admin, "Cassian Mire")
+
+        # Admin can inspect, edit, and export unclaimed dossier by ID
+        admin_detail = self.client.get(
+            reverse("spacemarches:dossier_detail_by_id", kwargs={"pk": unclaimed.pk})
+        )
+        self.assertEqual(admin_detail.status_code, 200)
+        self.assertContains(admin_detail, "Admin View")
+        self.assertContains(admin_detail, "awaiting /link")
+
+        admin_save = self.client.post(
+            reverse("spacemarches:dossier_answer_by_id", kwargs={"pk": unclaimed.pk}),
+            data=json.dumps(
+                {
+                    "question_id": "2",
+                    "answer_text": "Firewall sleeper agent",
+                    "entry_kind": "character_creation",
+                    "stardate_era": "auto",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(admin_save.status_code, 200)
+        self.assertEqual(admin_save.json()["core_answered"], 2)
+
+        admin_export = self.client.get(
+            reverse("spacemarches:dossier_export_by_id", kwargs={"pk": unclaimed.pk}) + "?include_private=1"
+        )
+        self.assertEqual(admin_export.status_code, 200)
+        self.assertContains(admin_export, "Firewall sleeper agent")
+
+        # Player links their Discord and takes control on website
+        code = generate_discord_link_code(self.other)
+        complete_discord_link(code, "444555666")
+        unclaimed.refresh_from_db()
+        self.assertEqual(unclaimed.user, self.other)
+
+        self.client.force_login(self.other)
+        claimed_list = self.client.get(reverse("spacemarches:dossier_list"))
+        self.assertContains(claimed_list, "Ghost Signal")
+
+        # Admin STILL retains edit access even after the player claims control
+        self.client.force_login(self.admin)
+        post_claim_admin_save = self.client.post(
+            reverse("spacemarches:dossier_answer_by_id", kwargs={"pk": unclaimed.pk}),
+            data=json.dumps(
+                {
+                    "question_id": "3",
+                    "answer_text": "Morph logged by ST",
+                    "entry_kind": "post_action_report",
+                    "stardate_era": "post_fall",
+                    "sol_date": "10.100",
+                }
+            ),
+            content_type="application/json",
+        )
+        self.assertEqual(post_claim_admin_save.status_code, 200)
+        self.assertEqual(post_claim_admin_save.json()["core_answered"], 3)
 

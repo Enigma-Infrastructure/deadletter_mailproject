@@ -2,8 +2,10 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse, JsonResponse
+from django.db.models import Q
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -229,6 +231,32 @@ def api_sync(request):
 # --------------------------------------------------
 
 
+def _is_gm_or_admin(user) -> bool:
+    return bool(user and getattr(user, "is_authenticated", False) and (user.is_staff or user.is_superuser))
+
+
+def _get_accessible_dossier(user, *, slug: str = "", pk: int | None = None) -> CharacterDossier:
+    is_admin = _is_gm_or_admin(user)
+    if pk is not None:
+        if is_admin:
+            return get_object_or_404(CharacterDossier.objects.select_related("user", "invited_by"), pk=pk)
+        return get_object_or_404(CharacterDossier.objects.select_related("user", "invited_by"), pk=pk, user=user)
+
+    owned = CharacterDossier.objects.select_related("user", "invited_by").filter(user=user, slug=slug).first()
+    if owned is not None:
+        return owned
+    if is_admin:
+        any_match = (
+            CharacterDossier.objects.select_related("user", "invited_by")
+            .filter(slug=slug)
+            .order_by("-updated_at")
+            .first()
+        )
+        if any_match is not None:
+            return any_match
+    raise Http404("Character dossier not found.")
+
+
 @login_required
 @require_http_methods(["GET", "POST"])
 def dossier_list(request):
@@ -263,12 +291,25 @@ def dossier_list(request):
         {"dossier": d, "stats": compute_dossier_stats(d)}
         for d in dossiers
     ]
+    gm_dossier_cards = []
+    if _is_gm_or_admin(request.user):
+        other_dossiers = list(
+            CharacterDossier.objects.filter(Q(user__isnull=True) | ~Q(user=request.user))
+            .select_related("user", "invited_by")
+            .order_by("-updated_at")
+        )
+        gm_dossier_cards = [
+            {"dossier": d, "stats": compute_dossier_stats(d)}
+            for d in other_dossiers
+        ]
     discord_link = DiscordLink.objects.filter(user=request.user).first()
     return render(
         request,
         "spacemarches/dossier_list.html",
         {
             "dossier_cards": dossier_cards,
+            "gm_dossier_cards": gm_dossier_cards,
+            "is_gm_or_admin": _is_gm_or_admin(request.user),
             "discord_link": discord_link,
             "voice_choices": CharacterDossier.NARRATIVE_VOICE_CHOICES,
         },
@@ -335,10 +376,7 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
     }
 
 
-@login_required
-def dossier_detail(request, slug: str):
-    """Interactive progressive-disclosure questionnaire view for an owned CharacterDossier."""
-    dossier = get_object_or_404(CharacterDossier, user=request.user, slug=slug)
+def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = False):
     responses = dossier.responses if isinstance(dossier.responses, dict) else {}
     private_keys = set(dossier.private_keys or [])
     include_sensitive = bool(dossier.show_sensitive_appendix)
@@ -363,6 +401,16 @@ def dossier_detail(request, slug: str):
         else STARDATE_ERA_AUTO
     )
 
+    use_id_routes = by_id or dossier.user_id != request.user.pk
+    if use_id_routes:
+        dossier_answer_url = reverse("spacemarches:dossier_answer_by_id", kwargs={"pk": dossier.pk})
+        dossier_export_url = reverse("spacemarches:dossier_export_by_id", kwargs={"pk": dossier.pk})
+        dossier_toggle_url = reverse("spacemarches:dossier_toggle_sensitive_by_id", kwargs={"pk": dossier.pk})
+    else:
+        dossier_answer_url = reverse("spacemarches:dossier_answer", kwargs={"slug": dossier.slug})
+        dossier_export_url = reverse("spacemarches:dossier_export", kwargs={"slug": dossier.slug})
+        dossier_toggle_url = reverse("spacemarches:dossier_toggle_sensitive", kwargs={"slug": dossier.slug})
+
     return render(
         request,
         "spacemarches/dossier_detail.html",
@@ -380,25 +428,58 @@ def dossier_detail(request, slug: str):
             "default_stardate_era": default_stardate_era,
             "default_sol_number": progression["latest_sol_number"],
             "attribution_notice": get_attribution_notice(),
+            "dossier_answer_url": dossier_answer_url,
+            "dossier_export_url": dossier_export_url,
+            "dossier_toggle_url": dossier_toggle_url,
+            "is_admin_override": dossier.user_id != request.user.pk,
         },
     )
+
+
+@login_required
+def dossier_detail(request, slug: str):
+    """Interactive progressive-disclosure questionnaire view for an accessible CharacterDossier."""
+    dossier = _get_accessible_dossier(request.user, slug=slug)
+    return _render_dossier_detail(request, dossier, by_id=False)
+
+
+@login_required
+def dossier_detail_by_id(request, pk: int):
+    """Primary-key dossier view supporting admin access to unclaimed or player-owned dossiers."""
+    dossier = _get_accessible_dossier(request.user, pk=pk)
+    return _render_dossier_detail(request, dossier, by_id=True)
+
+
+def _handle_toggle_sensitive(request, dossier: CharacterDossier, *, by_id: bool = False):
+    dossier.show_sensitive_appendix = not dossier.show_sensitive_appendix
+    dossier.save(update_fields=["show_sensitive_appendix", "updated_at"])
+    if by_id or dossier.user_id != request.user.pk:
+        return redirect("spacemarches:dossier_detail_by_id", pk=dossier.pk)
+    return redirect("spacemarches:dossier_detail", slug=dossier.slug)
 
 
 @login_required
 @require_POST
 def dossier_toggle_sensitive(request, slug: str):
     """Explicit opt-in toggle for sensitive appendix (13d1-13d6)."""
-    dossier = get_object_or_404(CharacterDossier, user=request.user, slug=slug)
-    dossier.show_sensitive_appendix = not dossier.show_sensitive_appendix
-    dossier.save(update_fields=["show_sensitive_appendix", "updated_at"])
-    return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+    dossier = _get_accessible_dossier(request.user, slug=slug)
+    return _handle_toggle_sensitive(request, dossier, by_id=False)
 
 
 @login_required
 @require_POST
-def dossier_answer(request, slug: str):
-    """Save an individual dossier progression update (supports JSON/fetch or standard form POST)."""
-    dossier = get_object_or_404(CharacterDossier, user=request.user, slug=slug)
+def dossier_toggle_sensitive_by_id(request, pk: int):
+    """Primary-key opt-in toggle for sensitive appendix (13d1-13d6)."""
+    dossier = _get_accessible_dossier(request.user, pk=pk)
+    return _handle_toggle_sensitive(request, dossier, by_id=True)
+
+
+def _handle_dossier_answer(request, dossier: CharacterDossier, *, by_id: bool = False):
+    redirect_response = (
+        redirect("spacemarches:dossier_detail_by_id", pk=dossier.pk)
+        if (by_id or dossier.user_id != request.user.pk)
+        else redirect("spacemarches:dossier_detail", slug=dossier.slug)
+    )
 
     content_type = (request.content_type or "").lower()
     if "application/json" in content_type:
@@ -437,7 +518,7 @@ def dossier_answer(request, slug: str):
         if wants_json:
             return JsonResponse({"error": f"Unknown question ID: {question_id}"}, status=400)
         messages.error(request, f"Unknown question ID: {question_id}")
-        return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+        return redirect_response
 
     if q.get("tier") == "sensitive_appendix" and not dossier.show_sensitive_appendix:
         if wants_json:
@@ -446,7 +527,7 @@ def dossier_answer(request, slug: str):
                 status=400,
             )
         messages.error(request, "Enable the Sensitive Appendix opt-in toggle before editing 13d questions.")
-        return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+        return redirect_response
 
     try:
         stats = save_dossier_answer(
@@ -465,7 +546,7 @@ def dossier_answer(request, slug: str):
         if wants_json:
             return JsonResponse({"error": str(err)}, status=400)
         messages.error(request, str(err))
-        return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+        return redirect_response
 
     if wants_json:
         return JsonResponse({"status": "saved", **stats})
@@ -477,15 +558,42 @@ def dossier_answer(request, slug: str):
             request,
             f"Saved [{question_id}] as {stats.get('version_label') or 'updated'}.",
         )
-    return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+    return redirect_response
 
 
 @login_required
-def dossier_export(request, slug: str):
-    """Export an owned CharacterDossier as a downloadable Markdown file."""
-    dossier = get_object_or_404(CharacterDossier, user=request.user, slug=slug)
+@require_POST
+def dossier_answer(request, slug: str):
+    """Save an individual dossier progression update (supports JSON/fetch or standard form POST)."""
+    dossier = _get_accessible_dossier(request.user, slug=slug)
+    return _handle_dossier_answer(request, dossier, by_id=False)
+
+
+@login_required
+@require_POST
+def dossier_answer_by_id(request, pk: int):
+    """Primary-key dossier answer endpoint supporting admin edits to unclaimed or player dossiers."""
+    dossier = _get_accessible_dossier(request.user, pk=pk)
+    return _handle_dossier_answer(request, dossier, by_id=True)
+
+
+def _handle_dossier_export(request, dossier: CharacterDossier):
     include_private = request.GET.get("include_private") in {"1", "true", "yes"}
     md_text = export_dossier_markdown(dossier, include_private=include_private)
     response = HttpResponse(md_text, content_type="text/markdown; charset=utf-8")
     response["Content-Disposition"] = f'attachment; filename="{dossier.slug}-dossier.md"'
     return response
+
+
+@login_required
+def dossier_export(request, slug: str):
+    """Export an accessible CharacterDossier as a downloadable Markdown file."""
+    dossier = _get_accessible_dossier(request.user, slug=slug)
+    return _handle_dossier_export(request, dossier)
+
+
+@login_required
+def dossier_export_by_id(request, pk: int):
+    """Primary-key Markdown export supporting admin access to unclaimed or player dossiers."""
+    dossier = _get_accessible_dossier(request.user, pk=pk)
+    return _handle_dossier_export(request, dossier)

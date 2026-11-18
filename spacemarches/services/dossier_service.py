@@ -9,7 +9,7 @@ from django.db import transaction
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 
-from spacemarches.models import CharacterDossier, DiscordLink
+from spacemarches.models import CharacterDossier, DiscordIntakeInvite, DiscordLink
 from spacemarches.questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -226,8 +226,31 @@ def generate_discord_link_code(user) -> str:
         return link.link_code
 
 
+def register_discord_intake_invite(
+    target_discord_user_id: str,
+    *,
+    invited_by_user=None,
+) -> DiscordIntakeInvite:
+    """Authorize an unlinked Discord user to create & fill character dossiers via intake onboarding."""
+    normalized_id = str(target_discord_user_id or "").strip()
+    if not normalized_id:
+        raise ValueError("Target Discord user ID cannot be empty.")
+
+    with transaction.atomic():
+        invite, created = DiscordIntakeInvite.objects.select_for_update().get_or_create(
+            discord_user_id=normalized_id,
+            defaults={"invited_by": invited_by_user},
+        )
+        if not created and invited_by_user is not None and invite.invited_by_id != getattr(invited_by_user, "pk", None):
+            invite.invited_by = invited_by_user
+            invite.save(update_fields=["invited_by", "updated_at"])
+        elif not created:
+            invite.save(update_fields=["updated_at"])
+        return invite
+
+
 def complete_discord_link(code: str, discord_user_id: str) -> DiscordLink:
-    """Bind a Discord user ID to the user owning the given one-time link code."""
+    """Bind a Discord user ID to the user owning the given link code and claim unclaimed dossiers."""
     normalized_code = (code or "").strip().upper()
     normalized_discord_id = str(discord_user_id or "").strip()
 
@@ -249,10 +272,51 @@ def complete_discord_link(code: str, discord_user_id: str) -> DiscordLink:
         if conflict:
             raise ValueError("This Discord account is already linked to a different website user.")
 
+        invite = (
+            DiscordIntakeInvite.objects.select_for_update()
+            .filter(discord_user_id=normalized_discord_id)
+            .first()
+        )
+        unclaimed = list(
+            CharacterDossier.objects.select_for_update()
+            .filter(user__isnull=True, discord_owner_id=normalized_discord_id)
+            .order_by("-updated_at")
+        )
+
+        claimed_dossiers: list[CharacterDossier] = []
+        for dossier in unclaimed:
+            base = dossier.slug or "character"
+            candidate = base
+            counter = 1
+            while (
+                CharacterDossier.objects.filter(user=link.user, slug=candidate)
+                .exclude(pk=dossier.pk)
+                .exists()
+            ):
+                counter += 1
+                candidate = f"{base[:140]}-{counter}"
+            dossier.user = link.user
+            dossier.slug = candidate
+            dossier.save(update_fields=["user", "slug"])
+            claimed_dossiers.append(dossier)
+
         link.discord_user_id = normalized_discord_id
         link.link_code = None
         link.linked_at = timezone.now()
-        link.save(update_fields=["discord_user_id", "link_code", "linked_at"])
+        update_fields = ["discord_user_id", "link_code", "linked_at"]
+
+        if link.active_dossier_id is None and claimed_dossiers:
+            preferred = None
+            if invite is not None and invite.active_dossier_id:
+                preferred = next((d for d in claimed_dossiers if d.pk == invite.active_dossier_id), None)
+            link.active_dossier = preferred or claimed_dossiers[0]
+            update_fields.append("active_dossier")
+
+        link.save(update_fields=update_fields)
+        if invite is not None:
+            invite.delete()
+
+        link.claimed_dossiers = claimed_dossiers
         return link
 
 
@@ -269,46 +333,68 @@ def _normalize_narrative_voice(raw_voice: str = "") -> str:
     )
 
 
-def _resolve_user_dossier(user, identifier: str) -> CharacterDossier:
+def _resolve_dossier_from_qs(qs, identifier: str) -> CharacterDossier:
     ident = (identifier or "").strip()
     if not ident:
         raise ValueError("Character name or slug is required.")
 
-    qs = CharacterDossier.objects.filter(user=user).order_by("-updated_at")
+    ordered = qs.order_by("-updated_at")
     if ident.isdigit():
-        by_pk = qs.filter(pk=int(ident)).first()
+        by_pk = ordered.filter(pk=int(ident)).first()
         if by_pk is not None:
             return by_pk
 
-    by_slug = qs.filter(slug__iexact=ident).first()
+    by_slug = ordered.filter(slug__iexact=ident).first()
     if by_slug is not None:
         return by_slug
 
-    by_name = qs.filter(character_name__iexact=ident).first()
+    by_name = ordered.filter(character_name__iexact=ident).first()
     if by_name is not None:
         return by_name
 
-    partial = list(qs.filter(character_name__icontains=ident)[:5])
+    partial = list(ordered.filter(character_name__icontains=ident)[:5])
     if len(partial) == 1:
         return partial[0]
     if len(partial) > 1:
         names = ", ".join(d.character_name for d in partial)
         raise ValueError(f"Multiple characters match '{ident}': {names}. Be more specific.")
 
-    raise ValueError(f"No Character Dossier matching '{ident}' found on your account.")
+    raise ValueError(f"No Character Dossier matching '{ident}' found.")
+
+
+def _resolve_user_dossier(user, identifier: str) -> CharacterDossier:
+    return _resolve_dossier_from_qs(CharacterDossier.objects.filter(user=user), identifier)
+
+
+def get_discord_actor_context(
+    discord_user_id: str,
+) -> tuple[DiscordLink | None, DiscordIntakeInvite | None, list[CharacterDossier]]:
+    normalized_id = str(discord_user_id or "").strip()
+    link = (
+        DiscordLink.objects.select_related("user", "active_dossier")
+        .filter(discord_user_id=normalized_id)
+        .first()
+    )
+    if link is not None:
+        dossiers = list(CharacterDossier.objects.filter(user=link.user).order_by("-updated_at"))
+        return link, None, dossiers
+
+    invite = (
+        DiscordIntakeInvite.objects.select_related("invited_by", "active_dossier")
+        .filter(discord_user_id=normalized_id)
+        .first()
+    )
+    dossiers = list(
+        CharacterDossier.objects.filter(user__isnull=True, discord_owner_id=normalized_id)
+        .order_by("-updated_at")
+    )
+    return None, invite, dossiers
 
 
 def get_user_dossiers_for_discord(
     discord_user_id: str,
 ) -> tuple[DiscordLink | None, list[CharacterDossier]]:
-    link = (
-        DiscordLink.objects.select_related("user", "active_dossier")
-        .filter(discord_user_id=str(discord_user_id))
-        .first()
-    )
-    if link is None:
-        return None, []
-    dossiers = list(CharacterDossier.objects.filter(user=link.user).order_by("-updated_at"))
+    link, _invite, dossiers = get_discord_actor_context(discord_user_id)
     return link, dossiers
 
 
@@ -317,35 +403,67 @@ def resolve_discord_dossier(
     character_identifier: str = "",
     *,
     activate: bool = False,
+    allow_unlinked: bool = False,
 ) -> tuple[CharacterDossier | None, dict[str, Any] | None]:
-    """Return active or requested CharacterDossier and summary metadata for a Discord user."""
-    link, dossiers = get_user_dossiers_for_discord(discord_user_id)
-    if link is None:
+    """Return active or requested CharacterDossier and metadata for a linked or invited Discord user."""
+    normalized_id = str(discord_user_id or "").strip()
+    link, invite, dossiers = get_discord_actor_context(normalized_id)
+    if link is None and invite is None and not dossiers and not allow_unlinked:
         return None, None
+
+    owner_label = str(link.user) if link is not None else f"Discord:{normalized_id}"
 
     if not dossiers:
         if (character_identifier or "").strip():
             raise ValueError("You have no Character Dossiers yet. Run /dossier create first.")
-        return None, {"linked": True, "username": str(link.user), "dossiers": []}
+        return None, {
+            "linked": link is not None,
+            "invited": invite is not None,
+            "username": owner_label,
+            "dossiers": [],
+        }
 
     chosen: CharacterDossier | None = None
-    if (character_identifier or "").strip():
-        chosen = _resolve_user_dossier(link.user, character_identifier)
-        if activate and link.active_dossier_id != chosen.pk:
-            link.active_dossier = chosen
-            link.save(update_fields=["active_dossier"])
-    elif link.active_dossier is not None and link.active_dossier.user_id == link.user_id:
-        chosen = link.active_dossier
+    if link is not None:
+        if (character_identifier or "").strip():
+            chosen = _resolve_user_dossier(link.user, character_identifier)
+            if activate and link.active_dossier_id != chosen.pk:
+                link.active_dossier = chosen
+                link.save(update_fields=["active_dossier"])
+        elif link.active_dossier is not None and link.active_dossier.user_id == link.user_id:
+            chosen = link.active_dossier
+        else:
+            chosen = dossiers[0]
+            if link.active_dossier_id != chosen.pk:
+                link.active_dossier = chosen
+                link.save(update_fields=["active_dossier"])
     else:
-        chosen = dossiers[0]
-        if link.active_dossier_id != chosen.pk:
-            link.active_dossier = chosen
-            link.save(update_fields=["active_dossier"])
+        unclaimed_qs = CharacterDossier.objects.filter(user__isnull=True, discord_owner_id=normalized_id)
+        if (character_identifier or "").strip():
+            chosen = _resolve_dossier_from_qs(unclaimed_qs, character_identifier)
+            if activate:
+                inv = invite or register_discord_intake_invite(normalized_id)
+                if inv.active_dossier_id != chosen.pk:
+                    inv.active_dossier = chosen
+                    inv.save(update_fields=["active_dossier", "updated_at"])
+        elif (
+            invite is not None
+            and invite.active_dossier is not None
+            and invite.active_dossier.user_id is None
+            and invite.active_dossier.discord_owner_id == normalized_id
+        ):
+            chosen = invite.active_dossier
+        else:
+            chosen = dossiers[0]
+            if invite is not None and invite.active_dossier_id != chosen.pk:
+                invite.active_dossier = chosen
+                invite.save(update_fields=["active_dossier", "updated_at"])
 
     stats = compute_dossier_stats(chosen)
     return chosen, {
-        "linked": True,
-        "username": str(link.user),
+        "linked": link is not None,
+        "invited": invite is not None,
+        "username": owner_label,
         "active_dossier_id": chosen.pk,
         "dossiers": dossiers,
         "stats": stats,
@@ -353,19 +471,28 @@ def resolve_discord_dossier(
 
 
 def set_active_discord_dossier(discord_user_id: str, character_identifier: str) -> CharacterDossier:
-    """Switch the linked Discord user's active CharacterDossier."""
-    link = (
-        DiscordLink.objects.select_related("user")
-        .filter(discord_user_id=str(discord_user_id))
-        .first()
-    )
-    if link is None:
-        raise ValueError("Your Discord account is not linked yet. Generate a link code and run `/link <code>`.")
+    """Switch the linked or invited Discord user's active CharacterDossier."""
+    normalized_id = str(discord_user_id or "").strip()
+    link, invite, dossiers = get_discord_actor_context(normalized_id)
+    if link is None and invite is None and not dossiers:
+        raise ValueError(
+            "Your Discord account is not linked yet. Ask a Storyteller to prompt `/intake`, "
+            "or generate a link code and run `/link <code>`."
+        )
 
-    dossier = _resolve_user_dossier(link.user, character_identifier)
-    if link.active_dossier_id != dossier.pk:
-        link.active_dossier = dossier
-        link.save(update_fields=["active_dossier"])
+    if link is not None:
+        dossier = _resolve_user_dossier(link.user, character_identifier)
+        if link.active_dossier_id != dossier.pk:
+            link.active_dossier = dossier
+            link.save(update_fields=["active_dossier"])
+        return dossier
+
+    unclaimed_qs = CharacterDossier.objects.filter(user__isnull=True, discord_owner_id=normalized_id)
+    dossier = _resolve_dossier_from_qs(unclaimed_qs, character_identifier)
+    inv = invite or register_discord_intake_invite(normalized_id)
+    if inv.active_dossier_id != dossier.pk:
+        inv.active_dossier = dossier
+        inv.save(update_fields=["active_dossier", "updated_at"])
     return dossier
 
 
@@ -373,8 +500,12 @@ def create_character_dossier_for_discord(
     discord_user_id: str,
     character_name: str,
     narrative_voice: str = "",
+    *,
+    allow_unlinked: bool = False,
+    invited_by_user=None,
 ) -> CharacterDossier:
-    """Create a new CharacterDossier for a linked Discord user and make it active."""
+    """Create a new CharacterDossier for a linked or invited Discord user and make it active."""
+    normalized_id = str(discord_user_id or "").strip()
     clean_name = (character_name or "").strip()
     if not clean_name:
         raise ValueError("Character Name / Callsign cannot be empty.")
@@ -385,19 +516,57 @@ def create_character_dossier_for_discord(
         link = (
             DiscordLink.objects.select_for_update()
             .select_related("user")
-            .filter(discord_user_id=str(discord_user_id))
+            .filter(discord_user_id=normalized_id)
             .first()
         )
-        if link is None:
-            raise ValueError("Your Discord account is not linked yet. Generate a link code and run `/link <code>`.")
+        if link is not None:
+            dossier = CharacterDossier.objects.create(
+                user=link.user,
+                discord_owner_id=normalized_id,
+                invited_by=invited_by_user,
+                character_name=clean_name[:160],
+                narrative_voice=voice,
+            )
+            link.active_dossier = dossier
+            link.save(update_fields=["active_dossier"])
+            return dossier
 
+        invite = (
+            DiscordIntakeInvite.objects.select_for_update()
+            .select_related("invited_by")
+            .filter(discord_user_id=normalized_id)
+            .first()
+        )
+        has_existing_unclaimed = CharacterDossier.objects.filter(
+            user__isnull=True,
+            discord_owner_id=normalized_id,
+        ).exists()
+
+        if invite is None and not has_existing_unclaimed and not allow_unlinked:
+            raise ValueError(
+                "Your Discord account is not linked yet. Ask a Storyteller to prompt `/intake`, "
+                "or generate a link code and run `/link <code>`."
+            )
+
+        effective_inviter = invited_by_user or (invite.invited_by if invite is not None else None)
         dossier = CharacterDossier.objects.create(
-            user=link.user,
+            user=None,
+            discord_owner_id=normalized_id,
+            invited_by=effective_inviter,
             character_name=clean_name[:160],
             narrative_voice=voice,
         )
-        link.active_dossier = dossier
-        link.save(update_fields=["active_dossier"])
+        if invite is None:
+            invite = DiscordIntakeInvite.objects.create(
+                discord_user_id=normalized_id,
+                invited_by=effective_inviter,
+                active_dossier=dossier,
+            )
+        else:
+            if invited_by_user is not None and invite.invited_by_id is None:
+                invite.invited_by = invited_by_user
+            invite.active_dossier = dossier
+            invite.save(update_fields=["invited_by", "active_dossier", "updated_at"])
         return dossier
 
 
@@ -752,7 +921,7 @@ def export_dossier_markdown(dossier: CharacterDossier, include_private: bool = F
         f"# {dossier.character_name}",
         "",
         f"- **Narrative Voice:** {dossier.get_narrative_voice_display()}",
-        f"- **Owner:** {dossier.user}",
+        f"- **Owner:** {dossier.owner_display}",
         f"- **Export Scope:** {'Full Dossier (Including GM Eyes Only)' if include_private else 'Player / Public Dossier'}",
         "",
     ]

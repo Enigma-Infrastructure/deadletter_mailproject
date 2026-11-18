@@ -7,6 +7,11 @@
 <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
   <div>
     <h1 style="margin-bottom: 0.2rem;">{{ dossier.character_name }}</h1>
+    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.25rem;">
+      Control: <strong>{% if dossier.is_claimed %}{{ dossier.user }}{% else %}Unclaimed (Discord {{ dossier.discord_owner_id|default:"pending" }} &middot; awaiting /link){% endif %}</strong>
+      {% if dossier.invited_by %}&middot; Intake initiated by <strong>{{ dossier.invited_by }}</strong>{% endif %}
+      {% if is_admin_override %}&middot; <span style="background: #fef3c7; color: #92400e; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 600;">Admin View</span>{% endif %}
+    </p>
     <p class="text-muted" id="dossier-progress-line">
       Voice: {{ dossier.get_narrative_voice_display }} &middot;
       Core: <strong id="stat-core">{{ stats.core_answered }}/{{ stats.core_total }}</strong> &middot;
@@ -15,8 +20,8 @@
     </p>
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_export' slug=dossier.slug %}">Export Markdown</a>
-    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_export' slug=dossier.slug %}?include_private=1">Export incl. GM Only</a>
+    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{{ dossier_export_url }}">Export Markdown</a>
+    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{{ dossier_export_url }}?include_private=1">Export incl. GM Only</a>
   </div>
 </div>
 
@@ -59,7 +64,7 @@
       </div>
     </div>
 
-    <form method="post" action="{% url 'spacemarches:dossier_toggle_sensitive' slug=dossier.slug %}" style="margin: 0;">
+    <form method="post" action="{{ dossier_toggle_url }}" style="margin: 0;">
       {% csrf_token %}
       <button type="submit" class="btn {% if dossier.show_sensitive_appendix %}btn-admin{% else %}btn-secondary{% endif %}" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
         {% if dossier.show_sensitive_appendix %}

@@ -4,6 +4,7 @@ from .models import (
     AgentSaveSlot,
     ArchiveEntry,
     CharacterDossier,
+    DiscordIntakeInvite,
     DiscordLink,
     FieldAgent,
     ForumPost,
@@ -61,8 +62,22 @@ class DiscordLinkAdmin(admin.ModelAdmin):
     search_fields = ("user__username", "discord_user_id", "link_code", "active_dossier__character_name")
 
 
+@admin.register(DiscordIntakeInvite)
+class DiscordIntakeInviteAdmin(admin.ModelAdmin):
+    list_display = ("discord_user_id", "invited_by", "active_dossier", "updated_at")
+    search_fields = ("discord_user_id", "invited_by__username", "active_dossier__character_name")
+
+
 @admin.register(CharacterDossier)
 class CharacterDossierAdmin(admin.ModelAdmin):
-    list_display = ("character_name", "user", "narrative_voice", "show_sensitive_appendix", "updated_at")
+    list_display = (
+        "character_name",
+        "user",
+        "discord_owner_id",
+        "invited_by",
+        "narrative_voice",
+        "show_sensitive_appendix",
+        "updated_at",
+    )
     list_filter = ("narrative_voice", "show_sensitive_appendix")
-    search_fields = ("character_name", "slug", "user__username")
+    search_fields = ("character_name", "slug", "user__username", "discord_owner_id")

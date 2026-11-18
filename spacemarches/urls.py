@@ -19,6 +19,14 @@ urlpatterns = [
     # Authenticated character dossiers & Discord linking
     path("dossier/", views.dossier_list, name="dossier_list"),
     path("dossier/discord-link/", views.generate_discord_code, name="generate_discord_code"),
+    path("dossier/id/<int:pk>/", views.dossier_detail_by_id, name="dossier_detail_by_id"),
+    path("dossier/id/<int:pk>/answer/", views.dossier_answer_by_id, name="dossier_answer_by_id"),
+    path("dossier/id/<int:pk>/export/", views.dossier_export_by_id, name="dossier_export_by_id"),
+    path(
+        "dossier/id/<int:pk>/toggle-sensitive/",
+        views.dossier_toggle_sensitive_by_id,
+        name="dossier_toggle_sensitive_by_id",
+    ),
     path("dossier/<slug:slug>/", views.dossier_detail, name="dossier_detail"),
     path("dossier/<slug:slug>/answer/", views.dossier_answer, name="dossier_answer"),
     path("dossier/<slug:slug>/export/", views.dossier_export, name="dossier_export"),

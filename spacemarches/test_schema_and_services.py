@@ -1,7 +1,12 @@
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 
-from spacemarches.models import AgentSaveSlot, CharacterDossier, DiscordLink
+from spacemarches.models import (
+    AgentSaveSlot,
+    CharacterDossier,
+    DiscordIntakeInvite,
+    DiscordLink,
+)
 from spacemarches.questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -18,9 +23,12 @@ from spacemarches.services.dossier_service import (
     STARDATE_ERA_POST_FALL,
     STARDATE_ERA_PRE_FALL,
     complete_discord_link,
+    create_character_dossier_for_discord,
     export_dossier_markdown,
     generate_discord_link_code,
     get_dossier_progression_summary,
+    register_discord_intake_invite,
+    resolve_discord_dossier,
     save_dossier_answer,
 )
 from spacemarches.services.game_sync_service import load_agent_save, sync_agent_save
@@ -285,6 +293,50 @@ class DossierAndSyncServiceTests(TestCase):
         other_code = generate_discord_link_code(self.other_user)
         with self.assertRaises(ValueError):
             complete_discord_link(other_code, "9876543210")
+
+    def test_unclaimed_discord_onboarding_and_claim_on_link(self):
+        # Cold unlinked user cannot initialize a dossier without invite/allow_unlinked
+        self.assertEqual(resolve_discord_dossier("111000222"), (None, None))
+        with self.assertRaises(ValueError):
+            create_character_dossier_for_discord("111000222", "Rook Zero")
+
+        # Storyteller/linked user invites unlinked Discord member
+        invite = register_discord_intake_invite("111000222", invited_by_user=self.other_user)
+        self.assertEqual(invite.invited_by, self.other_user)
+
+        unclaimed = create_character_dossier_for_discord(
+            "111000222",
+            "Rook Zero",
+            narrative_voice="omniscient",
+        )
+        self.assertIsNone(unclaimed.user)
+        self.assertFalse(unclaimed.is_claimed)
+        self.assertEqual(unclaimed.discord_owner_id, "111000222")
+        self.assertEqual(unclaimed.invited_by, self.other_user)
+        self.assertEqual(unclaimed.owner_display, "Unclaimed (Discord:111000222)")
+
+        save_dossier_answer(unclaimed, "1", "Rook Zero", source="discord")
+        md = export_dossier_markdown(unclaimed, include_private=False)
+        self.assertIn("Unclaimed (Discord:111000222)", md)
+        self.assertIn("Rook Zero", md)
+
+        # Create a second unclaimed dossier whose slug collides with self.user's existing Vesper Nine
+        colliding = create_character_dossier_for_discord("111000222", "Vesper Nine")
+        self.assertEqual(colliding.slug, "vesper-nine")
+
+        # Claim on website link: attaches both unclaimed dossiers & resolves slug collision
+        code = generate_discord_link_code(self.user)
+        link = complete_discord_link(code, "111000222")
+        unclaimed.refresh_from_db()
+        colliding.refresh_from_db()
+
+        self.assertEqual(unclaimed.user, self.user)
+        self.assertTrue(unclaimed.is_claimed)
+        self.assertEqual(colliding.user, self.user)
+        self.assertEqual(colliding.slug, "vesper-nine-2")
+        self.assertEqual(link.active_dossier_id, colliding.pk)
+        self.assertEqual(len(link.claimed_dossiers), 2)
+        self.assertFalse(DiscordIntakeInvite.objects.filter(discord_user_id="111000222").exists())
 
     def test_agent_save_slot_roundtrip(self):
         empty = load_agent_save(self.user, "auto")
