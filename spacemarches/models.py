@@ -216,7 +216,7 @@ class CharacterDossier(models.Model):
     VOICE_OMNISCIENT = "OMNISCIENT"
     NARRATIVE_VOICE_CHOICES = [
         (VOICE_FIRST_PERSON, "First-person agent log"),
-        (VOICE_OMNISCIENT, "Omniscient Foundation dossier"),
+        (VOICE_OMNISCIENT, "Omniscient institutional dossier"),
     ]
 
     user = models.ForeignKey(

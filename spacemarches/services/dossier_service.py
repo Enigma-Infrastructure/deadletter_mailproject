@@ -324,12 +324,12 @@ def _normalize_narrative_voice(raw_voice: str = "") -> str:
     cleaned = (raw_voice or "").strip().lower().replace("-", "_").replace(" ", "_")
     if cleaned in {"", "first", "first_person", "1st", "agent", "log"}:
         return CharacterDossier.VOICE_FIRST_PERSON
-    if cleaned in {"omni", "omniscient", "third", "3rd", "foundation", "dossier"}:
+    if cleaned in {"omni", "omniscient", "third", "3rd", "institution", "institutional", "dossier"}:
         return CharacterDossier.VOICE_OMNISCIENT
     if cleaned.upper() in {CharacterDossier.VOICE_FIRST_PERSON, CharacterDossier.VOICE_OMNISCIENT}:
         return cleaned.upper()
     raise ValueError(
-        "Unknown narrative voice. Use 'first' (First-person agent log) or 'omniscient' (Foundation dossier)."
+        "Unknown narrative voice. Use 'first' (First-person agent log) or 'omniscient' (institutional dossier)."
     )
 
 

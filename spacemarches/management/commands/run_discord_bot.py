@@ -395,7 +395,7 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
             default="first",
             required=False,
             max_length=32,
-            placeholder="first (agent log) or omniscient (Foundation)",
+            placeholder="first (agent log) or omniscient (institutional tone)",
         )
         self.add_item(self.narrative_voice_input)
 

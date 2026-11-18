@@ -307,10 +307,11 @@ class DossierAndSyncServiceTests(TestCase):
         unclaimed = create_character_dossier_for_discord(
             "111000222",
             "Rook Zero",
-            narrative_voice="omniscient",
+            narrative_voice="institutional",
         )
         self.assertIsNone(unclaimed.user)
         self.assertFalse(unclaimed.is_claimed)
+        self.assertEqual(unclaimed.get_narrative_voice_display(), "Omniscient institutional dossier")
         self.assertEqual(unclaimed.discord_owner_id, "111000222")
         self.assertEqual(unclaimed.invited_by, self.other_user)
         self.assertEqual(unclaimed.owner_display, "Unclaimed (Discord:111000222)")
