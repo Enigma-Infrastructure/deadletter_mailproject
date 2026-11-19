@@ -361,8 +361,77 @@ def _build_question_detail_embed(dossier: CharacterDossier, question: dict[str, 
 # --------------------------------------------------
 
 
+class SendTargetIntakeButton(discord.ui.Button):
+    """One-click follow-up button letting an ST/linked creator send the new character's intake prompt."""
+
+    def __init__(
+        self,
+        *,
+        target_member: discord.Member | discord.User,
+        dossier: CharacterDossier,
+        inviter_label: str,
+        row: int = 0,
+    ):
+        super().__init__(
+            label=f"Send Intake to {target_member.display_name}"[:80],
+            style=discord.ButtonStyle.primary,
+            row=row,
+        )
+        self.target_member = target_member
+        self.dossier = dossier
+        self.inviter_label = inviter_label
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        fresh = await _get_dossier_by_id_async(self.dossier.pk)
+        stats = compute_dossier_stats(fresh)
+        questions, resolved_scope = _filter_intake_questions(fresh, scope="core")
+        embed = _build_intake_overview_embed(
+            fresh,
+            stats,
+            scope=resolved_scope,
+            shown_count=len(questions),
+        )
+        target_id = str(self.target_member.id)
+        view = DossierSelectView(
+            dossier=fresh,
+            questions=questions,
+            allowed_user_id=target_id,
+        )
+        mention = getattr(self.target_member, "mention", f"<@{target_id}>")
+        channel = getattr(interaction, "channel", None)
+        channel_send = getattr(channel, "send", None)
+        channel_can_send = channel is not None and inspect.iscoroutinefunction(channel_send)
+        try:
+            await self.target_member.send(embed=embed, view=view)
+        except discord.Forbidden:
+            if channel_can_send:
+                await channel.send(
+                    content=(
+                        f"{mention} — **{self.inviter_label}** opened your Spacemarches character intake "
+                        "(posted here because your DMs are closed):"
+                    ),
+                    embed=embed,
+                    view=view,
+                )
+                await interaction.response.send_message(
+                    f"Could not DM **{self.target_member.display_name}**; posted intake for **{fresh.character_name}** in this channel instead.",
+                    ephemeral=True,
+                )
+                return
+            await interaction.response.send_message(
+                f"Could not DM {self.target_member.display_name}; run `/intake member:@player delivery:channel` instead.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            f"Sent intake prompt for **{fresh.character_name}** to **{self.target_member.display_name}** via DM.",
+            ephemeral=True,
+        )
+
+
 class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier"):
-    """Modal creating a new CharacterDossier and setting it active (linked or ST-invited)."""
+    """Modal creating a new CharacterDossier and setting it active (linked, ST-invited, or ST-for-member)."""
 
     def __init__(
         self,
@@ -372,6 +441,9 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
         start_intake_on_create: bool = False,
         scope: str = "core",
         category: str | None = None,
+        target_discord_user_id: str | None = None,
+        target_display_name: str = "",
+        target_member: discord.Member | discord.User | None = None,
     ):
         super().__init__()
         self.allow_unlinked = allow_unlinked
@@ -379,6 +451,9 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
         self.start_intake_on_create = start_intake_on_create
         self.scope = scope or "core"
         self.category = category
+        self.target_discord_user_id = str(target_discord_user_id) if target_discord_user_id else None
+        self.target_display_name = target_display_name
+        self.target_member = target_member
 
         self.character_name_input = discord.ui.TextInput(
             label="Character Name / Callsign",
@@ -400,9 +475,11 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
         self.add_item(self.narrative_voice_input)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
+        owner_discord_id = self.target_discord_user_id or str(interaction.user.id)
+        creating_for_other = owner_discord_id != str(interaction.user.id)
         try:
             dossier, stats = await _create_dossier_async(
-                str(interaction.user.id),
+                owner_discord_id,
                 character_name=self.character_name_input.value,
                 narrative_voice=self.narrative_voice_input.value,
                 allow_unlinked=self.allow_unlinked,
@@ -410,6 +487,29 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
             )
         except ValueError as err:
             await interaction.response.send_message(f"Could not create dossier: {err}", ephemeral=True)
+            return
+
+        if creating_for_other:
+            target_label = self.target_display_name or f"Discord:{owner_discord_id}"
+            embed = _build_dossier_overview_embed(dossier, stats, total_characters=1)
+            embed.title = f"Initialized for {target_label}: {dossier.character_name}"[:256]
+            embed.set_footer(
+                text=(
+                    f"Assigned to {target_label} · Click below or run `/intake member:` to send prompts."
+                )[:2048]
+            )
+            if self.target_member is not None:
+                view: discord.ui.View | None = discord.ui.View(timeout=300)
+                view.add_item(
+                    SendTargetIntakeButton(
+                        target_member=self.target_member,
+                        dossier=dossier,
+                        inviter_label=getattr(interaction.user, "display_name", "Storyteller"),
+                    )
+                )
+                await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+            else:
+                await interaction.response.send_message(embed=embed, ephemeral=True)
             return
 
         if self.start_intake_on_create:
@@ -1031,16 +1131,38 @@ async def handle_dossier_swap_command(
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
-async def handle_dossier_list_command(interaction: discord.Interaction) -> None:
-    """List all character dossiers on the user's linked or invited Discord identity and allow swapping."""
-    is_authorized, is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
-    if not is_authorized:
-        await interaction.response.send_message(
-            "Your Discord account is not linked yet. Ask a Storyteller to prompt `/intake`, "
-            "or generate a link code on the website and run `/link <code>`.",
-            ephemeral=True,
-        )
-        return
+async def handle_dossier_list_command(
+    interaction: discord.Interaction,
+    member: discord.Member | discord.User | None = None,
+) -> None:
+    """List character dossiers for yourself or (if ST/linked) another Discord member."""
+    targeting_other = member is not None and str(member.id) != str(interaction.user.id)
+    if targeting_other:
+        invoker_is_linked, _inv_uid, _inv_name = await _get_link_user_async(str(interaction.user.id))
+        if not invoker_is_linked and not _has_discord_st_permissions(interaction.user):
+            await interaction.response.send_message(
+                "Only linked users or Storytellers/Admins can inspect another member's dossiers.",
+                ephemeral=True,
+            )
+            return
+        lookup_id = str(member.id)
+        is_authorized, is_linked, items = await _get_actor_dossiers_async(lookup_id)
+        if not is_authorized or not items:
+            await interaction.response.send_message(
+                f"**{member.display_name}** has no Character Dossiers yet. Run `/intake member:@player` or "
+                "`/dossier create member:@player` to initialize one.",
+                ephemeral=True,
+            )
+            return
+    else:
+        is_authorized, is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
+        if not is_authorized:
+            await interaction.response.send_message(
+                "Your Discord account is not linked yet. Ask a Storyteller to prompt `/intake`, "
+                "or generate a link code on the website and run `/link <code>`.",
+                ephemeral=True,
+            )
+            return
 
     if not items:
         embed = discord.Embed(
@@ -1075,11 +1197,17 @@ async def handle_dossier_list_command(interaction: discord.Interaction) -> None:
             f"{claim_note}"
         )
 
+    title_prefix = f"{member.display_name}'s " if targeting_other and member is not None else ""
     embed = discord.Embed(
-        title=f"Character Dossiers ({len(items)})",
+        title=f"{title_prefix}Character Dossiers ({len(items)})",
         description="\n".join(lines)[:4096],
         color=discord.Color.teal(),
     )
+    if targeting_other:
+        embed.set_footer(text="Run `/intake member:@player character:<slug>` to prompt a specific character.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
     embed.set_footer(text="Use the dropdown below or `/dossier swap <character>` to switch active narrative.")
     view = DossierArchiveView(
         items=items,
@@ -1090,8 +1218,32 @@ async def handle_dossier_list_command(interaction: discord.Interaction) -> None:
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
-async def handle_dossier_create_command(interaction: discord.Interaction) -> None:
-    """Open the modal to create a new CharacterDossier if linked or ST-invited."""
+async def handle_dossier_create_command(
+    interaction: discord.Interaction,
+    member: discord.Member | discord.User | None = None,
+) -> None:
+    """Open the modal to create a new CharacterDossier for yourself or (if ST/linked) another member."""
+    if member is not None and str(member.id) != str(interaction.user.id):
+        invoker_is_linked, invoker_user_id, _inv_name = await _get_link_user_async(str(interaction.user.id))
+        if not invoker_is_linked and not _has_discord_st_permissions(interaction.user):
+            await interaction.response.send_message(
+                "Only linked users or Storytellers/Admins can create a character dossier for another member.",
+                ephemeral=True,
+            )
+            return
+        target_id = str(member.id)
+        await _register_intake_invite_async(target_id, invited_by_user_id=invoker_user_id)
+        await interaction.response.send_modal(
+            CreateDossierModal(
+                allow_unlinked=True,
+                invited_by_user_id=invoker_user_id,
+                target_discord_user_id=target_id,
+                target_display_name=member.display_name,
+                target_member=member,
+            )
+        )
+        return
+
     is_authorized, is_linked, _items = await _get_actor_dossiers_async(str(interaction.user.id))
     if not is_authorized:
         await interaction.response.send_message(
@@ -1124,16 +1276,29 @@ async def _prompt_target_member_intake(
     target_id = str(member.id)
     await _register_intake_invite_async(target_id, invited_by_user_id=invoker_user_id)
 
+    clean_char = (character or "").strip()
+    created_for_target = False
     try:
         dossier, meta = await _resolve_dossier_async(
             target_id,
-            character_identifier=character or "",
-            activate=bool(character),
+            character_identifier=clean_char,
+            activate=bool(clean_char),
             allow_unlinked=True,
         )
     except ValueError as err:
-        await interaction.response.send_message(str(err), ephemeral=True)
-        return
+        err_msg = str(err)
+        if clean_char and "Multiple characters match" not in err_msg:
+            dossier, stats = await _create_dossier_async(
+                target_id,
+                character_name=clean_char,
+                allow_unlinked=True,
+                invited_by_user_id=invoker_user_id,
+            )
+            meta = {"stats": stats}
+            created_for_target = True
+        else:
+            await interaction.response.send_message(err_msg, ephemeral=True)
+            return
 
     effective_scope = scope or ("all" if category else "core")
     inviter_label = invoker_username or getattr(interaction.user, "display_name", "Storyteller")
@@ -1180,7 +1345,8 @@ async def _prompt_target_member_intake(
             questions=questions,
             allowed_user_id=target_id,
         )
-        status_label = f"intake prompt for **{dossier.character_name}**"
+        created_note = " *(initialized)*" if created_for_target else ""
+        status_label = f"intake prompt for **{dossier.character_name}**{created_note}"
 
     mention = getattr(member, "mention", f"<@{target_id}>")
     channel = getattr(interaction, "channel", None)
@@ -1469,7 +1635,14 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
         interaction: discord.Interaction,
         current: str,
     ) -> list[app_commands.Choice[str]]:
-        _auth, _is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
+        namespace = getattr(interaction, "namespace", None)
+        target_member = getattr(namespace, "member", None) if namespace is not None else None
+        target_id = getattr(target_member, "id", None)
+        if not target_id and isinstance(target_member, (int, str)) and str(target_member).strip():
+            target_id = str(target_member).strip()
+        lookup_id = str(target_id or interaction.user.id)
+
+        _auth, _is_linked, items = await _get_actor_dossiers_async(lookup_id)
         cur = (current or "").strip().lower()
         choices: list[app_commands.Choice[str]] = []
         for entry in items:
@@ -1504,13 +1677,15 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
     async def dossier_swap_cmd(interaction: discord.Interaction, character: str):
         await handle_dossier_swap_command(interaction, character=character)
 
-    @dossier_group.command(name="list", description="List all your character dossiers and active status.")
-    async def dossier_list_cmd(interaction: discord.Interaction):
-        await handle_dossier_list_command(interaction)
+    @dossier_group.command(name="list", description="List character dossiers for yourself or (ST/linked) another member.")
+    @app_commands.describe(member="Optional Discord member whose character dossiers you want to inspect")
+    async def dossier_list_cmd(interaction: discord.Interaction, member: discord.Member | None = None):
+        await handle_dossier_list_command(interaction, member=member)
 
-    @dossier_group.command(name="create", description="Initialize a new character dossier narrative.")
-    async def dossier_create_cmd(interaction: discord.Interaction):
-        await handle_dossier_create_command(interaction)
+    @dossier_group.command(name="create", description="Initialize a new character dossier for yourself or another member.")
+    @app_commands.describe(member="Optional Discord member to initialize the character dossier for")
+    async def dossier_create_cmd(interaction: discord.Interaction, member: discord.Member | None = None):
+        await handle_dossier_create_command(interaction, member=member)
 
     tree.add_command(dossier_group)
 
@@ -1520,7 +1695,7 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
     )
     @app_commands.describe(
         member="ST / Linked User: optionally target another Discord member to onboard/prompt",
-        character="Optional character name or slug (activates if provided)",
+        character="Optional character name or slug (creates on target member if new)",
         scope="Prompt tier filter (defaults to Core Prompts unless a category is picked)",
         category="Optional category filter",
         delivery="When targeting a member: send via DM (with channel fallback) or post in channel",
@@ -1551,6 +1726,7 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
         question_ids="Comma-separated question IDs (e.g. 15a,15b,6.1d)",
         character="Optional player character name/slug (defaults to their active dossier)",
     )
+    @app_commands.autocomplete(character=_character_autocomplete)
     async def debrief_cmd(
         interaction: discord.Interaction,
         member: discord.Member,

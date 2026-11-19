@@ -16,6 +16,7 @@ from spacemarches.management.commands.run_discord_bot import (
     DossierQuestionSelect,
     LaunchIntakeButton,
     OnboardingInviteView,
+    SendTargetIntakeButton,
     build_bot,
     handle_debrief_command,
     handle_dossier_command,
@@ -404,4 +405,73 @@ class DiscordBotTests(TestCase):
         channel_mock.send.assert_awaited_once()
         self.assertIn("DMs are closed", channel_mock.send.call_args.kwargs["content"])
         self.assertIn("instead", linked_invoker.response.send_message.call_args.args[0])
+
+    def test_st_creates_named_character_for_target_via_intake_and_dossier_create(self):
+        st_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        target = MagicMock(spec=discord.Member)
+        target.id = "900800700"
+        target.display_name = "FreshAgent"
+        target.mention = "<@900800700>"
+        target.send = AsyncMock()
+
+        # 1. /intake member:@FreshAgent character:"Vesper Callsign" initializes the character on FreshAgent
+        async_to_sync(handle_intake_command)(
+            st_inter,
+            member=target,
+            character="Vesper Callsign",
+        )
+        vesper = CharacterDossier.objects.get(
+            user__isnull=True,
+            discord_owner_id="900800700",
+            character_name="Vesper Callsign",
+        )
+        self.assertFalse(CharacterDossier.objects.filter(discord_owner_id="100200300").exists())
+        target.send.assert_awaited_once()
+        dm_kwargs = target.send.call_args.kwargs
+        self.assertIn("Intake: Vesper Callsign", dm_kwargs["embed"].title)
+        self.assertIn("initialized", st_inter.response.send_message.call_args.args[0])
+
+        # 2. Unlinked non-ST cannot /dossier create for another member
+        cold_caller = _mock_member_interaction("777666555", manage_guild=False)
+        async_to_sync(handle_dossier_create_command)(cold_caller, member=target)
+        self.assertIn("Only linked users or Storytellers/Admins", cold_caller.response.send_message.call_args.args[0])
+
+        # 3. ST runs /dossier create member:@FreshAgent -> creates Backup Ego for FreshAgent (not ST)
+        create_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_dossier_create_command)(create_inter, member=target)
+        create_inter.response.send_modal.assert_awaited_once()
+        modal = create_inter.response.send_modal.call_args.args[0]
+        self.assertEqual(modal.target_discord_user_id, "900800700")
+
+        async def _submit_target_modal():
+            modal.character_name_input._value = "Backup Ego"
+            modal.narrative_voice_input._value = "omniscient"
+            sub_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+            await modal.on_submit(sub_inter)
+            sub_inter.response.send_message.assert_awaited_once()
+            s_kwargs = sub_inter.response.send_message.call_args.kwargs
+            self.assertIn("Initialized for FreshAgent: Backup Ego", s_kwargs["embed"].title)
+            send_btn = next(c for c in s_kwargs["view"].children if isinstance(c, SendTargetIntakeButton))
+            target.send.reset_mock()
+            btn_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+            await send_btn.callback(btn_inter)
+            target.send.assert_awaited_once()
+            self.assertIn("Intake: Backup Ego", target.send.call_args.kwargs["embed"].title)
+
+        async_to_sync(_submit_target_modal)()
+        backup = CharacterDossier.objects.get(
+            user__isnull=True,
+            discord_owner_id="900800700",
+            character_name="Backup Ego",
+        )
+        self.assertEqual(backup.narrative_voice, CharacterDossier.VOICE_OMNISCIENT)
+
+        # 4. ST runs /dossier list member:@FreshAgent -> sees both Vesper Callsign and Backup Ego
+        list_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_dossier_list_command)(list_inter, member=target)
+        list_embed = list_inter.response.send_message.call_args.kwargs["embed"]
+        self.assertIn("FreshAgent's Character Dossiers (2)", list_embed.title)
+        self.assertIn(vesper.character_name, list_embed.description)
+        self.assertIn(backup.character_name, list_embed.description)
+
 
