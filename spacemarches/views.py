@@ -1,6 +1,7 @@
 import json
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
@@ -33,9 +34,12 @@ from .services.dossier_service import (
     export_dossier_markdown,
     generate_discord_link_code,
     get_dossier_progression_summary,
+    reassign_dossier_control,
     save_dossier_answer,
 )
 from .services.game_sync_service import load_agent_save, sync_agent_save
+
+User = get_user_model()
 
 
 # --------------------------------------------------
@@ -411,6 +415,14 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
         dossier_export_url = reverse("spacemarches:dossier_export", kwargs={"slug": dossier.slug})
         dossier_toggle_url = reverse("spacemarches:dossier_toggle_sensitive", kwargs={"slug": dossier.slug})
 
+    can_admin_reassign = _is_gm_or_admin(request.user)
+    reassign_users = list(User.objects.order_by("username")) if can_admin_reassign else []
+    dossier_reassign_url = (
+        reverse("spacemarches:dossier_reassign_by_id", kwargs={"pk": dossier.pk})
+        if can_admin_reassign
+        else ""
+    )
+
     return render(
         request,
         "spacemarches/dossier_detail.html",
@@ -432,6 +444,9 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
             "dossier_export_url": dossier_export_url,
             "dossier_toggle_url": dossier_toggle_url,
             "is_admin_override": dossier.user_id != request.user.pk,
+            "can_admin_reassign": can_admin_reassign,
+            "reassign_users": reassign_users,
+            "dossier_reassign_url": dossier_reassign_url,
         },
     )
 
@@ -597,3 +612,36 @@ def dossier_export_by_id(request, pk: int):
     """Primary-key Markdown export supporting admin access to unclaimed or player dossiers."""
     dossier = _get_accessible_dossier(request.user, pk=pk)
     return _handle_dossier_export(request, dossier)
+
+
+@login_required
+@require_POST
+def dossier_reassign_by_id(request, pk: int):
+    """Staff/Admin endpoint to reassign control of a dossier to a website user or unclaimed Discord ID."""
+    if not _is_gm_or_admin(request.user):
+        raise Http404("Character dossier not found.")
+
+    dossier = get_object_or_404(CharacterDossier.objects.select_related("user"), pk=pk)
+    raw_target_user_id = (request.POST.get("target_user_id") or "").strip()
+    raw_discord_id = (request.POST.get("discord_owner_id") or "").strip()
+
+    target_user = None
+    if raw_target_user_id:
+        try:
+            target_user = User.objects.filter(pk=int(raw_target_user_id)).first()
+        except ValueError:
+            target_user = None
+        if target_user is None:
+            messages.error(request, "Selected website user account was not found.")
+            return redirect("spacemarches:dossier_detail_by_id", pk=dossier.pk)
+
+    reassign_dossier_control(
+        dossier,
+        target_user=target_user,
+        discord_owner_id=raw_discord_id,
+    )
+    messages.success(
+        request,
+        f"Updated control for {dossier.character_name}: {dossier.owner_display}.",
+    )
+    return redirect("spacemarches:dossier_detail_by_id", pk=dossier.pk)

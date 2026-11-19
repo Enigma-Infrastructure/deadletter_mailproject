@@ -27,6 +27,7 @@ urlpatterns = [
         views.dossier_toggle_sensitive_by_id,
         name="dossier_toggle_sensitive_by_id",
     ),
+    path("dossier/id/<int:pk>/reassign/", views.dossier_reassign_by_id, name="dossier_reassign_by_id"),
     path("dossier/<slug:slug>/", views.dossier_detail, name="dossier_detail"),
     path("dossier/<slug:slug>/answer/", views.dossier_answer, name="dossier_answer"),
     path("dossier/<slug:slug>/export/", views.dossier_export, name="dossier_export"),

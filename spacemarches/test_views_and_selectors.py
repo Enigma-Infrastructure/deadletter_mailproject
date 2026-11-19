@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from spacemarches.models import ArchiveEntry, CharacterDossier, ForumPost, ForumThread
+from spacemarches.models import ArchiveEntry, CharacterDossier, DiscordLink, ForumPost, ForumThread
 from spacemarches.selectors import get_user_spacemarches_summary
 from spacemarches.services.dossier_service import (
     complete_discord_link,
@@ -355,4 +355,63 @@ class SpacemarchesViewsAndSelectorsTests(TestCase):
         )
         self.assertEqual(post_claim_admin_save.status_code, 200)
         self.assertEqual(post_claim_admin_save.json()["core_answered"], 3)
+
+    def test_admin_reassign_dossier_control_and_non_staff_blocked(self):
+        # Set up colliding slug on target user (self.other) and a linked Discord ID
+        CharacterDossier.objects.create(
+            user=self.other,
+            character_name="Cassian Mire",
+            slug="cassian-mire",
+        )
+        DiscordLink.objects.create(user=self.other, discord_user_id="888777666")
+        admin_created = CharacterDossier.objects.create(
+            user=self.admin,
+            discord_owner_id="111000999",
+            character_name="Cassian Mire",
+            slug="cassian-mire",
+        )
+
+        # Non-staff (even sheet owner) cannot access reassign form or endpoint
+        self.client.force_login(self.user)
+        owner_detail = self.client.get(
+            reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug})
+        )
+        self.assertNotContains(owner_detail, "Admin: Reassign Control")
+        self.assertEqual(
+            self.client.post(
+                reverse("spacemarches:dossier_reassign_by_id", kwargs={"pk": self.dossier.pk}),
+                {"target_user_id": str(self.other.pk)},
+            ).status_code,
+            404,
+        )
+
+        # Admin sees Reassign Control form and moves accidentally self-owned dossier to self.other
+        self.client.force_login(self.admin)
+        admin_detail = self.client.get(
+            reverse("spacemarches:dossier_detail_by_id", kwargs={"pk": admin_created.pk})
+        )
+        self.assertEqual(admin_detail.status_code, 200)
+        self.assertContains(admin_detail, "Admin: Reassign Control")
+
+        reassign_resp = self.client.post(
+            reverse("spacemarches:dossier_reassign_by_id", kwargs={"pk": admin_created.pk}),
+            {"target_user_id": str(self.other.pk), "discord_owner_id": ""},
+        )
+        self.assertEqual(reassign_resp.status_code, 302)
+        admin_created.refresh_from_db()
+        self.assertEqual(admin_created.user, self.other)
+        self.assertEqual(admin_created.slug, "cassian-mire-2")
+        self.assertEqual(admin_created.discord_owner_id, "888777666")
+
+        # Admin can also move a dossier to Unclaimed Discord ID onboarding state
+        unclaim_resp = self.client.post(
+            reverse("spacemarches:dossier_reassign_by_id", kwargs={"pk": admin_created.pk}),
+            {"target_user_id": "", "discord_owner_id": "555999111"},
+        )
+        self.assertEqual(unclaim_resp.status_code, 302)
+        admin_created.refresh_from_db()
+        self.assertIsNone(admin_created.user)
+        self.assertEqual(admin_created.discord_owner_id, "555999111")
+        roster = self.client.get(reverse("spacemarches:dossier_list"))
+        self.assertContains(roster, "Unclaimed (Discord:555999111)")
 

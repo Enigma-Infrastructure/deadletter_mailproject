@@ -539,7 +539,12 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
         _auth, _is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
         embed = _build_dossier_overview_embed(dossier, stats, total_characters=max(len(items), 1))
         embed.title = f"Initialized & Active: {dossier.character_name}"[:256]
-        view = DossierArchiveView(items=items, active_dossier=dossier, allowed_user_id=str(interaction.user.id))
+        view = DossierArchiveView(
+            items=items,
+            active_dossier=dossier,
+            allowed_user_id=str(interaction.user.id),
+            allow_unlinked=not _is_linked,
+        )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
@@ -765,6 +770,7 @@ class CharacterSelect(discord.ui.Select):
             items=items,
             active_dossier=dossier,
             allowed_user_id=self.allowed_user_id,
+            allow_unlinked=not _is_linked,
         )
         await interaction.response.edit_message(embed=embed, view=view)
 
@@ -977,7 +983,7 @@ class DossierSelectView(discord.ui.View):
 
 
 class DebriefQuestionButton(discord.ui.Button):
-    """Interactive prompt button sent via DM for post-action report updates."""
+    """Interactive prompt button sent via DM or channel for post-action report updates."""
 
     def __init__(
         self,
@@ -986,6 +992,7 @@ class DebriefQuestionButton(discord.ui.Button):
         question: dict[str, Any],
         current_answer: str,
         sol_date: str,
+        allowed_user_id: str | None = None,
     ):
         qid = question["id"]
         super().__init__(
@@ -997,8 +1004,11 @@ class DebriefQuestionButton(discord.ui.Button):
         self.question = question
         self.current_answer = current_answer
         self.sol_date = sol_date
+        self.allowed_user_id = allowed_user_id
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        if not await _check_allowed_actor(interaction, self.allowed_user_id):
+            return
         modal = DossierAnswerModal(
             dossier_id=self.dossier_id,
             question=self.question,
@@ -1016,6 +1026,7 @@ class DebriefPromptView(discord.ui.View):
         dossier: CharacterDossier,
         questions: list[dict[str, Any]],
         sol_date: str,
+        allowed_user_id: str | None = None,
         timeout: float = 900,
     ):
         super().__init__(timeout=timeout)
@@ -1030,6 +1041,7 @@ class DebriefPromptView(discord.ui.View):
                     question=q,
                     current_answer=current_answer,
                     sol_date=sol_date,
+                    allowed_user_id=allowed_user_id,
                 )
             )
 
@@ -1060,11 +1072,25 @@ async def handle_link_command(interaction: discord.Interaction, code: str) -> No
 async def handle_dossier_open_command(
     interaction: discord.Interaction,
     character: str | None = None,
+    member: discord.Member | discord.User | None = None,
 ) -> None:
-    """Open the character dossier hub with character switcher, intake launcher, and new-character button."""
+    """Open the character dossier hub for yourself or (if ST/linked) inspect another member's active dossier."""
+    targeting_other = member is not None and str(member.id) != str(interaction.user.id)
+    if targeting_other:
+        invoker_is_linked, _inv_uid, _inv_name = await _get_link_user_async(str(interaction.user.id))
+        if not invoker_is_linked and not _has_discord_st_permissions(interaction.user):
+            await interaction.response.send_message(
+                "Only linked users or Storytellers/Admins can inspect another member's dossier.",
+                ephemeral=True,
+            )
+            return
+        lookup_id = str(member.id)
+    else:
+        lookup_id = str(interaction.user.id)
+
     try:
         dossier, meta = await _resolve_dossier_async(
-            str(interaction.user.id),
+            lookup_id,
             character_identifier=character or "",
             activate=bool(character),
         )
@@ -1073,6 +1099,12 @@ async def handle_dossier_open_command(
         return
 
     if meta is None:
+        if targeting_other and member is not None:
+            await interaction.response.send_message(
+                f"**{member.display_name}** has not linked or been onboarded yet. Run `/intake member:@player` to onboard them.",
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
             "Your Discord account is not linked yet. Ask a Storyteller to prompt `/intake`, "
             "or generate a link code on the website and run `/link <code>`.",
@@ -1081,6 +1113,13 @@ async def handle_dossier_open_command(
         return
 
     if dossier is None:
+        if targeting_other and member is not None:
+            await interaction.response.send_message(
+                f"**{member.display_name}** has no Character Dossiers yet. Run `/intake member:@player` or "
+                "`/dossier create member:@player` to initialize one.",
+                ephemeral=True,
+            )
+            return
         embed = discord.Embed(
             title="No Character Dossiers Found",
             description=(
@@ -1098,8 +1137,14 @@ async def handle_dossier_open_command(
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
         return
 
-    _auth, _is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
+    _auth, _is_linked, items = await _get_actor_dossiers_async(lookup_id)
     embed = _build_dossier_overview_embed(dossier, meta["stats"], total_characters=len(items))
+    if targeting_other and member is not None:
+        embed.title = f"{member.display_name}'s Active Dossier: {dossier.character_name}"[:256]
+        embed.set_footer(text="Run `/intake member:@player` to send prompts for this character.")
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
     view = DossierArchiveView(
         items=items,
         active_dossier=dossier,
@@ -1112,21 +1157,41 @@ async def handle_dossier_open_command(
 async def handle_dossier_swap_command(
     interaction: discord.Interaction,
     character: str,
+    member: discord.Member | discord.User | None = None,
 ) -> None:
-    """Switch the linked or invited user's active CharacterDossier."""
+    """Switch the active CharacterDossier for yourself or (if ST/linked) another member."""
+    targeting_other = member is not None and str(member.id) != str(interaction.user.id)
+    if targeting_other:
+        invoker_is_linked, _inv_uid, _inv_name = await _get_link_user_async(str(interaction.user.id))
+        if not invoker_is_linked and not _has_discord_st_permissions(interaction.user):
+            await interaction.response.send_message(
+                "Only linked users or Storytellers/Admins can switch another member's active dossier.",
+                ephemeral=True,
+            )
+            return
+        lookup_id = str(member.id)
+    else:
+        lookup_id = str(interaction.user.id)
+
     try:
-        dossier, stats = await _swap_active_dossier_async(str(interaction.user.id), character)
+        dossier, stats = await _swap_active_dossier_async(lookup_id, character)
     except ValueError as err:
         await interaction.response.send_message(str(err), ephemeral=True)
         return
 
-    _auth, _is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
+    _auth, is_linked, items = await _get_actor_dossiers_async(lookup_id)
     embed = _build_dossier_overview_embed(dossier, stats, total_characters=len(items))
+    if targeting_other and member is not None:
+        embed.title = f"Swapped {member.display_name}'s Active Dossier: {dossier.character_name}"[:256]
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
+
     embed.title = f"Swapped Active Dossier: {dossier.character_name}"[:256]
     view = DossierArchiveView(
         items=items,
         active_dossier=dossier,
         allowed_user_id=str(interaction.user.id),
+        allow_unlinked=not is_linked,
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
@@ -1513,8 +1578,9 @@ async def handle_debrief_command(
     *,
     character: str = "",
     session_tag: str = "",
+    delivery: Literal["dm", "channel"] = "dm",
 ) -> None:
-    invoker_is_linked, _inv_uid, _inv_name = await _get_link_user_async(str(interaction.user.id))
+    invoker_is_linked, _inv_uid, invoker_username = await _get_link_user_async(str(interaction.user.id))
     has_st_perm = _has_discord_st_permissions(interaction.user)
     is_real_discord_user = isinstance(interaction.user, (discord.Member, discord.User))
     if is_real_discord_user and not invoker_is_linked and not has_st_perm:
@@ -1555,9 +1621,10 @@ async def handle_debrief_command(
         )
         return
 
+    target_id = str(member.id)
     try:
         dossier, meta = await _resolve_dossier_async(
-            str(member.id),
+            target_id,
             character_identifier=character,
             activate=False,
         )
@@ -1598,19 +1665,60 @@ async def handle_debrief_command(
         dossier=dossier,
         questions=visible_questions,
         sol_date=canonical_sol,
+        allowed_user_id=target_id,
     )
+
+    q_summary = ", ".join(q["id"] for q in visible_questions)
+    inviter_label = invoker_username or getattr(interaction.user, "display_name", "Storyteller")
+    mention = getattr(member, "mention", f"<@{target_id}>")
+    channel = getattr(interaction, "channel", None)
+    channel_send = getattr(channel, "send", None)
+    channel_can_send = channel is not None and inspect.iscoroutinefunction(channel_send)
+
+    if delivery == "channel":
+        if channel_can_send:
+            await channel.send(
+                content=f"{mention} — **{inviter_label}** requested a Post-Action Report ({canonical_sol}):",
+                embed=dm_embed,
+                view=view,
+            )
+            await interaction.response.send_message(
+                f"Posted Post-Action Report debrief ({canonical_sol}) for {q_summary} ({dossier.character_name}) in this channel.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_message(
+            content=f"{mention} — **{inviter_label}** requested a Post-Action Report ({canonical_sol}):",
+            embed=dm_embed,
+            view=view,
+        )
+        return
 
     try:
         await member.send(embed=dm_embed, view=view)
     except discord.Forbidden:
+        if channel_can_send:
+            await channel.send(
+                content=(
+                    f"{mention} — **{inviter_label}** requested a Post-Action Report ({canonical_sol}) "
+                    "(posted here because your DMs are closed):"
+                ),
+                embed=dm_embed,
+                view=view,
+            )
+            await interaction.response.send_message(
+                f"Could not DM **{member.display_name}**; posted debrief ({canonical_sol}) in this channel instead.",
+                ephemeral=True,
+            )
+            return
         await interaction.response.send_message(
-            f"Could not DM {member.display_name}; their server DMs may be disabled.",
+            f"Could not DM {member.display_name}; their server DMs may be disabled (try `delivery:channel`).",
             ephemeral=True,
         )
         return
 
     await interaction.response.send_message(
-        f"Sent Post-Action Report debrief ({canonical_sol}) for {', '.join(q['id'] for q in visible_questions)} "
+        f"Sent Post-Action Report debrief ({canonical_sol}) for {q_summary} "
         f"({dossier.character_name}) to {member.display_name}.",
         ephemeral=True,
     )
@@ -1665,17 +1773,31 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
         description="Select, swap, or initialize your character dossiers.",
     )
 
-    @dossier_group.command(name="open", description="Open your character dossier overview and switcher.")
-    @app_commands.describe(character="Optional character name or slug to open and make active")
+    @dossier_group.command(name="open", description="Open your character dossier overview or inspect another member's active dossier.")
+    @app_commands.describe(
+        character="Optional character name or slug to open and make active",
+        member="Optional Discord member whose active dossier to inspect (ST/Linked only)",
+    )
     @app_commands.autocomplete(character=_character_autocomplete)
-    async def dossier_open_cmd(interaction: discord.Interaction, character: str | None = None):
-        await handle_dossier_open_command(interaction, character=character)
+    async def dossier_open_cmd(
+        interaction: discord.Interaction,
+        character: str | None = None,
+        member: discord.Member | None = None,
+    ):
+        await handle_dossier_open_command(interaction, character=character, member=member)
 
     @dossier_group.command(name="swap", description="Switch which character dossier is currently active.")
-    @app_commands.describe(character="Character name or slug to activate")
+    @app_commands.describe(
+        character="Character name or slug to activate",
+        member="Optional Discord member whose active character to switch (ST/Linked only)",
+    )
     @app_commands.autocomplete(character=_character_autocomplete)
-    async def dossier_swap_cmd(interaction: discord.Interaction, character: str):
-        await handle_dossier_swap_command(interaction, character=character)
+    async def dossier_swap_cmd(
+        interaction: discord.Interaction,
+        character: str,
+        member: discord.Member | None = None,
+    ):
+        await handle_dossier_swap_command(interaction, character=character, member=member)
 
     @dossier_group.command(name="list", description="List character dossiers for yourself or (ST/linked) another member.")
     @app_commands.describe(member="Optional Discord member whose character dossiers you want to inspect")
@@ -1719,12 +1841,13 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
             delivery=delivery,
         )
 
-    @tree.command(name="debrief", description="GM: DM a player interactive post-action report prompts.")
+    @tree.command(name="debrief", description="GM: DM (or post) interactive post-action report prompts for a player.")
     @app_commands.describe(
         member="Target Discord member",
         stardate="Pre-Fall, Fall, or Post-Fall Sol-date (e.g. 2.450)",
         question_ids="Comma-separated question IDs (e.g. 15a,15b,6.1d)",
         character="Optional player character name/slug (defaults to their active dossier)",
+        delivery="Send via DM (with channel fallback) or post directly in channel",
     )
     @app_commands.autocomplete(character=_character_autocomplete)
     async def debrief_cmd(
@@ -1733,6 +1856,7 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
         stardate: str,
         question_ids: str,
         character: str | None = None,
+        delivery: Literal["dm", "channel"] = "dm",
     ):
         await handle_debrief_command(
             interaction,
@@ -1740,6 +1864,7 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
             stardate=stardate,
             question_ids=question_ids,
             character=character or "",
+            delivery=delivery,
         )
 
     @client.event

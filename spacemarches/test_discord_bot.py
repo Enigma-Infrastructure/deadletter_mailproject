@@ -11,6 +11,7 @@ from spacemarches.management.commands.run_discord_bot import (
     CharacterSelect,
     CreateDossierButton,
     CreateDossierModal,
+    DebriefQuestionButton,
     DossierAnswerModal,
     DossierEditButton,
     DossierQuestionSelect,
@@ -473,5 +474,102 @@ class DiscordBotTests(TestCase):
         self.assertIn("FreshAgent's Character Dossiers (2)", list_embed.title)
         self.assertIn(vesper.character_name, list_embed.description)
         self.assertIn(backup.character_name, list_embed.description)
+
+    def test_debrief_channel_fallback_button_guard_and_dossier_open_swap_member(self):
+        # 1. ST creates two characters on unclaimed player 901202303
+        st_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        target = MagicMock(spec=discord.Member)
+        target.id = "901202303"
+        target.display_name = "ClosedAgent"
+        target.mention = "<@901202303>"
+        target.send = AsyncMock(side_effect=discord.Forbidden(MagicMock(), "DMs disabled"))
+
+        channel_mock = MagicMock()
+        channel_mock.send = AsyncMock()
+        st_inter.channel = channel_mock
+
+        async_to_sync(handle_intake_command)(st_inter, member=target, character="Alpha Frame")
+        # Channel fallback on Forbidden DM should have fired during intake
+        channel_mock.send.assert_awaited_once()
+        self.assertIn("DMs are closed", channel_mock.send.call_args.kwargs["content"])
+
+        from spacemarches.services.dossier_service import create_character_dossier_for_discord
+
+        beta = create_character_dossier_for_discord(
+            "901202303",
+            "Beta Frame",
+            allow_unlinked=True,
+        )
+
+        # 2. Non-ST / unlinked cannot /dossier open or /dossier swap another member
+        cold_caller = _mock_member_interaction("777666555", manage_guild=False)
+        async_to_sync(handle_dossier_open_command)(cold_caller, member=target)
+        self.assertIn("Only linked users or Storytellers/Admins", cold_caller.response.send_message.call_args.args[0])
+
+        cold_swap = _mock_member_interaction("777666555", manage_guild=False)
+        async_to_sync(handle_dossier_swap_command)(cold_swap, character="alpha-frame", member=target)
+        self.assertIn("Only linked users or Storytellers/Admins", cold_swap.response.send_message.call_args.args[0])
+
+        # 3. ST inspects target's active dossier (Beta Frame) and swaps to Alpha Frame
+        open_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_dossier_open_command)(open_inter, member=target)
+        open_embed = open_inter.response.send_message.call_args.kwargs["embed"]
+        self.assertIn("ClosedAgent's Active Dossier: Beta Frame", open_embed.title)
+
+        swap_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_dossier_swap_command)(swap_inter, character="alpha-frame", member=target)
+        swap_embed = swap_inter.response.send_message.call_args.kwargs["embed"]
+        self.assertIn("Swapped ClosedAgent's Active Dossier: Alpha Frame", swap_embed.title)
+        invite = DiscordIntakeInvite.objects.get(discord_user_id="901202303")
+        self.assertNotEqual(invite.active_dossier_id, beta.pk)
+
+        # 4. /debrief falls back to channel on Forbidden and guards buttons via allowed_user_id
+        channel_mock.send.reset_mock()
+        debrief_fb = _mock_member_interaction(
+            "100200300",
+            role_names=["Storyteller"],
+            display_name="ST-Valk",
+            channel=channel_mock,
+        )
+        async_to_sync(handle_debrief_command)(
+            debrief_fb,
+            member=target,
+            stardate="10.500",
+            question_ids="1",
+            character="beta-frame",
+        )
+        channel_mock.send.assert_awaited_once()
+        fb_kwargs = channel_mock.send.call_args.kwargs
+        self.assertIn("DMs are closed", fb_kwargs["content"])
+        self.assertIn("Beta Frame", fb_kwargs["embed"].description)
+
+        debrief_btn = next(c for c in fb_kwargs["view"].children if isinstance(c, DebriefQuestionButton))
+        bystander_click = _mock_member_interaction("999111222")
+        async_to_sync(debrief_btn.callback)(bystander_click)
+        self.assertIn("belongs to another player", bystander_click.response.send_message.call_args.args[0])
+
+        target_click = _mock_member_interaction("901202303")
+        async_to_sync(debrief_btn.callback)(target_click)
+        target_click.response.send_modal.assert_awaited_once()
+
+        # 5. Explicit delivery='channel' posts directly without calling member.send
+        target.send.reset_mock()
+        channel_mock.send.reset_mock()
+        debrief_ch = _mock_member_interaction(
+            "100200300",
+            role_names=["Storyteller"],
+            display_name="ST-Valk",
+            channel=channel_mock,
+        )
+        async_to_sync(handle_debrief_command)(
+            debrief_ch,
+            member=target,
+            stardate="10.750",
+            question_ids="1",
+            delivery="channel",
+        )
+        target.send.assert_not_called()
+        channel_mock.send.assert_awaited_once()
+        self.assertIn("requested a Post-Action Report", channel_mock.send.call_args.kwargs["content"])
 
 

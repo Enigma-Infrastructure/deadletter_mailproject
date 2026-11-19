@@ -8,6 +8,7 @@ from typing import Any
 from django.db import transaction
 from django.utils import timezone
 from django.utils.crypto import get_random_string
+from django.utils.text import slugify
 
 from spacemarches.models import CharacterDossier, DiscordIntakeInvite, DiscordLink
 from spacemarches.questionnaire import (
@@ -318,6 +319,63 @@ def complete_discord_link(code: str, discord_user_id: str) -> DiscordLink:
 
         link.claimed_dossiers = claimed_dossiers
         return link
+
+
+def reassign_dossier_control(
+    dossier: CharacterDossier,
+    *,
+    target_user=None,
+    discord_owner_id: str | None = None,
+) -> CharacterDossier:
+    """Reassign website user control and/or Discord owner ID for an existing CharacterDossier."""
+    raw_discord = "" if discord_owner_id is None else str(discord_owner_id).strip()
+
+    with transaction.atomic():
+        locked = CharacterDossier.objects.select_for_update().get(pk=dossier.pk)
+        previous_user_id = locked.user_id
+
+        if target_user is not None:
+            resolved_discord_id = raw_discord
+            if not resolved_discord_id:
+                target_link = DiscordLink.objects.filter(user=target_user).first()
+                if target_link is not None and target_link.discord_user_id:
+                    resolved_discord_id = target_link.discord_user_id
+        else:
+            resolved_discord_id = raw_discord
+
+        base = locked.slug or slugify(locked.character_name)[:140] or "character"
+        candidate = base
+        counter = 1
+        if target_user is not None:
+            conflict_qs = CharacterDossier.objects.filter(user=target_user)
+        elif resolved_discord_id:
+            conflict_qs = CharacterDossier.objects.filter(
+                user__isnull=True,
+                discord_owner_id=resolved_discord_id,
+            )
+        else:
+            conflict_qs = CharacterDossier.objects.filter(user__isnull=True)
+
+        while conflict_qs.filter(slug=candidate).exclude(pk=locked.pk).exists():
+            counter += 1
+            candidate = f"{base[:140]}-{counter}"
+
+        locked.user = target_user
+        locked.discord_owner_id = resolved_discord_id
+        locked.slug = candidate
+        locked.save(update_fields=["user", "discord_owner_id", "slug", "updated_at"])
+
+        if previous_user_id and previous_user_id != getattr(target_user, "pk", None):
+            DiscordLink.objects.filter(user_id=previous_user_id, active_dossier_id=locked.pk).update(
+                active_dossier=None
+            )
+
+        dossier.user = locked.user
+        dossier.user_id = locked.user_id
+        dossier.discord_owner_id = locked.discord_owner_id
+        dossier.slug = locked.slug
+        dossier.updated_at = locked.updated_at
+        return locked
 
 
 def _normalize_narrative_voice(raw_voice: str = "") -> str:
