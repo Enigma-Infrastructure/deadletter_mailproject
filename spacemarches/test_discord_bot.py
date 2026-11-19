@@ -18,6 +18,7 @@ from spacemarches.management.commands.run_discord_bot import (
     LaunchIntakeButton,
     OnboardingInviteView,
     SendTargetIntakeButton,
+    _claim_interaction,
     build_bot,
     handle_debrief_command,
     handle_dossier_command,
@@ -27,6 +28,7 @@ from spacemarches.management.commands.run_discord_bot import (
     handle_dossier_swap_command,
     handle_intake_command,
     handle_link_command,
+    handle_persistent_component_interaction,
 )
 from spacemarches.models import CharacterDossier, DiscordIntakeInvite, DiscordLink
 from spacemarches.questionnaire import get_question
@@ -571,5 +573,118 @@ class DiscordBotTests(TestCase):
         target.send.assert_not_called()
         channel_mock.send.assert_awaited_once()
         self.assertIn("requested a Post-Action Report", channel_mock.send.call_args.kwargs["content"])
+
+    def test_persistent_views_timeout_none_and_post_restart_custom_id_recovery(self):
+        DiscordLink.objects.create(user=self.user, discord_user_id="123123123")
+        second = CharacterDossier.objects.create(
+            user=self.user,
+            character_name="Backup Mirror",
+            slug="backup-mirror",
+        )
+
+        # 1. Verify all intake, debrief, archive, and onboarding views never expire (timeout=None)
+        st_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        unlinked = MagicMock(spec=discord.Member)
+        unlinked.id = "987987987"
+        unlinked.display_name = "LateResponder"
+        unlinked.mention = "<@987987987>"
+        unlinked.send = AsyncMock()
+
+        async_to_sync(handle_intake_command)(st_inter, member=unlinked, category="Campaign Hooks")
+        onboard_view = unlinked.send.call_args.kwargs["view"]
+        self.assertIsNone(onboard_view.timeout)
+        onboard_btn = next(c for c in onboard_view.children if isinstance(c, CreateDossierButton))
+        onboard_cid = onboard_btn.custom_id
+        self.assertTrue(onboard_cid.startswith("sm:new:"))
+
+        # 2. Simulate bot restart (dispatch purely via stateless custom_id without the View object)
+        late_click = _mock_member_interaction("987987987", display_name="LateResponder")
+        handled = async_to_sync(handle_persistent_component_interaction)(
+            late_click,
+            custom_id=onboard_cid,
+            data={"custom_id": onboard_cid},
+        )
+        self.assertTrue(handled)
+        late_click.response.send_modal.assert_awaited_once()
+        reconstructed_modal = late_click.response.send_modal.call_args.args[0]
+        self.assertIsInstance(reconstructed_modal, CreateDossierModal)
+        self.assertEqual(reconstructed_modal.category, "Campaign Hooks")
+        self.assertIsNone(reconstructed_modal.timeout)
+
+        # 3. Simulate /intake & /debrief sent to linked user, followed by post-restart dropdown/edit/debrief
+        linked_target = MagicMock(spec=discord.Member)
+        linked_target.id = "123123123"
+        linked_target.display_name = "EchoUser"
+        linked_target.mention = "<@123123123>"
+        linked_target.send = AsyncMock()
+
+        st_inter2 = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_intake_command)(st_inter2, member=linked_target, category="Campaign Hooks")
+        intake_view = linked_target.send.call_args.kwargs["view"]
+        self.assertIsNone(intake_view.timeout)
+        q_select = next(c for c in intake_view.children if isinstance(c, DossierQuestionSelect))
+        qsel_cid = q_select.custom_id
+
+        # Wrong actor clicking old message after restart is still blocked
+        bystander_sel = _mock_member_interaction("555666777")
+        async_to_sync(handle_persistent_component_interaction)(
+            bystander_sel,
+            custom_id=qsel_cid,
+            data={"custom_id": qsel_cid, "values": ["15a"]},
+        )
+        self.assertIn("belongs to another player", bystander_sel.response.send_message.call_args.args[0])
+
+        # Target selects question [15a] hours later -> edits message with persistent Answer / Edit button
+        target_sel = _mock_member_interaction("123123123")
+        async_to_sync(handle_persistent_component_interaction)(
+            target_sel,
+            custom_id=qsel_cid,
+            data={"custom_id": qsel_cid, "values": ["15a"]},
+        )
+        target_sel.response.edit_message.assert_awaited_once()
+        updated_view = target_sel.response.edit_message.call_args.kwargs["view"]
+        self.assertIsNone(updated_view.timeout)
+        edit_btn = next(c for c in updated_view.children if isinstance(c, DossierEditButton))
+
+        # Target clicks Answer / Edit [15a] -> opens DossierAnswerModal
+        target_edit = _mock_member_interaction("123123123")
+        async_to_sync(handle_persistent_component_interaction)(
+            target_edit,
+            custom_id=edit_btn.custom_id,
+            data={"custom_id": edit_btn.custom_id},
+        )
+        target_edit.response.send_modal.assert_awaited_once()
+
+        # Debrief view timeout=None + post-restart click recovers Sol-date and opens modal
+        linked_target.send.reset_mock()
+        st_inter3 = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_debrief_command)(
+            st_inter3,
+            member=linked_target,
+            stardate="7.250",
+            question_ids="1",
+            character="backup-mirror",
+        )
+        debrief_view = linked_target.send.call_args.kwargs["view"]
+        self.assertIsNone(debrief_view.timeout)
+        debrief_btn = next(c for c in debrief_view.children if isinstance(c, DebriefQuestionButton))
+
+        debrief_click = _mock_member_interaction("123123123")
+        async_to_sync(handle_persistent_component_interaction)(
+            debrief_click,
+            custom_id=debrief_btn.custom_id,
+            data={"custom_id": debrief_btn.custom_id},
+        )
+        debrief_click.response.send_modal.assert_awaited_once()
+        debrief_modal = debrief_click.response.send_modal.call_args.args[0]
+        self.assertEqual(debrief_modal.dossier_id, second.pk)
+        self.assertEqual(debrief_modal.stardate_input.default, "Sol 7.250")
+
+        # Live interaction_check claims interaction.id so on_interaction never double-handles
+        live_inter = _mock_member_interaction("123123123")
+        live_inter.id = 42424242
+        self.assertTrue(async_to_sync(onboard_view.interaction_check)(live_inter))
+        self.assertFalse(_claim_interaction(42424242))
+
 
 

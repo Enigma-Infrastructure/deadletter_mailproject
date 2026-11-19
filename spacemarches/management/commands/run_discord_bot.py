@@ -1,6 +1,8 @@
 """Django management command running the Spacemarches Discord dossier & intake bot."""
 from __future__ import annotations
 
+import asyncio
+from collections import OrderedDict
 import inspect
 import os
 from typing import Any, Literal
@@ -168,6 +170,11 @@ def _get_dossier_by_id_async(dossier_id: int) -> CharacterDossier:
 
 
 @sync_to_async
+def _get_dossier_or_none_async(dossier_id: int) -> CharacterDossier | None:
+    return CharacterDossier.objects.filter(pk=dossier_id).first()
+
+
+@sync_to_async
 def _save_dossier_answer_async(
     dossier_id: int,
     question_id: str,
@@ -199,6 +206,59 @@ async def _check_allowed_actor(interaction: discord.Interaction, allowed_user_id
         )
         return False
     return True
+
+
+_SCOPE_TO_CODE = {"core": "c", "all": "a", "unanswered": "u"}
+_CODE_TO_SCOPE = {"c": "core", "a": "all", "u": "unanswered"}
+_CLAIMED_INTERACTION_IDS: OrderedDict[int, None] = OrderedDict()
+
+
+def _claim_interaction(interaction_id: Any) -> bool:
+    """Record a handled interaction ID to prevent live View + on_interaction double-firing."""
+    if not isinstance(interaction_id, int):
+        return True
+    if interaction_id in _CLAIMED_INTERACTION_IDS:
+        return False
+    _CLAIMED_INTERACTION_IDS[interaction_id] = None
+    while len(_CLAIMED_INTERACTION_IDS) > 2048:
+        _CLAIMED_INTERACTION_IDS.popitem(last=False)
+    return True
+
+
+def _category_to_index(category: str | None) -> int:
+    if not category:
+        return -1
+    cat_lower = category.strip().lower()
+    for idx, cat in enumerate(get_categories(include_sensitive=False)):
+        if cat == category or cat.lower() == cat_lower:
+            return idx
+    return -1
+
+
+def _index_to_category(raw_idx: str) -> str | None:
+    try:
+        idx = int(raw_idx)
+    except (TypeError, ValueError):
+        return None
+    if idx < 0:
+        return None
+    cats = get_categories(include_sensitive=False)
+    return cats[idx] if 0 <= idx < len(cats) else None
+
+
+def _parse_allowed_uid(token: str) -> str | None:
+    return None if not token or token == "any" else token
+
+
+class _PersistentView(discord.ui.View):
+    """Non-expiring View base that claims live component interactions."""
+
+    def __init__(self, *, timeout: float | None = None):
+        super().__init__(timeout=timeout)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        _claim_interaction(getattr(interaction, "id", None))
+        return True
 
 
 # --------------------------------------------------
@@ -375,6 +435,7 @@ class SendTargetIntakeButton(discord.ui.Button):
         super().__init__(
             label=f"Send Intake to {target_member.display_name}"[:80],
             style=discord.ButtonStyle.primary,
+            custom_id=f"sm:sendint:{dossier.pk}:{target_member.id}"[:100],
             row=row,
         )
         self.target_member = target_member
@@ -382,7 +443,13 @@ class SendTargetIntakeButton(discord.ui.Button):
         self.inviter_label = inviter_label
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        fresh = await _get_dossier_by_id_async(self.dossier.pk)
+        fresh = await _get_dossier_or_none_async(self.dossier.pk)
+        if fresh is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists.",
+                ephemeral=True,
+            )
+            return
         stats = compute_dossier_stats(fresh)
         questions, resolved_scope = _filter_intake_questions(fresh, scope="core")
         embed = _build_intake_overview_embed(
@@ -395,6 +462,7 @@ class SendTargetIntakeButton(discord.ui.Button):
         view = DossierSelectView(
             dossier=fresh,
             questions=questions,
+            scope=resolved_scope,
             allowed_user_id=target_id,
         )
         mention = getattr(self.target_member, "mention", f"<@{target_id}>")
@@ -445,7 +513,7 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
         target_display_name: str = "",
         target_member: discord.Member | discord.User | None = None,
     ):
-        super().__init__()
+        super().__init__(timeout=None)
         self.allow_unlinked = allow_unlinked
         self.invited_by_user_id = invited_by_user_id
         self.start_intake_on_create = start_intake_on_create
@@ -499,7 +567,7 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
                 )[:2048]
             )
             if self.target_member is not None:
-                view: discord.ui.View | None = discord.ui.View(timeout=300)
+                view: discord.ui.View | None = _PersistentView(timeout=None)
                 view.add_item(
                     SendTargetIntakeButton(
                         target_member=self.target_member,
@@ -518,19 +586,23 @@ class CreateDossierModal(discord.ui.Modal, title="Initialize Character Dossier")
                 scope=self.scope,
                 category=self.category,
             )
+            cat_for_view = self.category
             if not questions:
                 questions, resolved_scope = _filter_intake_questions(dossier, scope="all")
+                cat_for_view = None
             embed = _build_intake_overview_embed(
                 dossier,
                 stats,
                 scope=resolved_scope,
-                category=self.category,
+                category=cat_for_view,
                 shown_count=len(questions),
             )
             embed.title = f"Created & Starting Intake: {dossier.character_name}"[:256]
             view = DossierSelectView(
                 dossier=dossier,
                 questions=questions,
+                scope=resolved_scope,
+                category=cat_for_view,
                 allowed_user_id=str(interaction.user.id),
             )
             await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -563,7 +635,7 @@ class DossierAnswerModal(discord.ui.Modal):
         sol_date: str = "",
     ):
         qid = question["id"]
-        super().__init__(title=f"Dossier [{qid}]"[:45])
+        super().__init__(title=f"Dossier [{qid}]"[:45], timeout=None)
         self.dossier_id = dossier_id
         self.question_id = qid
         self.session_tag = session_tag
@@ -641,9 +713,13 @@ class LaunchIntakeButton(discord.ui.Button):
         allowed_user_id: str | None = None,
         row: int = 0,
     ):
+        scope_code = _SCOPE_TO_CODE.get(scope or "core", "c")
+        cat_idx = _category_to_index(category)
+        uid_token = str(allowed_user_id or "any")
         super().__init__(
             label="Start / Continue Intake",
             style=discord.ButtonStyle.primary,
+            custom_id=f"sm:go:{dossier.pk}:{scope_code}:{cat_idx}:{uid_token}"[:100],
             row=row,
         )
         self.dossier = dossier
@@ -654,7 +730,13 @@ class LaunchIntakeButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         if not await _check_allowed_actor(interaction, self.allowed_user_id):
             return
-        fresh_dossier = await _get_dossier_by_id_async(self.dossier.pk)
+        fresh_dossier = await _get_dossier_or_none_async(self.dossier.pk)
+        if fresh_dossier is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists. Ask a Storyteller to run `/intake`.",
+                ephemeral=True,
+            )
+            return
         stats = compute_dossier_stats(fresh_dossier)
         questions, resolved_scope = _filter_intake_questions(
             fresh_dossier,
@@ -671,6 +753,8 @@ class LaunchIntakeButton(discord.ui.Button):
         view = DossierSelectView(
             dossier=fresh_dossier,
             questions=questions,
+            scope=resolved_scope,
+            category=self.category,
             allowed_user_id=self.allowed_user_id,
         )
         await interaction.response.edit_message(embed=embed, view=view)
@@ -692,7 +776,15 @@ class CreateDossierButton(discord.ui.Button):
         category: str | None = None,
         row: int = 0,
     ):
-        super().__init__(label=label[:80], style=style, row=row)
+        scope_code = _SCOPE_TO_CODE.get(scope or "core", "c")
+        cat_idx = _category_to_index(category)
+        uid_token = str(allowed_user_id or "any")
+        inv_token = str(invited_by_user_id or 0)
+        cid = (
+            f"sm:new:{uid_token}:{1 if allow_unlinked else 0}:"
+            f"{1 if start_intake_on_create else 0}:{scope_code}:{cat_idx}:{inv_token}"
+        )[:100]
+        super().__init__(label=label[:80], style=style, custom_id=cid, row=row)
         self.allowed_user_id = allowed_user_id
         self.allow_unlinked = allow_unlinked
         self.invited_by_user_id = invited_by_user_id
@@ -712,6 +804,31 @@ class CreateDossierButton(discord.ui.Button):
                 category=self.category,
             )
         )
+
+
+async def _handle_character_select_swap(
+    interaction: discord.Interaction,
+    *,
+    allowed_user_id: str | None,
+    selected_pk: str,
+) -> None:
+    if not await _check_allowed_actor(interaction, allowed_user_id):
+        return
+    try:
+        dossier, stats = await _swap_active_dossier_async(str(interaction.user.id), selected_pk)
+    except ValueError as err:
+        await interaction.response.send_message(f"Swap failed: {err}", ephemeral=True)
+        return
+
+    _auth, _is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
+    embed = _build_dossier_overview_embed(dossier, stats, total_characters=len(items))
+    view = DossierArchiveView(
+        items=items,
+        active_dossier=dossier,
+        allowed_user_id=allowed_user_id,
+        allow_unlinked=not _is_linked,
+    )
+    await interaction.response.edit_message(embed=embed, view=view)
 
 
 class CharacterSelect(discord.ui.Select):
@@ -751,31 +868,19 @@ class CharacterSelect(discord.ui.Select):
             min_values=1,
             max_values=1,
             options=options,
+            custom_id=f"sm:cswap:{allowed_user_id or 'any'}"[:100],
             row=row,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        if not await _check_allowed_actor(interaction, self.allowed_user_id):
-            return
-        selected_pk = self.values[0]
-        try:
-            dossier, stats = await _swap_active_dossier_async(str(interaction.user.id), selected_pk)
-        except ValueError as err:
-            await interaction.response.send_message(f"Swap failed: {err}", ephemeral=True)
-            return
-
-        _auth, _is_linked, items = await _get_actor_dossiers_async(str(interaction.user.id))
-        embed = _build_dossier_overview_embed(dossier, stats, total_characters=len(items))
-        view = DossierArchiveView(
-            items=items,
-            active_dossier=dossier,
+        await _handle_character_select_swap(
+            interaction,
             allowed_user_id=self.allowed_user_id,
-            allow_unlinked=not _is_linked,
+            selected_pk=self.values[0],
         )
-        await interaction.response.edit_message(embed=embed, view=view)
 
 
-class DossierArchiveView(discord.ui.View):
+class DossierArchiveView(_PersistentView):
     """Archive view for /dossier open, /dossier list, and /dossier swap."""
 
     def __init__(
@@ -786,7 +891,7 @@ class DossierArchiveView(discord.ui.View):
         allowed_user_id: str | None = None,
         allow_unlinked: bool = False,
         invited_by_user_id: int | None = None,
-        timeout: float = 300,
+        timeout: float | None = None,
     ):
         super().__init__(timeout=timeout)
         if active_dossier is not None:
@@ -809,7 +914,7 @@ class DossierArchiveView(discord.ui.View):
             self.add_item(CharacterSelect(items=items, allowed_user_id=allowed_user_id, row=1))
 
 
-class OnboardingInviteView(discord.ui.View):
+class OnboardingInviteView(_PersistentView):
     """Onboarding prompt sent to an unlinked player triggered via /intake member:@Player."""
 
     def __init__(
@@ -819,7 +924,7 @@ class OnboardingInviteView(discord.ui.View):
         invited_by_user_id: int | None = None,
         scope: str = "core",
         category: str | None = None,
-        timeout: float = 900,
+        timeout: float | None = None,
     ):
         super().__init__(timeout=timeout)
         self.add_item(
@@ -850,9 +955,11 @@ class DossierEditButton(discord.ui.Button):
         row: int = 0,
     ):
         qid = question["id"]
+        uid_token = str(allowed_user_id or "any")
         super().__init__(
             label=f"Answer / Edit [{qid}]"[:80],
             style=discord.ButtonStyle.primary,
+            custom_id=f"sm:qedit:{dossier.pk}:{qid}:{uid_token}"[:100],
             row=row,
         )
         self.dossier = dossier
@@ -863,7 +970,13 @@ class DossierEditButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         if not await _check_allowed_actor(interaction, self.allowed_user_id):
             return
-        fresh_dossier = await _get_dossier_by_id_async(self.dossier.pk)
+        fresh_dossier = await _get_dossier_or_none_async(self.dossier.pk)
+        if fresh_dossier is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists. Ask a Storyteller to run `/intake`.",
+                ephemeral=True,
+            )
+            return
         qid = self.question["id"]
         responses = fresh_dossier.responses if isinstance(fresh_dossier.responses, dict) else {}
         existing = responses.get(qid)
@@ -881,6 +994,43 @@ class DossierEditButton(discord.ui.Button):
         await interaction.response.send_modal(modal)
 
 
+async def _handle_question_select(
+    interaction: discord.Interaction,
+    *,
+    dossier: CharacterDossier,
+    questions: list[dict[str, Any]],
+    session_tag: str = "",
+    scope: str = "core",
+    category: str | None = None,
+    allowed_user_id: str | None = None,
+    selected_qid: str,
+) -> None:
+    if not await _check_allowed_actor(interaction, allowed_user_id):
+        return
+    question = get_question(selected_qid)
+    if question is None:
+        await interaction.response.send_message(f"Unknown question ID: {selected_qid}", ephemeral=True)
+        return
+    fresh_dossier = await _get_dossier_or_none_async(dossier.pk)
+    if fresh_dossier is None:
+        await interaction.response.send_message(
+            "That Character Dossier no longer exists. Ask a Storyteller to run `/intake`.",
+            ephemeral=True,
+        )
+        return
+    embed = _build_question_detail_embed(fresh_dossier, question)
+    view = DossierSelectView(
+        dossier=fresh_dossier,
+        questions=questions,
+        session_tag=session_tag,
+        selected_question=question,
+        scope=scope,
+        category=category,
+        allowed_user_id=allowed_user_id,
+    )
+    await interaction.response.edit_message(embed=embed, view=view)
+
+
 class DossierQuestionSelect(discord.ui.Select):
     """Dropdown selecting a questionnaire prompt to preview in full before editing."""
 
@@ -891,12 +1041,16 @@ class DossierQuestionSelect(discord.ui.Select):
         questions: list[dict[str, Any]],
         session_tag: str = "",
         selected_id: str = "",
+        scope: str = "core",
+        category: str | None = None,
         allowed_user_id: str | None = None,
         row: int = 0,
     ):
         self.dossier = dossier
         self.questions = questions
         self.session_tag = session_tag
+        self.scope = scope
+        self.category = category
         self.allowed_user_id = allowed_user_id
         responses = dossier.responses if isinstance(dossier.responses, dict) else {}
 
@@ -917,35 +1071,32 @@ class DossierQuestionSelect(discord.ui.Select):
                 )
             )
 
+        scope_code = _SCOPE_TO_CODE.get(scope or "core", "c")
+        cat_idx = _category_to_index(category)
+        uid_token = str(allowed_user_id or "any")
         super().__init__(
             placeholder="Choose a dossier question to read or edit...",
             min_values=1,
             max_values=1,
             options=options,
+            custom_id=f"sm:qsel:{dossier.pk}:{scope_code}:{cat_idx}:{uid_token}"[:100],
             row=row,
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
-        if not await _check_allowed_actor(interaction, self.allowed_user_id):
-            return
-        qid = self.values[0]
-        question = get_question(qid)
-        if question is None:
-            await interaction.response.send_message(f"Unknown question ID: {qid}", ephemeral=True)
-            return
-        fresh_dossier = await _get_dossier_by_id_async(self.dossier.pk)
-        embed = _build_question_detail_embed(fresh_dossier, question)
-        view = DossierSelectView(
-            dossier=fresh_dossier,
+        await _handle_question_select(
+            interaction,
+            dossier=self.dossier,
             questions=self.questions,
             session_tag=self.session_tag,
-            selected_question=question,
+            scope=self.scope,
+            category=self.category,
             allowed_user_id=self.allowed_user_id,
+            selected_qid=self.values[0],
         )
-        await interaction.response.edit_message(embed=embed, view=view)
 
 
-class DossierSelectView(discord.ui.View):
+class DossierSelectView(_PersistentView):
     def __init__(
         self,
         *,
@@ -953,8 +1104,10 @@ class DossierSelectView(discord.ui.View):
         questions: list[dict[str, Any]],
         session_tag: str = "",
         selected_question: dict[str, Any] | None = None,
+        scope: str = "core",
+        category: str | None = None,
         allowed_user_id: str | None = None,
-        timeout: float = 300,
+        timeout: float | None = None,
     ):
         super().__init__(timeout=timeout)
         select_row = 0
@@ -976,6 +1129,8 @@ class DossierSelectView(discord.ui.View):
                     questions=questions,
                     session_tag=session_tag,
                     selected_id=selected_question["id"] if selected_question else "",
+                    scope=scope,
+                    category=category,
                     allowed_user_id=allowed_user_id,
                     row=select_row,
                 )
@@ -995,10 +1150,12 @@ class DebriefQuestionButton(discord.ui.Button):
         allowed_user_id: str | None = None,
     ):
         qid = question["id"]
+        uid_token = str(allowed_user_id or "any")
+        safe_sol = (sol_date or "10.000").replace(":", "-")[:24]
         super().__init__(
             label=f"Update [{qid}]",
             style=discord.ButtonStyle.primary,
-            custom_id=f"debrief:{dossier_id}:{qid}",
+            custom_id=f"sm:deb:{dossier_id}:{qid}:{uid_token}:{safe_sol}"[:100],
         )
         self.dossier_id = dossier_id
         self.question = question
@@ -1009,17 +1166,31 @@ class DebriefQuestionButton(discord.ui.Button):
     async def callback(self, interaction: discord.Interaction) -> None:
         if not await _check_allowed_actor(interaction, self.allowed_user_id):
             return
+        fresh_dossier = await _get_dossier_or_none_async(self.dossier_id)
+        if fresh_dossier is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists. Ask a Storyteller to run `/debrief` again.",
+                ephemeral=True,
+            )
+            return
+        responses = fresh_dossier.responses if isinstance(fresh_dossier.responses, dict) else {}
+        existing = responses.get(self.question["id"])
+        latest_answer = (
+            str(existing.get("answer", ""))
+            if isinstance(existing, dict)
+            else self.current_answer
+        )
         modal = DossierAnswerModal(
             dossier_id=self.dossier_id,
             question=self.question,
-            current_answer=self.current_answer,
+            current_answer=latest_answer,
             entry_kind=ENTRY_KIND_POST_ACTION_REPORT,
             sol_date=self.sol_date,
         )
         await interaction.response.send_modal(modal)
 
 
-class DebriefPromptView(discord.ui.View):
+class DebriefPromptView(_PersistentView):
     def __init__(
         self,
         *,
@@ -1027,7 +1198,7 @@ class DebriefPromptView(discord.ui.View):
         questions: list[dict[str, Any]],
         sol_date: str,
         allowed_user_id: str | None = None,
-        timeout: float = 900,
+        timeout: float | None = None,
     ):
         super().__init__(timeout=timeout)
         responses = dossier.responses if isinstance(dossier.responses, dict) else {}
@@ -1044,6 +1215,163 @@ class DebriefPromptView(discord.ui.View):
                     allowed_user_id=allowed_user_id,
                 )
             )
+
+
+async def handle_persistent_component_interaction(
+    interaction: discord.Interaction,
+    *,
+    custom_id: str,
+    data: dict[str, Any] | None = None,
+) -> bool:
+    """Stateless fallback router for sm:* components after bot restarts or long delays."""
+    if not custom_id.startswith("sm:"):
+        return False
+
+    parts = custom_id.split(":")
+    action = parts[1] if len(parts) > 1 else ""
+
+    if action == "new" and len(parts) >= 8:
+        allowed_uid = _parse_allowed_uid(parts[2])
+        allow_unlinked = parts[3] == "1"
+        start_intake = parts[4] == "1"
+        scope = _CODE_TO_SCOPE.get(parts[5], "core")
+        category = _index_to_category(parts[6])
+        try:
+            inviter_uid = int(parts[7]) or None
+        except ValueError:
+            inviter_uid = None
+        btn = CreateDossierButton(
+            allowed_user_id=allowed_uid,
+            allow_unlinked=allow_unlinked,
+            invited_by_user_id=inviter_uid,
+            start_intake_on_create=start_intake,
+            scope=scope,
+            category=category,
+        )
+        await btn.callback(interaction)
+        return True
+
+    if action == "go" and len(parts) >= 6:
+        try:
+            dossier_id = int(parts[2])
+        except ValueError:
+            return False
+        scope = _CODE_TO_SCOPE.get(parts[3], "core")
+        category = _index_to_category(parts[4])
+        allowed_uid = _parse_allowed_uid(parts[5])
+        dossier = await _get_dossier_or_none_async(dossier_id)
+        if dossier is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists. Ask a Storyteller to run `/intake`.",
+                ephemeral=True,
+            )
+            return True
+        btn = LaunchIntakeButton(
+            dossier=dossier,
+            scope=scope,
+            category=category,
+            allowed_user_id=allowed_uid,
+        )
+        await btn.callback(interaction)
+        return True
+
+    if action == "cswap" and len(parts) >= 3:
+        allowed_uid = _parse_allowed_uid(parts[2])
+        values = (data or {}).get("values") or []
+        if not values:
+            return False
+        await _handle_character_select_swap(
+            interaction,
+            allowed_user_id=allowed_uid,
+            selected_pk=str(values[0]),
+        )
+        return True
+
+    if action == "qsel" and len(parts) >= 6:
+        try:
+            dossier_id = int(parts[2])
+        except ValueError:
+            return False
+        scope = _CODE_TO_SCOPE.get(parts[3], "core")
+        category = _index_to_category(parts[4])
+        allowed_uid = _parse_allowed_uid(parts[5])
+        values = (data or {}).get("values") or []
+        if not values:
+            return False
+        dossier = await _get_dossier_or_none_async(dossier_id)
+        if dossier is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists. Ask a Storyteller to run `/intake`.",
+                ephemeral=True,
+            )
+            return True
+        questions, resolved_scope = _filter_intake_questions(dossier, scope=scope, category=category)
+        await _handle_question_select(
+            interaction,
+            dossier=dossier,
+            questions=questions,
+            scope=resolved_scope,
+            category=category,
+            allowed_user_id=allowed_uid,
+            selected_qid=str(values[0]),
+        )
+        return True
+
+    if action == "qedit" and len(parts) >= 5:
+        try:
+            dossier_id = int(parts[2])
+        except ValueError:
+            return False
+        qid = parts[3]
+        allowed_uid = _parse_allowed_uid(parts[4])
+        question = get_question(qid)
+        if question is None:
+            await interaction.response.send_message(f"Unknown question ID: {qid}", ephemeral=True)
+            return True
+        dossier = await _get_dossier_or_none_async(dossier_id)
+        if dossier is None:
+            await interaction.response.send_message(
+                "That Character Dossier no longer exists. Ask a Storyteller to run `/intake`.",
+                ephemeral=True,
+            )
+            return True
+        btn = DossierEditButton(dossier=dossier, question=question, allowed_user_id=allowed_uid)
+        await btn.callback(interaction)
+        return True
+
+    if action == "deb":
+        deb_parts = custom_id.split(":", 5)
+        if len(deb_parts) < 6:
+            return False
+        try:
+            dossier_id = int(deb_parts[2])
+        except ValueError:
+            return False
+        qid = deb_parts[3]
+        allowed_uid = _parse_allowed_uid(deb_parts[4])
+        sol_date = deb_parts[5]
+        question = get_question(qid)
+        if question is None:
+            await interaction.response.send_message(f"Unknown question ID: {qid}", ephemeral=True)
+            return True
+        btn = DebriefQuestionButton(
+            dossier_id=dossier_id,
+            question=question,
+            current_answer="",
+            sol_date=sol_date,
+            allowed_user_id=allowed_uid,
+        )
+        await btn.callback(interaction)
+        return True
+
+    if action == "sendint":
+        await interaction.response.send_message(
+            "Bot restarted since this shortcut was created — run `/intake member:@player` to send their prompt.",
+            ephemeral=True,
+        )
+        return True
+
+    return False
 
 
 # --------------------------------------------------
@@ -1408,6 +1736,8 @@ async def _prompt_target_member_intake(
         view = DossierSelectView(
             dossier=dossier,
             questions=questions,
+            scope=resolved_scope,
+            category=category,
             allowed_user_id=target_id,
         )
         created_note = " *(initialized)*" if created_for_target else ""
@@ -1512,7 +1842,7 @@ async def handle_intake_command(
             ),
             color=discord.Color.blue(),
         )
-        view = discord.ui.View(timeout=300)
+        view = _PersistentView(timeout=None)
         view.add_item(
             CreateDossierButton(
                 label="Create Character & Start Intake",
@@ -1551,6 +1881,8 @@ async def handle_intake_command(
     view = DossierSelectView(
         dossier=dossier,
         questions=questions,
+        scope=resolved_scope,
+        category=category,
         allowed_user_id=str(interaction.user.id),
     )
     await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
@@ -1875,6 +2207,23 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
             await tree.sync(guild=guild_obj)
         else:
             await tree.sync()
+
+    @client.event
+    async def on_interaction(interaction: discord.Interaction):
+        if getattr(interaction, "type", None) != discord.InteractionType.component:
+            return
+        data = getattr(interaction, "data", None) or {}
+        custom_id = str(data.get("custom_id") or "")
+        if not custom_id.startswith("sm:"):
+            return
+        await asyncio.sleep(0)
+        if not _claim_interaction(getattr(interaction, "id", None)):
+            return
+        await handle_persistent_component_interaction(
+            interaction,
+            custom_id=custom_id,
+            data=data,
+        )
 
     client.tree = tree
     return client
