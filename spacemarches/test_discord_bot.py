@@ -118,7 +118,7 @@ class DiscordBotTests(TestCase):
         link = DiscordLink.objects.get(user=self.user)
         self.assertEqual(link.discord_user_id, "555000111")
 
-        # Seed an answer on web, then test /intake (and /dossier alias) ephemeral embed + view
+        # Seed an answer on web, then test /intake (and /dossier alias) published embed + view
         save_dossier_answer(
             self.dossier,
             "15a",
@@ -131,7 +131,7 @@ class DiscordBotTests(TestCase):
         async_to_sync(handle_dossier_command)(dossier_interaction, category="Campaign Hooks")
         dossier_interaction.response.send_message.assert_awaited_once()
         kwargs = dossier_interaction.response.send_message.call_args.kwargs
-        self.assertTrue(kwargs.get("ephemeral"))
+        self.assertFalse(kwargs.get("ephemeral"))
         self.assertIn("Echo Seven", kwargs["embed"].title)
 
         # Simulate submitting a Discord Modal edit with a Post-Fall Sol-date
@@ -201,7 +201,7 @@ class DiscordBotTests(TestCase):
             await modal.on_submit(submit_interaction)
             submit_interaction.response.send_message.assert_awaited_once()
             kwargs = submit_interaction.response.send_message.call_args.kwargs
-            self.assertTrue(kwargs.get("ephemeral"))
+            self.assertFalse(kwargs.get("ephemeral"))
             self.assertIn("Dr. Elena Vance", kwargs["embed"].title)
 
         async_to_sync(_create_second_character)()
@@ -685,6 +685,136 @@ class DiscordBotTests(TestCase):
         live_inter.id = 42424242
         self.assertTrue(async_to_sync(onboard_view.interaction_check)(live_inter))
         self.assertFalse(_claim_interaction(42424242))
+
+    def test_target_channel_forum_thread_posting_and_published_vs_ephemeral(self):
+        DiscordLink.objects.create(user=self.user, discord_user_id="314159265")
+        st_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+
+        forum_thread = MagicMock(spec=discord.Thread)
+        forum_thread.id = 777111222
+        forum_thread.name = "echo-seven-sheet"
+        forum_thread.mention = "<#777111222>"
+        sent_msg = MagicMock()
+        sent_msg.jump_url = "https://discord.com/channels/1/777111222/999"
+        forum_thread.send = AsyncMock(return_value=sent_msg)
+
+        linked_player = MagicMock(spec=discord.Member)
+        linked_player.id = "314159265"
+        linked_player.display_name = "ThreadPlayer"
+        linked_player.mention = "<@314159265>"
+        linked_player.send = AsyncMock()
+
+        unlinked_player = MagicMock(spec=discord.Member)
+        unlinked_player.id = "271828182"
+        unlinked_player.display_name = "ThreadNewbie"
+        unlinked_player.mention = "<@271828182>"
+        unlinked_player.send = AsyncMock()
+
+        # 1. /intake member:@ThreadNewbie channel:#forum-thread posts OnboardingInviteView in thread + ephemeral receipt
+        async_to_sync(handle_intake_command)(st_inter, member=unlinked_player, target_channel=forum_thread)
+        unlinked_player.send.assert_not_called()
+        forum_thread.send.assert_awaited_once()
+        post_kwargs = forum_thread.send.call_args.kwargs
+        self.assertIn("<@271828182>", post_kwargs["content"])
+        self.assertIsInstance(post_kwargs["view"], OnboardingInviteView)
+        st_inter.response.send_message.assert_awaited_once()
+        self.assertTrue(st_inter.response.send_message.call_args.kwargs.get("ephemeral"))
+        receipt = st_inter.response.send_message.call_args.args[0]
+        self.assertIn("<#777111222>", receipt)
+        self.assertIn("https://discord.com/channels/1/777111222/999", receipt)
+
+        # 2. /intake member:@ThreadPlayer channel:#forum-thread posts DossierSelectView in thread
+        forum_thread.send.reset_mock()
+        st_inter2 = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_intake_command)(st_inter2, member=linked_player, target_channel=forum_thread)
+        linked_player.send.assert_not_called()
+        forum_thread.send.assert_awaited_once()
+        self.assertIn("<@314159265>", forum_thread.send.call_args.kwargs["content"])
+        self.assertIn("Intake: Echo Seven", forum_thread.send.call_args.kwargs["embed"].title)
+        self.assertTrue(st_inter2.response.send_message.call_args.kwargs.get("ephemeral"))
+
+        # 3. /debrief member:@ThreadPlayer channel:#forum-thread posts DebriefPromptView in thread
+        forum_thread.send.reset_mock()
+        st_inter3 = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_debrief_command)(
+            st_inter3,
+            member=linked_player,
+            stardate="11.000",
+            question_ids="1",
+            target_channel=forum_thread,
+        )
+        linked_player.send.assert_not_called()
+        forum_thread.send.assert_awaited_once()
+        deb_kwargs = forum_thread.send.call_args.kwargs
+        self.assertIn("<@314159265>", deb_kwargs["content"])
+        self.assertIn("Sol 11.000", deb_kwargs["embed"].title)
+        self.assertTrue(st_inter3.response.send_message.call_args.kwargs.get("ephemeral"))
+        self.assertIn("https://discord.com/channels/1/777111222/999", st_inter3.response.send_message.call_args.args[0])
+
+        # 4. /dossier create member:@ThreadPlayer channel:#forum-thread passes target_channel to SendTargetIntakeButton
+        forum_thread.send.reset_mock()
+        st_create = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_dossier_create_command)(st_create, member=linked_player, target_channel=forum_thread)
+        modal = st_create.response.send_modal.call_args.args[0]
+        self.assertIs(modal.target_channel, forum_thread)
+
+        async def _submit_and_send_to_thread():
+            modal.character_name_input._value = "Thread Runner"
+            modal.narrative_voice_input._value = "first"
+            sub_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+            await modal.on_submit(sub_inter)
+            s_kwargs = sub_inter.response.send_message.call_args.kwargs
+            self.assertTrue(s_kwargs.get("ephemeral"))
+            send_btn = next(c for c in s_kwargs["view"].children if isinstance(c, SendTargetIntakeButton))
+            btn_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+            await send_btn.callback(btn_inter)
+            forum_thread.send.assert_awaited_once()
+            self.assertIn("<@314159265>", forum_thread.send.call_args.kwargs["content"])
+            self.assertIn("Intake: Thread Runner", forum_thread.send.call_args.kwargs["embed"].title)
+            self.assertTrue(btn_inter.response.send_message.call_args.kwargs.get("ephemeral"))
+
+        async_to_sync(_submit_and_send_to_thread)()
+
+        # 5. /dossier open & list & swap: self publishes ephemeral=False, with channel posts to thread + ephemeral=True, ST without channel stays ephemeral=True
+        self_open = _mock_member_interaction("314159265")
+        async_to_sync(handle_dossier_open_command)(self_open)
+        self.assertFalse(self_open.response.send_message.call_args.kwargs.get("ephemeral"))
+
+        forum_thread.send.reset_mock()
+        self_open_thread = _mock_member_interaction("314159265")
+        async_to_sync(handle_dossier_open_command)(self_open_thread, target_channel=forum_thread)
+        forum_thread.send.assert_awaited_once()
+        self.assertTrue(self_open_thread.response.send_message.call_args.kwargs.get("ephemeral"))
+
+        self_list = _mock_member_interaction("314159265")
+        async_to_sync(handle_dossier_list_command)(self_list)
+        self.assertFalse(self_list.response.send_message.call_args.kwargs.get("ephemeral"))
+
+        st_inspect = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_dossier_list_command)(st_inspect, member=linked_player)
+        self.assertTrue(st_inspect.response.send_message.call_args.kwargs.get("ephemeral"))
+
+        # 6. Non-sendable channel fails gracefully with ephemeral=True
+        bad_channel = MagicMock()
+        bad_channel.send = "not-callable"
+        bad_inter = _mock_member_interaction("100200300", role_names=["Storyteller"], display_name="ST-Valk")
+        async_to_sync(handle_intake_command)(bad_inter, member=linked_player, target_channel=bad_channel)
+        self.assertTrue(bad_inter.response.send_message.call_args.kwargs.get("ephemeral"))
+        self.assertIn("does not support text messages", bad_inter.response.send_message.call_args.args[0])
+
+        # 7. Onboarding CreateDossierModal (start_intake_on_create=True) publishes DossierSelectView with ephemeral=False
+        async def _submit_onboarding_create():
+            onboard_modal = CreateDossierModal(allow_unlinked=True, start_intake_on_create=True)
+            onboard_modal.character_name_input._value = "Forum Arrival"
+            onboard_modal.narrative_voice_input._value = "first"
+            player_inter = _mock_member_interaction("271828182", display_name="ThreadNewbie")
+            await onboard_modal.on_submit(player_inter)
+            p_kwargs = player_inter.response.send_message.call_args.kwargs
+            self.assertFalse(p_kwargs.get("ephemeral"))
+            self.assertIn("Created & Starting Intake: Forum Arrival", p_kwargs["embed"].title)
+
+        async_to_sync(_submit_onboarding_create)()
+
 
 
 
