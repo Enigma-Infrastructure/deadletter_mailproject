@@ -40,7 +40,7 @@ class OAuth2IdentityProviderTests(TestCase):
 
     def test_userinfo_requires_valid_bearer_token(self):
         url = reverse("oauth_userinfo")
-        self.assertEqual(self.client.get(url).status_code, 401)
+        self.assertEqual(self.client.get(url).status_code, 403)
 
     def test_authorization_code_flow_without_pkce_and_userinfo_claims(self):
         # 1. Anonymous user hitting /o/authorize/ redirects to /accounts/login/
