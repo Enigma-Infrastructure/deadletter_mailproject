@@ -86,3 +86,9 @@ DATABASES = {
         "NAME": _absolute_path("DJANGO_DB_PATH", BASE_DIR / "db.sqlite3"),
     }
 }
+
+OAUTH2_PROVIDER = {
+    **OAUTH2_PROVIDER,  # noqa: F405
+    "ALLOWED_REDIRECT_URI_SCHEMES": ["https"],
+}
+

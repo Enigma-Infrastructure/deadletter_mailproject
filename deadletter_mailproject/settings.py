@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "easymde",
     "qr_code",
+    "oauth2_provider",
 
     # Project apps
     "accounts",
@@ -174,4 +175,20 @@ LOGIN_REDIRECT_URL = "/letters/desk/"
 
 # Spacemarches Discord bot integration (optional)
 DISCORD_BOT_TOKEN = os.environ.get("DISCORD_BOT_TOKEN", "")
+
+# Cross-application OAuth2 Identity Provider (django-oauth-toolkit)
+# PKCE_REQUIRED is False because Misago's built-in OAuth2 client uses confidential
+# Authorization Code flow without PKCE code_challenge parameters.
+OAUTH2_PROVIDER = {
+    "SCOPES": {
+        "read": "Read your account identity and participation profile",
+        "write": "Update linked resources on your behalf",
+    },
+    "DEFAULT_SCOPES": ["read"],
+    "PKCE_REQUIRED": False,
+    "ALLOWED_REDIRECT_URI_SCHEMES": ["http", "https"],
+    "ACCESS_TOKEN_EXPIRE_SECONDS": 3600,
+    "REFRESH_TOKEN_EXPIRE_SECONDS": 2592000,
+}
+
 

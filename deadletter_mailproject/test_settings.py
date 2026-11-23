@@ -24,6 +24,8 @@ class EnvironmentSettingsTests(SimpleTestCase):
             "'redirect': s.SECURE_SSL_REDIRECT, "
             "'proxy': s.SECURE_PROXY_SSL_HEADER, "
             "'hsts_seconds': getattr(s, 'SECURE_HSTS_SECONDS', 0), "
+            "'pkce_required': s.OAUTH2_PROVIDER.get('PKCE_REQUIRED'), "
+            "'oauth_schemes': s.OAUTH2_PROVIDER.get('ALLOWED_REDIRECT_URI_SCHEMES'), "
             "'database': str(s.DATABASES['default']['NAME'])}))"
         )
         return subprocess.run(
@@ -61,6 +63,8 @@ class EnvironmentSettingsTests(SimpleTestCase):
         self.assertTrue(values["redirect"])
         self.assertIsNone(values["proxy"])
         self.assertEqual(values["hsts_seconds"], 31536000)
+        self.assertFalse(values["pkce_required"])
+        self.assertEqual(values["oauth_schemes"], ["https"])
 
     def test_production_rejects_missing_or_weak_secret(self):
         for secret in ("", "short", "x" * 60):

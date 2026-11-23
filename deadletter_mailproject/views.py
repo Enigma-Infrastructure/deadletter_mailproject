@@ -52,4 +52,12 @@ def admin_hub(request):
         account_links.append({'label': 'Registration sources', 'url': reverse('admin:accounts_registrationsource_changelist')})
     if account_links:
         sections.insert(1, {'title': 'Participant accounts', 'links': account_links})
+    if request.user.is_superuser:
+        sections.append({
+            'title': 'Identity & OAuth2 SSO',
+            'links': [
+                {'label': 'OAuth2 client applications (Misago / SSO)', 'url': '/admin/oauth2_provider/application/'},
+            ],
+        })
     return render(request, 'admin_hub.html', {'sections': sections})
+

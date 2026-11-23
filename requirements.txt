@@ -11,3 +11,5 @@ markdown
 nh3
 Pillow
 discord.py>=2.3
+django-oauth-toolkit>=3.4
+
