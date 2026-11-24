@@ -2,7 +2,7 @@ import json
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.urls import reverse
 
@@ -128,12 +128,13 @@ class GeneratedCharacterTests(TestCase):
             raw_data=payload,
         )
         with self.assertRaises(IntegrityError):
-            GeneratedCharacter.objects.create(
-                user=self.user,
-                external_id="dexie-1",
-                character_name="Echo Dup",
-                raw_data=payload,
-            )
+            with transaction.atomic():
+                GeneratedCharacter.objects.create(
+                    user=self.user,
+                    external_id="dexie-1",
+                    character_name="Echo Dup",
+                    raw_data=payload,
+                )
 
         # Same external_id on different user is allowed
         GeneratedCharacter.objects.create(
