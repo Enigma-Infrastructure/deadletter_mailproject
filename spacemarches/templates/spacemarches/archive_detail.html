@@ -5,9 +5,12 @@
 <p><a href="{% url 'spacemarches:archive_list' %}">&larr; All Declassified Archives</a></p>
 <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
   <h1 style="margin-bottom: 0.25rem;">{{ entry.title }}</h1>
-  <span style="font-family: monospace; font-size: 0.85rem; padding: 0.25rem 0.55rem; border-radius: 4px; background: #0f172a; color: #f8fafc;">{{ entry.classification_level }}</span>
+  <span class="sm-code-tag">{{ entry.classification_level }}</span>
 </div>
-<p class="text-muted">Slug: <code>{{ entry.slug }}</code> &middot; Published {{ entry.created_at|date:"Y-m-d" }}</p>
+<div class="sm-meta-strip" style="margin-top: 0.25rem;">
+  <span><span class="sm-meta-key">Slug</span> <code>{{ entry.slug }}</code></span>
+  <span><span class="sm-meta-key">Published</span> {{ entry.created_at|date:"Y-m-d" }}</span>
+</div>
 
 <hr>
 <div>{{ rendered_body|safe }}</div>

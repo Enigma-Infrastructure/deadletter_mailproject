@@ -1,256 +1,334 @@
 {% load static %}
 <!doctype html>
-<html lang="en">
+<html lang="en" class="ep">
 <head>
   <meta charset="utf-8">
-  <title>Spacemarches Terminal // {{ user.username }}</title>
+  <title>{% if is_public_generator %}MeshNet | Spacemarches{% else %}MeshNet // {{ user.username }} | Spacemarches{% endif %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  {# Drop-in hook: add compiled mesh-net CSS bundle here once extracted into spacemarches/static/spacemarches/assets/ #}
-  {# <link rel="stylesheet" href="{% static 'spacemarches/assets/index.css' %}"> #}
-  <style>
-    :root {
-      color-scheme: dark;
-      --term-bg: #070b10;
-      --term-panel: #0f1722;
-      --term-border: #1e293b;
-      --term-fg: #e2e8f0;
-      --term-muted: #94a3b8;
-      --term-accent: #38bdf8;
-      --term-ok: #34d399;
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      background: var(--term-bg);
-      color: var(--term-fg);
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    .term-topbar {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      justify-content: space-between;
-      gap: 0.75rem;
-      padding: 0.75rem 1.25rem;
-      background: var(--term-panel);
-      border-bottom: 1px solid var(--term-border);
-      font-size: 0.85rem;
-    }
-    .term-topbar a, .term-topbar button {
-      color: var(--term-fg);
-      background: #162032;
-      border: 1px solid var(--term-border);
-      border-radius: 6px;
-      padding: 0.35rem 0.7rem;
-      text-decoration: none;
-      cursor: pointer;
-      font-family: inherit;
-      font-size: 0.8rem;
-    }
-    .term-topbar a:hover, .term-topbar button:hover {
-      border-color: var(--term-accent);
-    }
-    .term-container {
-      flex: 1;
-      padding: 1.5rem;
-      max-width: 1120px;
-      width: 100%;
-      margin: 0 auto;
-    }
-    .term-shell-card {
-      background: var(--term-panel);
-      border: 1px solid var(--term-border);
-      border-radius: 10px;
-      padding: 1.5rem;
-    }
-    .badge-ok { color: var(--term-ok); }
-    .muted { color: var(--term-muted); }
-  </style>
-</head>
-<body>
-  <header class="term-topbar">
-    <div>
-      <strong>MESH-NET TERMINAL</strong>
-      <span class="muted"> // Agent: {{ user.username }} // Slot: {{ slot_name }}</span>
-      <span id="bridge-status" class="badge-ok" style="margin-left: 0.5rem;">[BRIDGE READY]</span>
-    </div>
-    <div style="display: flex; gap: 0.5rem; align-items: center;">
-      <button type="button" id="bridge-manual-sync">Sync Save</button>
-      <a href="{% url 'spacemarches:dossier_list' %}">Character Dossiers</a>
-      <a href="{% url 'spacemarches:portal' %}">Spacemarches Portal</a>
-    </div>
-  </header>
-
-  <main class="term-container">
-    {# Mount root for the incoming mesh-net JS application #}
-    <div id="root" data-spacemarches-terminal="true" data-slot="{{ slot_name }}">
-      <section class="term-shell-card">
-        <h1 style="margin-top: 0; font-size: 1.2rem; color: var(--term-accent);">
-          MESH-NET RUNTIME MOUNT POINT
-        </h1>
-        <p class="muted">
-          Authenticated cloud save bridge is active for slot <code>{{ slot_name }}</code>.
-          Extract the compiled <code>mesh-net</code> bundle into
-          <code>spacemarches/static/spacemarches/assets/</code> and link the CSS/JS entry points in
-          <code>terminal.html</code> (removing <code>sw.js</code> and <code>workbox-*.js</code>).
-        </p>
-        <div style="margin-top: 1rem;">
-          <strong style="font-size: 0.85rem;">Hydrated Cloud State Preview:</strong>
-          <pre id="bridge-state-preview" style="background: #04070b; padding: 0.9rem; border-radius: 6px; border: 1px solid var(--term-border); overflow-x: auto; font-size: 0.8rem;"></pre>
-        </div>
-      </section>
-    </div>
-  </main>
-
-  {{ initial_save|json_script:"spacemarches-initial-save" }}
-
   <script>
     (function () {
-      const STORAGE_PREFIX = "spacemarches:";
-      const syncUrl = "{% url 'spacemarches:api_sync' %}";
-      const slotName = "{{ slot_name|escapejs }}";
-      const initialScript = document.getElementById("spacemarches-initial-save");
-      const initialData = initialScript ? JSON.parse(initialScript.textContent || "{}") : {};
-      const statusEl = document.getElementById("bridge-status");
-      const previewEl = document.getElementById("bridge-state-preview");
+      try {
+        var raw = localStorage.getItem("sm-style-cache-v1");
+        if (!raw) return;
+        var cached = JSON.parse(raw);
+        if (cached && cached.cssText) {
+          var st = document.createElement("style");
+          st.id = "sm-dynamic-theme";
+          st.textContent = cached.cssText;
+          document.head.appendChild(st);
+        }
+        var root = document.documentElement;
+        if (cached.mode) root.setAttribute("data-sm-mode", cached.mode);
+        if (cached.contrast) root.setAttribute("data-sm-contrast", cached.contrast);
+        if (cached.scale) root.setAttribute("data-sm-scale", cached.scale);
+        if (cached.reducedMotion) root.setAttribute("data-sm-reduced-motion", "true");
+      } catch (e) {}
+    })();
+  </script>
+  {% if meshnet_bundle.ready %}
+    {% for css_path in meshnet_bundle.css_entries %}
+      <link rel="stylesheet" href="{% static css_path %}">
+    {% endfor %}
+  {% endif %}
+  <link rel="stylesheet" href="{% static 'spacemarches/spacemarches-theme.css' %}">
+  <style>
+    html, body {
+      height: 100%;
+      margin: 0;
+    }
+    .sm-generator-viewport {
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      height: 100dvh;
+      max-height: 100dvh;
+      width: 100%;
+      overflow: hidden;
+      background: var(--sm-background);
+      color: var(--sm-on-surface);
+    }
+    .sm-generator-mount {
+      min-height: 0;
+      min-width: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
+      overflow: hidden;
+      position: relative;
+    }
+    .sm-generator-mount > #root {
+      min-height: 0;
+      min-width: 0;
+      display: grid;
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-columns: minmax(0, 1fr);
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="sm-body">
+<div class="sm-generator-viewport">
+  <header class="sm-header">
+    <div class="sm-header-inner" style="padding: 0.48rem 1rem;">
+      <a class="sm-brand" href="{% url 'spacemarches:portal' %}">
+        <span class="sm-brand-mark">Spacemarches</span>
+        <span class="sm-brand-sector">MeshNet</span>
+      </a>
 
-      function getCookie(name) {
-        const parts = (document.cookie || "").split(";");
-        for (const part of parts) {
-          const trimmed = part.trim();
-          if (trimmed.startsWith(name + "=")) {
-            return decodeURIComponent(trimmed.slice(name.length + 1));
+      <nav class="sm-nav" aria-label="Spacemarches navigation">
+        <a class="sm-nav-link" href="{% url 'spacemarches:portal' %}">Portal</a>
+        <a class="sm-nav-link" href="{% url 'spacemarches:archive_list' %}">Archives</a>
+        <a class="sm-nav-link" href="{% url 'spacemarches:forum_list' %}">Forums</a>
+        <a class="sm-nav-link is-active" href="{% url 'spacemarches:meshnet' %}">MeshNet</a>
+        {% if user.is_authenticated %}
+          <a class="sm-nav-link" href="{% url 'spacemarches:character_roster' %}">Characters</a>
+          <a class="sm-nav-link" href="{% url 'spacemarches:dossier_list' %}">Dossiers</a>
+        {% endif %}
+      </nav>
+
+      <div class="sm-header-actions">
+        <button
+          type="button"
+          id="sm-palette-toggle"
+          class="btn btn-secondary btn-sm"
+          aria-expanded="false"
+          aria-controls="sm-palette-panel"
+        >Palette &amp; Contrast</button>
+        {% if user.is_authenticated %}
+          <span id="bridge-status" class="sm-code-tag" style="font-size: 0.72rem;">Synced: {{ user.username }}</span>
+          <button type="button" id="bridge-manual-sync" class="btn btn-secondary btn-sm">Sync Save</button>
+        {% else %}
+          <a class="btn btn-secondary btn-sm" href="{% url 'register' %}?next={{ request.get_full_path|urlencode }}">Create Account</a>
+          <a class="btn btn-sm" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in to Save</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <section id="sm-palette-panel" class="sm-palette-drawer" aria-label="Palette and accessibility settings" hidden>
+      <div class="sm-palette-inner">
+        <div class="sm-palette-group">
+          <span class="sm-palette-label">Material Presets</span>
+          <div id="sm-preset-swatches" class="sm-swatch-grid"></div>
+        </div>
+        <div class="sm-palette-group">
+          <label class="sm-palette-label" for="sm-custom-primary">Custom Tint &amp; Scheme</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input id="sm-custom-primary" type="color" value="#4a6fa5" aria-label="Custom palette primary color">
+            <select id="sm-variant-select" aria-label="Color scheme variant" style="width: auto; min-width: 150px; padding: 0.32rem 0.5rem; font-size: 0.82rem;">
+              <option value="tonalSpot">Tonal Spot</option>
+              <option value="content">Content</option>
+              <option value="fidelity">Fidelity</option>
+              <option value="rainbow">Rainbow</option>
+              <option value="vibrant">Vibrant</option>
+              <option value="expressive">Expressive</option>
+              <option value="neutral">Neutral</option>
+              <option value="monochrome">Monochrome</option>
+              <option value="fruitSalad">Fruit Salad</option>
+            </select>
+          </div>
+        </div>
+        <div class="sm-palette-group">
+          <span class="sm-palette-label">Surface Mode &amp; Contrast</span>
+          <div class="sm-segmented" role="group" aria-label="Color mode">
+            <button type="button" class="sm-seg-btn" data-sm-set-mode="auto">Auto</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-mode="light">Light</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-mode="dark">Dark</button>
+          </div>
+          <div class="sm-segmented" role="group" aria-label="Contrast level" style="margin-top: 0.2rem;">
+            <button type="button" class="sm-seg-btn" data-sm-set-contrast="0">Standard</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-contrast="0.5">Medium</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-contrast="1">High Contrast</button>
+          </div>
+        </div>
+        <div class="sm-palette-group">
+          <label class="sm-palette-label" for="sm-text-scale">Readability &amp; Motion</label>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;">
+            <select id="sm-text-scale" style="width: auto; padding: 0.32rem 0.55rem; font-size: 0.82rem;">
+              <option value="100">Text: Standard (100%)</option>
+              <option value="112">Text: Large (112%)</option>
+            </select>
+            <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
+              <input id="sm-reduced-motion" type="checkbox" style="width: auto;">
+              Reduced motion
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <main class="sm-generator-mount">
+    <div id="root" data-spacemarches-terminal="true" data-slot="{{ slot_name }}">
+      {% if not meshnet_bundle.ready %}
+        <div style="padding: 2rem; max-width: 780px; margin: 2rem auto;">
+          <section class="sm-surface-frame">
+            <p class="sm-eyebrow">Point-Buy v2 Mount Point</p>
+            <h1>Mesh-Net Bundle Pending</h1>
+            <p class="text-muted">
+              Build the Mesh-Net frontend assets into <code>spacemarches/static/spacemarches/assets/</code> so the interactive Point-Buy v2 character generator mounts here.
+            </p>
+            {% if not user.is_authenticated %}
+              <p style="margin-top: 1rem;">
+                <a class="btn btn-sm" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in to Save Characters</a>
+              </p>
+            {% endif %}
+          </section>
+        </div>
+      {% endif %}
+    </div>
+  </main>
+</div>
+
+{{ initial_save|json_script:"spacemarches-initial-save" }}
+{{ generator_boot|json_script:"spacemarches-generator-boot" }}
+
+<script src="{% static 'spacemarches/spacemarches-palette.js' %}"></script>
+<script>
+  (function () {
+    const bootScript = document.getElementById("spacemarches-generator-boot");
+    const bootData = bootScript ? JSON.parse(bootScript.textContent || "{}") : {};
+    window.__SPACEMARCHES_BOOT__ = bootData;
+
+    const isAuthenticated = Boolean(bootData.authenticated);
+    const syncUrl = "{% url 'spacemarches:api_sync' %}";
+    const slotName = "{{ slot_name|escapejs }}";
+    const initialScript = document.getElementById("spacemarches-initial-save");
+    const initialData = initialScript ? JSON.parse(initialScript.textContent || "{}") : {};
+    const statusEl = document.getElementById("bridge-status");
+
+    function getCookie(name) {
+      const parts = (document.cookie || "").split(";");
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed.startsWith(name + "=")) {
+          return decodeURIComponent(trimmed.slice(name.length + 1));
+        }
+      }
+      return "";
+    }
+
+    function snapshotLocalStorage() {
+      const state = {};
+      try {
+        for (let i = 0; i < window.localStorage.length; i++) {
+          const key = window.localStorage.key(i);
+          if (key !== null) {
+            state[key] = window.localStorage.getItem(key);
           }
         }
-        return "";
+      } catch (err) {
+        console.warn("SpacemarchesBridge localStorage read unavailable:", err);
       }
+      return state;
+    }
 
-      function snapshotLocalStorage() {
-        const state = {};
-        try {
-          for (let i = 0; i < window.localStorage.length; i++) {
-            const key = window.localStorage.key(i);
-            if (key !== null) {
-              state[key] = window.localStorage.getItem(key);
-            }
+    function applyStateToLocalStorage(rawState) {
+      if (!rawState || typeof rawState !== "object") return;
+      try {
+        for (const [k, v] of Object.entries(rawState)) {
+          if (typeof v === "string") {
+            originalSetItem(k, v);
+          } else {
+            originalSetItem(k, JSON.stringify(v));
           }
-        } catch (err) {
-          console.warn("SpacemarchesBridge localStorage read unavailable:", err);
         }
-        return state;
+      } catch (err) {
+        console.warn("SpacemarchesBridge hydrate error:", err);
       }
+    }
 
-      function applyStateToLocalStorage(rawState) {
-        if (!rawState || typeof rawState !== "object") return;
-        try {
-          for (const [k, v] of Object.entries(rawState)) {
-            if (typeof v === "string") {
-              originalSetItem(k, v);
-            } else {
-              originalSetItem(k, JSON.stringify(v));
-            }
-          }
-        } catch (err) {
-          console.warn("SpacemarchesBridge hydrate error:", err);
-        }
+    const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
+    const originalRemoveItem = window.localStorage.removeItem.bind(window.localStorage);
+    let syncTimer = null;
+    let latestSummary = initialData.clearance_summary || {};
+
+    async function syncNow(overrideRawState, overrideSummary) {
+      if (!isAuthenticated) {
+        return { status: "anonymous-local-only" };
       }
-
-      const originalSetItem = window.localStorage.setItem.bind(window.localStorage);
-      const originalRemoveItem = window.localStorage.removeItem.bind(window.localStorage);
-
-      let syncTimer = null;
-      let latestSummary = initialData.clearance_summary || {};
-
-      async function syncNow(overrideRawState, overrideSummary) {
-        if (statusEl) statusEl.textContent = "[SYNCING...]";
-        const payload = {
-          slot_name: slotName,
-          raw_state: overrideRawState || snapshotLocalStorage(),
-          clearance_summary: overrideSummary || latestSummary || {}
-        };
-        try {
-          const resp = await fetch(syncUrl, {
-            method: "POST",
-            credentials: "same-origin",
-            headers: {
-              "Content-Type": "application/json",
-              "X-CSRFToken": getCookie("csrftoken")
-            },
-            body: JSON.stringify(payload)
-          });
-          if (!resp.ok) throw new Error("HTTP " + resp.status);
-          const data = await resp.json();
-          if (statusEl) statusEl.textContent = "[SYNCED " + (data.updated_at || "") + "]";
-          if (previewEl) previewEl.textContent = JSON.stringify(payload.raw_state, null, 2);
-          return data;
-        } catch (err) {
-          if (statusEl) statusEl.textContent = "[SYNC ERROR]";
-          console.error("SpacemarchesBridge sync failed:", err);
-          throw err;
-        }
+      if (statusEl) statusEl.textContent = "Syncing...";
+      const payload = {
+        slot_name: slotName,
+        raw_state: overrideRawState || snapshotLocalStorage(),
+        clearance_summary: overrideSummary || latestSummary || {}
+      };
+      try {
+        const resp = await fetch(syncUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken")
+          },
+          body: JSON.stringify(payload)
+        });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        if (statusEl) statusEl.textContent = "Synced";
+        return data;
+      } catch (err) {
+        if (statusEl) statusEl.textContent = "Sync error";
+        console.error("SpacemarchesBridge sync failed:", err);
+        throw err;
       }
+    }
 
-      function scheduleSync() {
-        if (syncTimer) window.clearTimeout(syncTimer);
-        syncTimer = window.setTimeout(() => { syncNow().catch(() => {}); }, 600);
-      }
+    function scheduleSync() {
+      if (!isAuthenticated) return;
+      if (syncTimer) window.clearTimeout(syncTimer);
+      syncTimer = window.setTimeout(() => { syncNow().catch(() => {}); }, 800);
+    }
 
+    if (isAuthenticated) {
       window.localStorage.setItem = function (key, value) {
         originalSetItem(key, value);
-        if (String(key).startsWith(STORAGE_PREFIX) || true) {
-          scheduleSync();
-        }
+        scheduleSync();
       };
-
       window.localStorage.removeItem = function (key) {
         originalRemoveItem(key);
         scheduleSync();
       };
-
-      // Hydrate from server-injected initial save immediately
       if (initialData && initialData.exists && initialData.raw_state) {
         applyStateToLocalStorage(initialData.raw_state);
       }
-      if (previewEl) {
-        previewEl.textContent = JSON.stringify(initialData.raw_state || {}, null, 2);
-      }
+    }
 
-      window.SpacemarchesBridge = {
-        slotName: slotName,
-        syncUrl: syncUrl,
-        getInitialSave: function () { return initialData; },
-        hydrateFromServer: async function () {
-          const resp = await fetch(syncUrl + "?slot=" + encodeURIComponent(slotName), {
-            credentials: "same-origin"
-          });
-          if (!resp.ok) throw new Error("HTTP " + resp.status);
-          const data = await resp.json();
-          if (data.raw_state) applyStateToLocalStorage(data.raw_state);
-          return data;
-        },
-        sync: function (rawState, clearanceSummary) {
-          if (clearanceSummary) latestSummary = clearanceSummary;
-          return syncNow(rawState, clearanceSummary);
-        },
-        setClearanceSummary: function (summary) {
-          latestSummary = summary || {};
-          scheduleSync();
-        }
-      };
-
-      const manualBtn = document.getElementById("bridge-manual-sync");
-      if (manualBtn) {
-        manualBtn.addEventListener("click", () => {
-          syncNow().catch(() => {});
+    window.SpacemarchesBridge = {
+      slotName: slotName,
+      syncUrl: syncUrl,
+      authenticated: isAuthenticated,
+      getBoot: function () { return bootData; },
+      getInitialSave: function () { return initialData; },
+      hydrateFromServer: async function () {
+        if (!isAuthenticated) return initialData;
+        const resp = await fetch(syncUrl + "?slot=" + encodeURIComponent(slotName), {
+          credentials: "same-origin"
         });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        if (data.raw_state) applyStateToLocalStorage(data.raw_state);
+        return data;
+      },
+      sync: function (rawState, clearanceSummary) {
+        if (clearanceSummary) latestSummary = clearanceSummary;
+        return syncNow(rawState, clearanceSummary);
+      },
+      setClearanceSummary: function (summary) {
+        latestSummary = summary || {};
+        scheduleSync();
       }
-    })();
-  </script>
+    };
 
-  {# Drop-in hook: load compiled mesh-net ES module bundle AFTER window.SpacemarchesBridge #}
-  {# <script type="module" src="{% static 'spacemarches/assets/index.js' %}"></script> #}
+    const manualBtn = document.getElementById("bridge-manual-sync");
+    if (manualBtn) {
+      manualBtn.addEventListener("click", () => {
+        syncNow().catch(() => {});
+      });
+    }
+  })();
+</script>
+
+{% if meshnet_bundle.ready %}
+  <script type="module" src="{% static meshnet_bundle.js_entry %}"></script>
+{% endif %}
 </body>
 </html>

@@ -5,38 +5,128 @@
   <meta charset="utf-8">
   <title>{% block title %}Spacemarches{% endblock %}</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="{% static 'css/base.css' %}">
+  <script>
+    (function () {
+      try {
+        var raw = localStorage.getItem("sm-style-cache-v1");
+        if (!raw) return;
+        var cached = JSON.parse(raw);
+        if (cached && cached.cssText) {
+          var st = document.createElement("style");
+          st.id = "sm-dynamic-theme";
+          st.textContent = cached.cssText;
+          document.head.appendChild(st);
+        }
+        var root = document.documentElement;
+        if (cached.mode) root.setAttribute("data-sm-mode", cached.mode);
+        if (cached.contrast) root.setAttribute("data-sm-contrast", cached.contrast);
+        if (cached.scale) root.setAttribute("data-sm-scale", cached.scale);
+        if (cached.reducedMotion) root.setAttribute("data-sm-reduced-motion", "true");
+      } catch (e) {}
+    })();
+  </script>
+  <link rel="stylesheet" href="{% static 'spacemarches/spacemarches-theme.css' %}">
+  {% block spacemarches_head %}{% endblock %}
 </head>
-<body>
-<div class="app-shell">
-  <main>
-    <div class="card" style="max-width: 920px; width: 100%; border-top: 4px solid #1e293b;">
-      <header style="display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; padding-bottom: 1rem; margin-bottom: 1.25rem; border-bottom: 1px solid var(--border);">
-        <div>
-          <span style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">MESH-NET // CONTAINMENT SECTOR</span>
-          <div style="font-weight: 700; font-size: 1.2rem; color: #0f172a;">
-            <a href="{% url 'spacemarches:portal' %}" style="color: inherit; text-decoration: none;">Spacemarches</a>
+<body class="sm-body">
+<div class="sm-shell">
+  <header class="sm-header">
+    <div class="sm-header-inner">
+      <a class="sm-brand" href="{% url 'spacemarches:portal' %}">
+        <span class="sm-brand-mark">Spacemarches</span>
+        <span class="sm-brand-sector">Mesh-Net Sector</span>
+      </a>
+
+      <nav class="sm-nav" aria-label="Spacemarches navigation">
+        <a class="sm-nav-link {% if request.resolver_match.url_name == 'portal' %}is-active{% endif %}" href="{% url 'spacemarches:portal' %}">Portal</a>
+        <a class="sm-nav-link {% if 'archive' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:archive_list' %}">Archives</a>
+        <a class="sm-nav-link {% if 'forum' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:forum_list' %}">Forums</a>
+        {% if user.is_authenticated %}
+          <a class="sm-nav-link {% if 'character' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:character_roster' %}">Characters</a>
+          <a class="sm-nav-link {% if 'dossier' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:dossier_list' %}">Dossiers</a>
+        {% endif %}
+      </nav>
+
+      <div class="sm-header-actions">
+        <button
+          type="button"
+          id="sm-palette-toggle"
+          class="btn btn-secondary btn-sm"
+          aria-expanded="false"
+          aria-controls="sm-palette-panel"
+        >Palette &amp; Contrast</button>
+        <a class="btn btn-sm" href="{% url 'spacemarches:meshnet' %}">MeshNet</a>
+        {% if user.is_authenticated %}
+          <form method="post" action="{% url 'logout' %}" style="margin: 0;">{% csrf_token %}<button class="btn btn-secondary btn-sm" type="submit">Log out</button></form>
+        {% else %}
+          <a class="btn btn-secondary btn-sm" href="{% url 'register' %}">Register</a>
+          <a class="btn btn-secondary btn-sm" href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}">Log in</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <section id="sm-palette-panel" class="sm-palette-drawer" aria-label="Palette and accessibility settings" hidden>
+      <div class="sm-palette-inner">
+        <div class="sm-palette-group">
+          <span class="sm-palette-label">Material Presets</span>
+          <div id="sm-preset-swatches" class="sm-swatch-grid"></div>
+        </div>
+
+        <div class="sm-palette-group">
+          <label class="sm-palette-label" for="sm-custom-primary">Custom Tint &amp; Scheme</label>
+          <div style="display: flex; align-items: center; gap: 0.5rem;">
+            <input id="sm-custom-primary" type="color" value="#4a6fa5" aria-label="Custom palette primary color">
+            <select id="sm-variant-select" aria-label="Color scheme variant" style="width: auto; min-width: 150px; padding: 0.32rem 0.5rem; font-size: 0.82rem;">
+              <option value="tonalSpot">Tonal Spot</option>
+              <option value="content">Content</option>
+              <option value="fidelity">Fidelity</option>
+              <option value="rainbow">Rainbow</option>
+              <option value="vibrant">Vibrant</option>
+              <option value="expressive">Expressive</option>
+              <option value="neutral">Neutral</option>
+              <option value="monochrome">Monochrome</option>
+              <option value="fruitSalad">Fruit Salad</option>
+            </select>
           </div>
         </div>
-        <nav aria-label="Spacemarches navigation" style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
-          <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:portal' %}">Portal</a>
-          <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:archive_list' %}">Archives</a>
-          <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:forum_list' %}">Forums</a>
-          {% if user.is_authenticated %}
-            <a class="btn" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:dossier_list' %}">Dossiers</a>
-            <a class="btn btn-auth" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'spacemarches:terminal' %}">Terminal</a>
-            <form method="post" action="{% url 'logout' %}" style="margin: 0;">{% csrf_token %}<button class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" type="submit">Log out</button></form>
-          {% else %}
-            <a class="btn btn-auth" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'register' %}">Register</a>
-            <a class="btn btn-auth" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{% url 'login' %}?next={% url 'spacemarches:terminal' %}">Log in</a>
-          {% endif %}
-        </nav>
-      </header>
 
+        <div class="sm-palette-group">
+          <span class="sm-palette-label">Surface Mode &amp; Contrast</span>
+          <div class="sm-segmented" role="group" aria-label="Color mode">
+            <button type="button" class="sm-seg-btn" data-sm-set-mode="auto">Auto</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-mode="light">Light</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-mode="dark">Dark</button>
+          </div>
+          <div class="sm-segmented" role="group" aria-label="Contrast level" style="margin-top: 0.2rem;">
+            <button type="button" class="sm-seg-btn" data-sm-set-contrast="0">Standard</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-contrast="0.5">Medium</button>
+            <button type="button" class="sm-seg-btn" data-sm-set-contrast="1">High Contrast</button>
+          </div>
+        </div>
+
+        <div class="sm-palette-group">
+          <label class="sm-palette-label" for="sm-text-scale">Readability &amp; Motion</label>
+          <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem;">
+            <select id="sm-text-scale" style="width: auto; padding: 0.32rem 0.55rem; font-size: 0.82rem;">
+              <option value="100">Text: Standard (100%)</option>
+              <option value="112">Text: Large (112%)</option>
+            </select>
+            <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
+              <input id="sm-reduced-motion" type="checkbox" style="width: auto;">
+              Reduced motion
+            </label>
+          </div>
+        </div>
+      </div>
+    </section>
+  </header>
+
+  <main class="sm-main">
+    <div class="sm-surface-frame">
       {% if messages %}
         <div style="margin-bottom: 1rem;">
           {% for message in messages %}
-            <div style="padding: 0.65rem 0.9rem; border-radius: 8px; margin-bottom: 0.5rem; border: 1px solid {% if message.tags == 'error' %}#fca5a5; background: #fef2f2; color: #991b1b;{% else %}#cbd5e1; background: #f8fafc; color: #0f172a;{% endif %} font-size: 0.9rem;">
+            <div class="sm-alert {% if message.tags == 'error' %}is-error{% elif message.tags == 'success' %}is-success{% endif %}">
               {{ message }}
             </div>
           {% endfor %}
@@ -47,5 +137,7 @@
     </div>
   </main>
 </div>
+
+<script src="{% static 'spacemarches/spacemarches-palette.js' %}"></script>
 </body>
 </html>

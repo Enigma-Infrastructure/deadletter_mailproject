@@ -2,18 +2,19 @@
 {% block title %}Declassified Archives | Spacemarches{% endblock %}
 
 {% block spacemarches_content %}
+<p class="sm-eyebrow">Containment Sector</p>
 <h1>Declassified Containment &amp; Lore Archives</h1>
 <p class="text-muted">Only records cleared with public release status are listed here.</p>
 
 {% if entries %}
-  <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+  <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1.15rem;">
     {% for entry in entries %}
-      <article style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem;">
-        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
+      <article class="sm-card">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap;">
           <h2 style="margin: 0;"><a href="{% url 'spacemarches:archive_detail' slug=entry.slug %}">{{ entry.title }}</a></h2>
-          <span style="font-family: monospace; font-size: 0.78rem; padding: 0.2rem 0.45rem; border-radius: 4px; background: #e2e8f0; color: #0f172a;">{{ entry.classification_level }}</span>
+          <span class="sm-code-tag">{{ entry.classification_level }}</span>
         </div>
-        <p class="text-muted" style="margin-top: 0.35rem;">{{ entry.body|truncatewords:32 }}</p>
+        <p class="text-muted" style="margin-top: 0.4rem;">{{ entry.body|truncatewords:32 }}</p>
       </article>
     {% endfor %}
   </div>

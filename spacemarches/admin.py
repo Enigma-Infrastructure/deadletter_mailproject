@@ -9,6 +9,7 @@ from .models import (
     FieldAgent,
     ForumPost,
     ForumThread,
+    GeneratedCharacter,
     OperationSession,
 )
 
@@ -17,6 +18,13 @@ from .models import (
 class AgentSaveSlotAdmin(admin.ModelAdmin):
     list_display = ("user", "slot_name", "updated_at")
     search_fields = ("user__username", "slot_name")
+
+
+@admin.register(GeneratedCharacter)
+class GeneratedCharacterAdmin(admin.ModelAdmin):
+    list_display = ("character_name", "user", "dossier", "source_system", "external_id", "updated_at")
+    list_filter = ("source_system",)
+    search_fields = ("character_name", "external_id", "user__username", "dossier__character_name")
 
 
 @admin.register(OperationSession)

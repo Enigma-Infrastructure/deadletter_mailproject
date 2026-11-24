@@ -1,5 +1,8 @@
 import json
+from pathlib import Path
+from typing import Any
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
@@ -11,7 +14,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .markdown_utils import render_markdown_safe
-from .models import ArchiveEntry, CharacterDossier, DiscordLink, ForumPost, ForumThread
+from .models import ArchiveEntry, CharacterDossier, DiscordLink, ForumPost, ForumThread, GeneratedCharacter
 from .questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -22,6 +25,13 @@ from .questionnaire import (
     get_question_temporal_defaults,
 )
 from .selectors import get_user_spacemarches_summary
+from .services.character_sync_service import (
+    export_generated_character_html,
+    export_generated_character_markdown,
+    link_character_to_dossier,
+    save_generated_character,
+    serialize_generated_character,
+)
 from .services.dossier_service import (
     ENTRY_KIND_CHARACTER_CREATION,
     ENTRY_KIND_CHOICES,
@@ -167,21 +177,106 @@ def forum_reply(request, slug: str):
 
 
 # --------------------------------------------------
-# Authenticated Terminal & Cloud Save Sync (mesh-net)
+# Public Point-Buy v2 Generator, Terminal & Cloud Save Sync (mesh-net)
 # --------------------------------------------------
 
 
-@login_required
-def terminal(request):
-    """Authenticated shell hosting the mesh-net terminal bundle and localStorage bridge."""
-    slot_name = (request.GET.get("slot") or "auto").strip() or "auto"
-    saved = load_agent_save(request.user, slot_name=slot_name)
+def _resolve_meshnet_bundle() -> dict[str, Any]:
+    """Locate compiled MeshNet entry JS and CSS files inside static/spacemarches/assets/."""
+    assets_dir = Path(settings.BASE_DIR) / "spacemarches" / "static" / "spacemarches" / "assets"
+    js_entry = ""
+    css_entries: list[str] = []
+    if assets_dir.is_dir():
+        index_js = sorted(assets_dir.glob("index-*.js"))
+        if index_js:
+            js_entry = f"spacemarches/assets/{index_js[0].name}"
+        elif (assets_dir / "index.js").is_file():
+            js_entry = "spacemarches/assets/index.js"
+        for css_file in sorted(assets_dir.glob("index-*.css")):
+            css_entries.append(f"spacemarches/assets/{css_file.name}")
+        if not css_entries and (assets_dir / "index.css").is_file():
+            css_entries.append("spacemarches/assets/index.css")
+    return {
+        "ready": bool(js_entry),
+        "js_entry": js_entry,
+        "css_entries": css_entries,
+    }
+
+
+def _build_generator_boot_payload(request, *, route_url: str) -> dict[str, Any]:
+    """Build client bootstrap payload for the MeshNet Point-Buy v2 generator."""
+    is_auth = bool(request.user and request.user.is_authenticated)
+    saved_characters: list[dict[str, Any]] = []
+    dossiers: list[dict[str, Any]] = []
+    if is_auth:
+        chars = GeneratedCharacter.objects.filter(user=request.user).select_related("dossier").order_by("-updated_at")
+        saved_characters = [serialize_generated_character(c, include_raw=False) for c in chars]
+        user_dossiers = CharacterDossier.objects.filter(user=request.user).order_by("-updated_at")
+        dossiers = [
+            {
+                "id": d.pk,
+                "character_name": d.character_name,
+                "slug": d.slug,
+                "url": reverse("spacemarches:dossier_detail", kwargs={"slug": d.slug}),
+            }
+            for d in user_dossiers
+        ]
+
+    return {
+        "authenticated": is_auth,
+        "username": request.user.username if is_auth else "",
+        "login_url": f"{reverse('login')}?next={route_url}",
+        "register_url": f"{reverse('register')}?next={route_url}",
+        "portal_url": reverse("spacemarches:portal"),
+        "roster_url": reverse("spacemarches:character_roster"),
+        "dossier_list_url": reverse("spacemarches:dossier_list"),
+        "characters_api_url": reverse("spacemarches:api_characters"),
+        "saved_characters": saved_characters,
+        "dossiers": dossiers,
+        "initial_load_id": (request.GET.get("load") or "").strip(),
+        "initial_external_id": (request.GET.get("external_id") or "").strip(),
+    }
+
+
+def generator(request):
+    """Public MeshNet / Point-Buy v2 character generator: anonymous users build & export; logged-in users sync & link Dossiers."""
+    route_url = request.path or reverse("spacemarches:meshnet")
+    bundle = _resolve_meshnet_bundle()
+    boot = _build_generator_boot_payload(request, route_url=route_url)
+    initial_save = (
+        load_agent_save(request.user, slot_name=(request.GET.get("slot") or "auto").strip() or "auto")
+        if request.user.is_authenticated
+        else {"exists": False, "slot_name": "auto", "raw_state": {}, "clearance_summary": {}, "updated_at": None}
+    )
     return render(
         request,
         "spacemarches/terminal.html",
         {
+            "is_public_generator": True,
+            "slot_name": initial_save["slot_name"],
+            "initial_save": initial_save,
+            "generator_boot": boot,
+            "meshnet_bundle": bundle,
+        },
+    )
+
+
+@login_required
+def terminal(request):
+    """Authenticated shell hosting the mesh-net bundle, cloud save bridge, and character sync."""
+    slot_name = (request.GET.get("slot") or "auto").strip() or "auto"
+    saved = load_agent_save(request.user, slot_name=slot_name)
+    bundle = _resolve_meshnet_bundle()
+    boot = _build_generator_boot_payload(request, route_url=reverse("spacemarches:terminal"))
+    return render(
+        request,
+        "spacemarches/terminal.html",
+        {
+            "is_public_generator": False,
             "slot_name": saved["slot_name"],
             "initial_save": saved,
+            "generator_boot": boot,
+            "meshnet_bundle": bundle,
         },
     )
 
@@ -226,6 +321,239 @@ def api_sync(request):
             "created": created,
             "slot_name": slot.slot_name,
             "updated_at": slot.updated_at.isoformat(),
+        }
+    )
+
+
+@login_required
+def character_roster(request):
+    """Authenticated Django roster of generated EP2E characters with Dossier matching and exports."""
+    if request.method == "POST":
+        uploaded = request.FILES.get("character_json")
+        if uploaded is None:
+            messages.error(request, "Select a Point-Buy JSON export file to import.")
+            return redirect("spacemarches:character_roster")
+        if uploaded.size > 2_000_000:
+            messages.error(request, "Uploaded JSON file exceeds 2 MB limit.")
+            return redirect("spacemarches:character_roster")
+        try:
+            raw_data = json.loads(uploaded.read().decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            messages.error(request, "Uploaded file is not valid JSON.")
+            return redirect("spacemarches:character_roster")
+        if not isinstance(raw_data, dict):
+            messages.error(request, "Character JSON root must be an object.")
+            return redirect("spacemarches:character_roster")
+        try:
+            char, _ = save_generated_character(
+                request.user,
+                raw_data=raw_data,
+                dossier_id=request.POST.get("dossier_id") or None,
+            )
+            messages.success(request, f"Saved {char.character_name} to your Spacemarches account.")
+        except ValueError as err:
+            messages.error(request, str(err))
+        return redirect("spacemarches:character_roster")
+
+    characters = list(
+        GeneratedCharacter.objects.filter(user=request.user).select_related("dossier").order_by("-updated_at")
+    )
+    dossiers = list(CharacterDossier.objects.filter(user=request.user).order_by("-updated_at"))
+    return render(
+        request,
+        "spacemarches/character_roster.html",
+        {
+            "characters": characters,
+            "dossiers": dossiers,
+            "voice_choices": CharacterDossier.NARRATIVE_VOICE_CHOICES,
+        },
+    )
+
+
+@login_required
+def character_export(request, pk: int):
+    """Download a saved GeneratedCharacter as HTML, JSON, or Markdown."""
+    qs = GeneratedCharacter.objects.select_related("dossier")
+    if _is_gm_or_admin(request.user):
+        character = get_object_or_404(qs, pk=pk)
+    else:
+        character = get_object_or_404(qs, pk=pk, user=request.user)
+
+    fmt = (request.GET.get("format") or "html").strip().lower()
+    base_name = slugify(character.character_name) or f"character-{character.pk}"
+    if fmt == "json":
+        payload = json.dumps(character.raw_data, indent=2)
+        resp = HttpResponse(payload, content_type="application/json; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="{base_name}-point-buy.json"'
+        return resp
+    if fmt in {"md", "markdown"}:
+        md_text = export_generated_character_markdown(character)
+        resp = HttpResponse(md_text, content_type="text/markdown; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="{base_name}-sheet.md"'
+        return resp
+    html_text = export_generated_character_html(character)
+    resp = HttpResponse(html_text, content_type="text/html; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="{base_name}-sheet.html"'
+    return resp
+
+
+@login_required
+@require_POST
+def character_link_dossier(request, pk: int):
+    """Link, unlink, or create-and-link a CharacterDossier for a GeneratedCharacter."""
+    character = get_object_or_404(GeneratedCharacter, pk=pk, user=request.user)
+    create_new = request.POST.get("create_dossier") in {"1", "true", "yes"}
+    dossier_id = request.POST.get("dossier_id")
+    voice = (request.POST.get("narrative_voice") or CharacterDossier.VOICE_FIRST_PERSON).strip()
+    next_url = (request.POST.get("next") or "").strip()
+
+    try:
+        dossier = link_character_to_dossier(
+            request.user,
+            character,
+            dossier_id=dossier_id,
+            create_dossier=create_new,
+            narrative_voice=voice,
+        )
+        if dossier is None:
+            messages.success(request, f"Unlinked dossier from {character.character_name}.")
+        else:
+            messages.success(request, f"Linked {character.character_name} to dossier {dossier.character_name}.")
+    except ValueError as err:
+        messages.error(request, str(err))
+
+    if next_url.startswith("/spacemarches/"):
+        return redirect(next_url)
+    return redirect("spacemarches:character_roster")
+
+
+@login_required
+@require_POST
+def character_delete(request, pk: int):
+    """Delete a saved GeneratedCharacter owned by the user."""
+    character = get_object_or_404(GeneratedCharacter, pk=pk, user=request.user)
+    name = character.character_name
+    character.delete()
+    messages.success(request, f"Removed {name} from cloud saves.")
+    return redirect("spacemarches:character_roster")
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def api_characters(request):
+    """JSON endpoint listing or saving/importing Point-Buy v2 characters for the authenticated user."""
+    if request.method == "GET":
+        chars = GeneratedCharacter.objects.filter(user=request.user).select_related("dossier").order_by("-updated_at")
+        dossiers = CharacterDossier.objects.filter(user=request.user).order_by("-updated_at")
+        return JsonResponse(
+            {
+                "characters": [serialize_generated_character(c, include_raw=False) for c in chars],
+                "dossiers": [
+                    {
+                        "id": d.pk,
+                        "character_name": d.character_name,
+                        "slug": d.slug,
+                        "url": reverse("spacemarches:dossier_detail", kwargs={"slug": d.slug}),
+                    }
+                    for d in dossiers
+                ],
+            }
+        )
+
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+
+    if not isinstance(payload, dict):
+        return JsonResponse({"error": "JSON payload must be an object."}, status=400)
+
+    # Support batch import (e.g., migrating anonymous IndexedDB drafts on login)
+    if isinstance(payload.get("characters"), list):
+        saved_items = []
+        for entry in payload["characters"][:25]:
+            if not isinstance(entry, dict) or not isinstance(entry.get("raw_data"), dict):
+                continue
+            try:
+                char, created = save_generated_character(
+                    request.user,
+                    external_id=str(entry.get("external_id") or ""),
+                    character_name=str(entry.get("character_name") or ""),
+                    source_system=str(entry.get("source_system") or GeneratedCharacter.SOURCE_POINT_BUY_V2),
+                    raw_data=entry.get("raw_data"),
+                    dossier_id=entry.get("dossier_id"),
+                )
+                saved_items.append(serialize_generated_character(char, include_raw=False))
+            except ValueError as err:
+                return JsonResponse({"error": str(err)}, status=400)
+        return JsonResponse({"status": "ok", "characters": saved_items})
+
+    raw_data = payload.get("raw_data")
+    if raw_data is None:
+        return JsonResponse({"error": "Missing raw_data field."}, status=400)
+
+    try:
+        char, created = save_generated_character(
+            request.user,
+            external_id=str(payload.get("external_id") or ""),
+            character_name=str(payload.get("character_name") or ""),
+            source_system=str(payload.get("source_system") or GeneratedCharacter.SOURCE_POINT_BUY_V2),
+            raw_data=raw_data,
+            dossier_id=payload.get("dossier_id"),
+            character_pk=payload.get("id"),
+        )
+    except ValueError as err:
+        return JsonResponse({"error": str(err)}, status=400)
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "created": created,
+            "character": serialize_generated_character(char, include_raw=False),
+        }
+    )
+
+
+@login_required
+@require_http_methods(["GET", "DELETE"])
+def api_character_detail(request, pk: int):
+    """Fetch full raw_data (for hydrating MeshNet IndexedDB) or delete a saved character."""
+    character = get_object_or_404(GeneratedCharacter.objects.select_related("dossier"), pk=pk, user=request.user)
+    if request.method == "DELETE":
+        character.delete()
+        return JsonResponse({"status": "deleted"})
+    return JsonResponse({"character": serialize_generated_character(character, include_raw=True)})
+
+
+@login_required
+@require_POST
+def api_character_link_dossier(request, pk: int):
+    """JSON endpoint matching or creating a CharacterDossier for a GeneratedCharacter."""
+    character = get_object_or_404(GeneratedCharacter.objects.select_related("dossier"), pk=pk, user=request.user)
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+
+    if not isinstance(payload, dict):
+        return JsonResponse({"error": "JSON payload must be an object."}, status=400)
+
+    try:
+        link_character_to_dossier(
+            request.user,
+            character,
+            dossier_id=payload.get("dossier_id"),
+            create_dossier=bool(payload.get("create_dossier")),
+            narrative_voice=str(payload.get("narrative_voice") or CharacterDossier.VOICE_FIRST_PERSON),
+        )
+    except ValueError as err:
+        return JsonResponse({"error": str(err)}, status=400)
+
+    character.refresh_from_db()
+    return JsonResponse(
+        {
+            "status": "ok",
+            "character": serialize_generated_character(character, include_raw=False),
         }
     )
 
@@ -423,11 +751,26 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
         else ""
     )
 
+    linked_characters = list(
+        dossier.generated_characters.order_by("-updated_at")
+    )
+    available_characters = (
+        list(
+            GeneratedCharacter.objects.filter(user=request.user)
+            .exclude(dossier=dossier)
+            .order_by("-updated_at")
+        )
+        if dossier.user_id == request.user.pk
+        else []
+    )
+
     return render(
         request,
         "spacemarches/dossier_detail.html",
         {
             "dossier": dossier,
+            "linked_characters": linked_characters,
+            "available_characters": available_characters,
             "core_nodes": core_nodes,
             "core_question_count": len(core_nodes),
             "all_question_count": len(all_questions),

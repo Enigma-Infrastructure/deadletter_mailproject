@@ -24,6 +24,54 @@ class AgentSaveSlot(models.Model):
         return f"{self.user} [{self.slot_name}]"
 
 
+class GeneratedCharacter(models.Model):
+    """Persists an Eclipse Phase 2E Point-Buy v2 (or future Life-Path) character sheet and optional Dossier link."""
+
+    SOURCE_POINT_BUY_V2 = "point_buy_v2"
+    SOURCE_LIFE_PATH = "life_path"
+    SOURCE_SYSTEM_CHOICES = [
+        (SOURCE_POINT_BUY_V2, "Point-Buy (v2)"),
+        (SOURCE_LIFE_PATH, "Life-Path"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="generated_characters",
+    )
+    dossier = models.ForeignKey(
+        "CharacterDossier",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="generated_characters",
+    )
+    external_id = models.CharField(max_length=64, blank=True, db_index=True)
+    character_name = models.CharField(max_length=160)
+    source_system = models.CharField(
+        max_length=32,
+        choices=SOURCE_SYSTEM_CHOICES,
+        default=SOURCE_POINT_BUY_V2,
+    )
+    raw_data = models.JSONField(default=dict, blank=True)
+    summary = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "external_id"],
+                condition=models.Q(external_id__gt=""),
+                name="spacemarches_uniq_user_genchar_ext_id",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.character_name} ({self.user})"
+
+
 class OperationSession(models.Model):
     """Server-authoritative multiplayer TRPG campaign session."""
 

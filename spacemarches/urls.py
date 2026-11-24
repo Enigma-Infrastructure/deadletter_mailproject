@@ -13,9 +13,19 @@ urlpatterns = [
     path("forums/new/", views.forum_new, name="forum_new"),
     path("forums/<slug:slug>/", views.forum_detail, name="forum_detail"),
     path("forums/<slug:slug>/reply/", views.forum_reply, name="forum_reply"),
-    # Authenticated gameplay & cloud sync
+    # Public MeshNet / Point-Buy v2 character generator (anonymous export + optional cloud save CTA)
+    path("meshnet/", views.generator, name="meshnet"),
+    path("generator/", views.generator, name="generator"),
+    # Legacy authenticated shell alias & cloud sync
     path("terminal/", views.terminal, name="terminal"),
     path("api/sync/", views.api_sync, name="api_sync"),
+    path("characters/", views.character_roster, name="character_roster"),
+    path("characters/<int:pk>/export/", views.character_export, name="character_export"),
+    path("characters/<int:pk>/link/", views.character_link_dossier, name="character_link_dossier"),
+    path("characters/<int:pk>/delete/", views.character_delete, name="character_delete"),
+    path("api/characters/", views.api_characters, name="api_characters"),
+    path("api/characters/<int:pk>/", views.api_character_detail, name="api_character_detail"),
+    path("api/characters/<int:pk>/link-dossier/", views.api_character_link_dossier, name="api_character_link_dossier"),
     # Authenticated character dossiers & Discord linking
     path("dossier/", views.dossier_list, name="dossier_list"),
     path("dossier/discord-link/", views.generate_discord_code, name="generate_discord_code"),

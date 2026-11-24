@@ -1,0 +1,1 @@
+import{r as o,c as e,ai as i,aj as n,B as m}from"./index-XVJUGaRL.js";import{B as g}from"./BrowseDesignsLayout-D0slmk_M.js";function f(){const[s,r]=o["/browse-designs/gear"].useSearchParams();return e(g,{documentTitle:{id:"a5ffZg",message:"Browse Gear"},types:i,children:(a,t)=>e(n,m({get designs(){return a()},filters:s,setFilters:r},t))})}export{f as default};

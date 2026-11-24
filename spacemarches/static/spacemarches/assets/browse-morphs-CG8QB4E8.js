@@ -1,0 +1,1 @@
+import{r as t,c as s,ak as n,al as m,B as i}from"./index-XVJUGaRL.js";import{B as p}from"./BrowseDesignsLayout-D0slmk_M.js";function u(){const[e,r]=t["/browse-designs/morphs"].useSearchParams();return s(p,{documentTitle:{id:"dmnnwP",message:"Browse Morphs"},types:n,children:(a,o)=>s(m,i({get designs(){return a()},filters:e,setFilters:r},o))})}export{u as default};

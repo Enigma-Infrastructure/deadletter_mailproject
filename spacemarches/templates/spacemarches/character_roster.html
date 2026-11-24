@@ -1,0 +1,123 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}Saved Characters | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem; margin-bottom: 1.15rem;">
+  <div>
+    <p class="sm-eyebrow">Point-Buy v2 Cloud Roster</p>
+    <h1>Saved Characters ({{ characters|length }})</h1>
+    <p class="text-muted">Sync Eclipse Phase Point-Buy v2 characters to your account, export standalone character sheets, or link a sheet with a Character Dossier.</p>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+    <a class="btn" href="{% url 'spacemarches:meshnet' %}">Open MeshNet</a>
+    <a class="btn btn-secondary" href="{% url 'spacemarches:dossier_list' %}">My Dossiers</a>
+  </div>
+</div>
+
+<details class="sm-panel" style="margin-bottom: 1.25rem;">
+  <summary style="cursor: pointer; font-weight: 600;">+ Import Point-Buy JSON File</summary>
+  <form method="post" action="{% url 'spacemarches:character_roster' %}" enctype="multipart/form-data" style="margin-top: 0.85rem;">
+    {% csrf_token %}
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem; align-items: end;">
+      <div class="form-group" style="margin: 0;">
+        <label for="id_character_json">Point-Buy Export (.json)</label>
+        <input id="id_character_json" type="file" name="character_json" accept=".json,application/json" required>
+      </div>
+      {% if dossiers %}
+        <div class="form-group" style="margin: 0;">
+          <label for="id_import_dossier">Link to Dossier (optional)</label>
+          <select id="id_import_dossier" name="dossier_id">
+            <option value="">&mdash; None &mdash;</option>
+            {% for d in dossiers %}
+              <option value="{{ d.pk }}">{{ d.character_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+      <div>
+        <button type="submit" class="btn">Upload &amp; Save</button>
+      </div>
+    </div>
+  </form>
+</details>
+
+{% if characters %}
+  <div class="sm-card-grid">
+    {% for ch in characters %}
+      <article class="sm-card" style="display: flex; flex-direction: column; gap: 0.65rem;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
+          <h2 style="margin: 0;">{{ ch.character_name }}</h2>
+          <span class="sm-code-tag">{{ ch.source_system }}</span>
+        </div>
+
+        {% if ch.summary.concept %}
+          <p class="text-muted" style="margin: 0;">{{ ch.summary.concept }}</p>
+        {% endif %}
+
+        <div class="sm-meta-strip">
+          {% if ch.summary.morphs %}
+            <span><span class="sm-meta-key">Morph</span> <span class="sm-meta-val">{{ ch.summary.morphs|join:", " }}</span></span>
+          {% endif %}
+          {% if ch.summary.skill_count %}
+            <span><span class="sm-meta-key">Skills</span> <span class="sm-meta-val">{{ ch.summary.skill_count }}</span></span>
+          {% endif %}
+          <span><span class="sm-meta-key">Updated</span> {{ ch.updated_at|date:"Y-m-d H:i" }}</span>
+        </div>
+
+        {% if ch.summary.aptitudes %}
+          <div class="sm-meta-strip" style="font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.78rem;">
+            <span>COG {{ ch.summary.aptitudes.cog|default:"-" }}</span>
+            <span>INT {{ ch.summary.aptitudes.int|default:"-" }}</span>
+            <span>REF {{ ch.summary.aptitudes.ref|default:"-" }}</span>
+            <span>SAV {{ ch.summary.aptitudes.sav|default:"-" }}</span>
+            <span>SOM {{ ch.summary.aptitudes.som|default:"-" }}</span>
+            <span>WIL {{ ch.summary.aptitudes.wil|default:"-" }}</span>
+          </div>
+        {% endif %}
+
+        <div class="sm-panel" style="padding: 0.7rem 0.85rem;">
+          {% if ch.dossier %}
+            <p style="font-size: 0.84rem; margin-bottom: 0.45rem;">
+              <span class="sm-status-flag is-ok">Linked Dossier</span>
+              <a href="{% url 'spacemarches:dossier_detail' slug=ch.dossier.slug %}" style="margin-left: 0.35rem; font-weight: 600;">{{ ch.dossier.character_name }}</a>
+            </p>
+          {% endif %}
+          <form method="post" action="{% url 'spacemarches:character_link_dossier' pk=ch.pk %}" style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0;">
+            {% csrf_token %}
+            <select name="dossier_id" aria-label="Select dossier for {{ ch.character_name }}" style="width: auto; min-width: 170px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+              <option value="">&mdash; Unlinked &mdash;</option>
+              {% for d in dossiers %}
+                <option value="{{ d.pk }}" {% if ch.dossier_id == d.pk %}selected{% endif %}>{{ d.character_name }}</option>
+              {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-secondary btn-sm">Update Link</button>
+          </form>
+          {% if not ch.dossier %}
+            <form method="post" action="{% url 'spacemarches:character_link_dossier' pk=ch.pk %}" style="margin-top: 0.4rem;">
+              {% csrf_token %}
+              <input type="hidden" name="create_dossier" value="1">
+              <button type="submit" class="btn btn-auth btn-sm">Create &amp; Link New Dossier</button>
+            </form>
+          {% endif %}
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin-top: auto;">
+          <a class="btn btn-sm" href="{% url 'spacemarches:meshnet' %}?load={{ ch.pk }}">Open in MeshNet</a>
+          <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=ch.pk %}?format=html">Export HTML</a>
+          <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=ch.pk %}?format=md">MD</a>
+          <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=ch.pk %}?format=json">JSON</a>
+          <form method="post" action="{% url 'spacemarches:character_delete' pk=ch.pk %}" style="margin: 0 0 0 auto;">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+          </form>
+        </div>
+      </article>
+    {% endfor %}
+  </div>
+{% else %}
+  <div class="sm-panel">
+    <p class="text-muted" style="margin-bottom: 0.65rem;">No cloud-saved Point-Buy characters yet. Open MeshNet to build a character and click Save to Cloud, or upload a JSON export above.</p>
+    <a class="btn btn-sm" href="{% url 'spacemarches:meshnet' %}">Open MeshNet</a>
+  </div>
+{% endif %}
+{% endblock %}

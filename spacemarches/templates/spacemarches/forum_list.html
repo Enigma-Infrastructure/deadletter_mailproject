@@ -2,11 +2,12 @@
 {% block title %}Forums | Spacemarches{% endblock %}
 
 {% block spacemarches_content %}
+<p class="sm-eyebrow">Operational Dispatches</p>
 <h1>Spacemarches Forums</h1>
 <p class="text-muted">Public archive commentary and mission dispatches. Sign in to start a thread or reply.</p>
 
 {% if user.is_authenticated %}
-  <details style="margin: 1rem 0; border: 1px solid var(--border); border-radius: 10px; padding: 0.85rem 1rem; background: #f8fafc;">
+  <details class="sm-panel" style="margin: 1rem 0;">
     <summary style="cursor: pointer; font-weight: 600;">+ Open New Discussion Thread</summary>
     <form method="post" action="{% url 'spacemarches:forum_new' %}" style="margin-top: 0.85rem;">
       {% csrf_token %}
@@ -18,7 +19,7 @@
         <div class="form-group">
           <label for="id_related_archive">Related Archive Entry (optional)</label>
           <select id="id_related_archive" name="related_archive">
-            <option value="">— None —</option>
+            <option value="">&mdash; None &mdash;</option>
             {% for arch in public_archives %}
               <option value="{{ arch.slug }}">[{{ arch.classification_level }}] {{ arch.title }}</option>
             {% endfor %}
@@ -39,16 +40,17 @@
 {% endif %}
 
 {% if threads %}
-  <div style="display: flex; flex-direction: column; gap: 0.75rem; margin-top: 1rem;">
+  <div style="display: flex; flex-direction: column; gap: 0.8rem; margin-top: 1rem;">
     {% for thread in threads %}
-      <article style="border: 1px solid var(--border); border-radius: 10px; padding: 1rem;">
-        <h2 style="margin: 0 0 0.25rem;"><a href="{% url 'spacemarches:forum_detail' slug=thread.slug %}">{{ thread.title }}</a></h2>
-        <p class="text-muted" style="margin: 0 0 0.4rem;">
-          Started by {{ thread.author|default:"Anonymous" }} &middot; {{ thread.created_at|date:"Y-m-d H:i" }}
+      <article class="sm-card">
+        <h2 style="margin: 0 0 0.3rem;"><a href="{% url 'spacemarches:forum_detail' slug=thread.slug %}">{{ thread.title }}</a></h2>
+        <div class="sm-meta-strip" style="margin-bottom: 0.45rem;">
+          <span>Started by <strong>{{ thread.author|default:"Anonymous" }}</strong></span>
+          <span>{{ thread.created_at|date:"Y-m-d H:i" }}</span>
           {% if thread.related_archive and thread.related_archive.is_public %}
-            &middot; Archive: <a href="{% url 'spacemarches:archive_detail' slug=thread.related_archive.slug %}">{{ thread.related_archive.title }}</a>
+            <span>Archive: <a href="{% url 'spacemarches:archive_detail' slug=thread.related_archive.slug %}">{{ thread.related_archive.title }}</a></span>
           {% endif %}
-        </p>
+        </div>
         <p style="margin: 0;">{{ thread.body|truncatewords:28 }}</p>
       </article>
     {% endfor %}

@@ -38,6 +38,7 @@ def admin_hub(request):
         ]},
         {'title': 'Spacemarches', 'links': [
             {'label': 'Spacemarches portal', 'url': '/spacemarches/'},
+            {'label': 'MeshNet (Point-Buy v2)', 'url': '/spacemarches/meshnet/'},
             {'label': 'Declassified archives', 'url': '/spacemarches/archives/'},
             {'label': 'Archive entries (admin)', 'url': '/admin/spacemarches/archiveentry/'},
             {'label': 'Forum threads (admin)', 'url': '/admin/spacemarches/forumthread/'},

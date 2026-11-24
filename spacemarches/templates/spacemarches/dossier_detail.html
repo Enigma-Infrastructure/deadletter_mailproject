@@ -6,12 +6,12 @@
 
 <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
   <div>
-    <h1 style="margin-bottom: 0.2rem;">{{ dossier.character_name }}</h1>
-    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.25rem;">
-      Control: <strong>{% if dossier.is_claimed %}{{ dossier.user }}{% else %}Unclaimed (Discord {{ dossier.discord_owner_id|default:"pending" }} &middot; awaiting /link){% endif %}</strong>
-      {% if dossier.invited_by %}&middot; Intake initiated by <strong>{{ dossier.invited_by }}</strong>{% endif %}
-      {% if is_admin_override %}&middot; <span style="background: #fef3c7; color: #92400e; padding: 0.1rem 0.4rem; border-radius: 4px; font-weight: 600;">Admin View</span>{% endif %}
-    </p>
+    <h1 style="margin-bottom: 0.25rem;">{{ dossier.character_name }}</h1>
+    <div class="sm-meta-strip" style="margin-bottom: 0.3rem;">
+      <span>Control: <strong>{% if dossier.is_claimed %}{{ dossier.user }}{% else %}Unclaimed (Discord {{ dossier.discord_owner_id|default:"pending" }} &middot; awaiting /link){% endif %}</strong></span>
+      {% if dossier.invited_by %}<span>Intake initiated by <strong>{{ dossier.invited_by }}</strong></span>{% endif %}
+      {% if is_admin_override %}<span class="sm-status-flag is-warn">Admin View</span>{% endif %}
+    </div>
     <p class="text-muted" id="dossier-progress-line">
       Voice: {{ dossier.get_narrative_voice_display }} &middot;
       Core: <strong id="stat-core">{{ stats.core_answered }}/{{ stats.core_total }}</strong> &middot;
@@ -19,21 +19,21 @@
       (<span id="stat-pct">{{ stats.completion_percent }}</span>%)
     </p>
   </div>
-  <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
-    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{{ dossier_export_url }}">Export Markdown</a>
-    <a class="btn btn-secondary" style="padding: 0.4rem 0.75rem; font-size: 0.85rem;" href="{{ dossier_export_url }}?include_private=1">Export incl. GM Only</a>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+    <a class="btn btn-secondary btn-sm" href="{{ dossier_export_url }}">Export Markdown</a>
+    <a class="btn btn-secondary btn-sm" href="{{ dossier_export_url }}?include_private=1">Export incl. GM Only</a>
   </div>
 </div>
 
 {% if can_admin_reassign %}
-  <details style="border: 1px solid #f59e0b; border-radius: 10px; padding: 0.65rem 1rem; margin: 0.75rem 0; background: #fffbeb;">
-    <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem; color: #92400e;">
+  <details class="sm-panel" style="border-color: var(--sm-tertiary); margin: 0.85rem 0;">
+    <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem;">
       Admin: Reassign Control ({{ dossier.owner_display }})
     </summary>
     <form method="post" action="{{ dossier_reassign_url }}" style="display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: flex-end; margin-top: 0.65rem;">
       {% csrf_token %}
       <div>
-        <label for="reassign-target-user" style="display: block; margin-bottom: 0.2rem; font-size: 0.78rem; font-weight: 600;">Website Owner</label>
+        <label for="reassign-target-user" style="font-size: 0.78rem;">Website Owner</label>
         <select id="reassign-target-user" name="target_user_id" style="width: auto; min-width: 210px; padding: 0.35rem 0.6rem; font-size: 0.85rem;">
           <option value="" {% if not dossier.is_claimed %}selected{% endif %}>&mdash; Unclaimed (Discord Onboarding Only) &mdash;</option>
           {% for u in reassign_users %}
@@ -42,7 +42,7 @@
         </select>
       </div>
       <div>
-        <label for="reassign-discord-id" style="display: block; margin-bottom: 0.2rem; font-size: 0.78rem; font-weight: 600;">Discord Owner ID (optional)</label>
+        <label for="reassign-discord-id" style="font-size: 0.78rem;">Discord Owner ID (optional)</label>
         <input
           type="text"
           id="reassign-discord-id"
@@ -52,16 +52,91 @@
           style="width: 240px; padding: 0.35rem 0.6rem; font-size: 0.85rem;"
         >
       </div>
-      <button type="submit" class="btn btn-admin" style="padding: 0.38rem 0.85rem; font-size: 0.84rem;">Reassign Control</button>
+      <button type="submit" class="btn btn-admin btn-sm">Reassign Control</button>
     </form>
   </details>
 {% endif %}
 
-<div style="border: 1px solid var(--border); border-radius: 10px; padding: 0.9rem 1rem; margin: 0.85rem 0 1rem; background: #f8fafc;">
+<section class="sm-panel" style="margin: 0.85rem 0;" aria-label="Linked Point-Buy Characters">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+    <h2 style="margin: 0; font-size: 1rem;">Linked Point-Buy Character Sheets ({{ linked_characters|length }})</h2>
+    <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:meshnet' %}">Open MeshNet</a>
+      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_roster' %}">Manage Roster</a>
+    </div>
+  </div>
+  {% if linked_characters %}
+    <div class="sm-card-grid">
+      {% for ch in linked_characters %}
+        <article class="sm-card" style="padding: 0.75rem 0.9rem;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem;">
+            <strong>{{ ch.character_name }}</strong>
+            <span class="sm-code-tag">{{ ch.source_system }}</span>
+          </div>
+          {% if ch.summary.concept %}
+            <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 0.35rem;">{{ ch.summary.concept }}</p>
+          {% endif %}
+          <div class="sm-meta-strip" style="font-size: 0.78rem; margin-bottom: 0.55rem;">
+            {% if ch.summary.morphs %}<span>Morph: <strong>{{ ch.summary.morphs|join:", " }}</strong></span>{% endif %}
+            {% if ch.summary.skill_count %}<span>Skills: <strong>{{ ch.summary.skill_count }}</strong></span>{% endif %}
+            {% if ch.summary.aptitudes %}
+              <span>
+                COG {{ ch.summary.aptitudes.cog|default:"-" }} &middot;
+                INT {{ ch.summary.aptitudes.int|default:"-" }} &middot;
+                REF {{ ch.summary.aptitudes.ref|default:"-" }} &middot;
+                SAV {{ ch.summary.aptitudes.sav|default:"-" }} &middot;
+                SOM {{ ch.summary.aptitudes.som|default:"-" }} &middot;
+                WIL {{ ch.summary.aptitudes.wil|default:"-" }}
+              </span>
+            {% endif %}
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
+            <a class="btn btn-sm" href="{% url 'spacemarches:meshnet' %}?load={{ ch.pk }}">Open in MeshNet</a>
+            <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=ch.pk %}?format=html">HTML</a>
+            <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=ch.pk %}?format=md">MD</a>
+            <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=ch.pk %}?format=json">JSON</a>
+            {% if not is_admin_override %}
+              <form method="post" action="{% url 'spacemarches:character_link_dossier' pk=ch.pk %}" style="margin: 0;">
+                {% csrf_token %}
+                <input type="hidden" name="dossier_id" value="">
+                <input type="hidden" name="next" value="{{ request.path }}">
+                <button type="submit" class="btn btn-secondary btn-sm">Unlink</button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0;">No mechanical Point-Buy sheet is linked to this dossier yet.</p>
+  {% endif %}
+
+  {% if available_characters %}
+    <details style="margin-top: 0.6rem;">
+      <summary style="cursor: pointer; font-size: 0.84rem; font-weight: 600; color: var(--sm-primary);">
+        + Match Existing Saved Point-Buy Character ({{ available_characters|length }})
+      </summary>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; margin-top: 0.5rem;">
+        {% for avail in available_characters %}
+          <form method="post" action="{% url 'spacemarches:character_link_dossier' pk=avail.pk %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="dossier_id" value="{{ dossier.pk }}">
+            <input type="hidden" name="next" value="{{ request.path }}">
+            <button type="submit" class="btn btn-secondary btn-sm">
+              Link &ldquo;{{ avail.character_name }}&rdquo;
+            </button>
+          </form>
+        {% endfor %}
+      </div>
+    </details>
+  {% endif %}
+</section>
+
+<div class="sm-panel" style="margin: 0.85rem 0 1rem;">
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem; margin-bottom: 0.65rem;">
     <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;">
       <div>
-        <label for="global-entry-kind" style="display: block; margin-bottom: 0.2rem; font-size: 0.8rem; font-weight: 600;">Tracking Mode</label>
+        <label for="global-entry-kind" style="font-size: 0.8rem;">Tracking Mode</label>
         <select id="global-entry-kind" style="width: auto; min-width: 195px; padding: 0.35rem 0.6rem; font-size: 0.88rem;">
           {% for value, label in entry_kind_choices %}
             <option value="{{ value }}" {% if value == default_entry_kind %}selected{% endif %}>{{ label }}</option>
@@ -70,7 +145,7 @@
       </div>
 
       <div>
-        <label for="global-stardate-era" style="display: block; margin-bottom: 0.2rem; font-size: 0.8rem; font-weight: 600;">Changes as of Stardate</label>
+        <label for="global-stardate-era" style="font-size: 0.8rem;">Changes as of Stardate</label>
         <select id="global-stardate-era" style="width: auto; min-width: 215px; padding: 0.35rem 0.6rem; font-size: 0.88rem;">
           {% for value, label in stardate_era_choices %}
             <option value="{{ value }}" {% if value == default_stardate_era %}selected{% endif %}>{{ label }}</option>
@@ -79,7 +154,7 @@
       </div>
 
       <div id="global-sol-date-wrap" style="{% if default_stardate_era != 'post_fall' %}display: none;{% endif %}">
-        <label for="global-sol-date" style="display: block; margin-bottom: 0.2rem; font-size: 0.8rem; font-weight: 600;">Post-Fall Sol-Date (0.000&ndash;10.000+)</label>
+        <label for="global-sol-date" style="font-size: 0.8rem;">Post-Fall Sol-Date (0.000&ndash;10.000+)</label>
         <input
           type="text"
           id="global-sol-date"
@@ -98,7 +173,7 @@
 
     <form method="post" action="{{ dossier_toggle_url }}" style="margin: 0;">
       {% csrf_token %}
-      <button type="submit" class="btn {% if dossier.show_sensitive_appendix %}btn-admin{% else %}btn-secondary{% endif %}" style="padding: 0.35rem 0.75rem; font-size: 0.82rem;">
+      <button type="submit" class="btn btn-sm {% if dossier.show_sensitive_appendix %}btn-admin{% else %}btn-secondary{% endif %}">
         {% if dossier.show_sensitive_appendix %}
           Hide Sensitive Appendix (13d1&ndash;13d6 Enabled)
         {% else %}
@@ -138,7 +213,7 @@
 </div>
 
 {% if progression.timeline %}
-  <details style="border: 1px solid var(--border); border-radius: 10px; padding: 0.7rem 1rem; margin-bottom: 1rem; background: #ffffff;">
+  <details class="sm-card" style="margin-bottom: 1rem;">
     <summary style="cursor: pointer; font-weight: 600; font-size: 0.88rem;">
       Character Progression Log ({{ progression.total_versions }} saved snapshot{{ progression.total_versions|pluralize }})
     </summary>
@@ -147,12 +222,12 @@
         <li style="margin-bottom: 0.4rem;">
           <strong><code>[{{ item.question_id }}]</code> {{ item.version_label }}</strong>
           &middot; {{ item.entry_kind_label }}
-          {% if item.is_current %}<span style="font-size: 0.74rem; color: #166534;">(Current Default)</span>{% endif %}
-          {% if item.is_gm_only %}<span style="font-size: 0.74rem; color: #92400e;">[GM Eyes Only]</span>{% endif %}
+          {% if item.is_current %}<span class="sm-status-flag is-ok">(Current Default)</span>{% endif %}
+          {% if item.is_gm_only %}<span class="sm-status-flag is-warn">[GM Eyes Only]</span>{% endif %}
           <span class="text-muted">&mdash; {{ item.prompt|truncatechars:70 }}</span>
           <button
             type="button"
-            class="btn btn-secondary jump-stardate-btn"
+            class="btn btn-secondary btn-sm jump-stardate-btn"
             data-entry-kind="{{ item.entry_kind }}"
             data-stardate-era="{{ item.stardate_era }}"
             data-sol-number="{{ item.sol_number }}"
@@ -165,7 +240,7 @@
   </details>
 {% endif %}
 
-<div id="filter-empty-notice" style="display: none; border: 1px dashed var(--border); border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background: #f8fafc; color: #475569; font-size: 0.9rem;">
+<div id="filter-empty-notice" class="sm-panel" style="display: none; border-style: dashed; margin-bottom: 1rem;">
   No prompts match the current filter. If filtering by <strong>GM Eyes Only</strong>, check <em>"GM Eyes Only (redact from public exports)"</em> on one or more prompt cards first.
 </div>
 
@@ -330,7 +405,7 @@
 
         const btn = document.createElement("button");
         btn.type = "button";
-        btn.className = "btn btn-secondary clarify-version-btn";
+        btn.className = "btn btn-secondary btn-sm clarify-version-btn";
         btn.dataset.entryKind = rev.entry_kind || "character_creation";
         btn.dataset.stardateEra = rev.stardate_era || "pre_fall";
         btn.dataset.solNumber = rev.sol_number || "";
@@ -352,7 +427,6 @@
       const answered = Boolean(data.version_label);
       card.dataset.answered = answered ? "true" : "false";
       card.dataset.gmOnly = data.is_gm_only ? "true" : "false";
-      card.style.borderColor = data.is_gm_only ? "#f59e0b" : "var(--border)";
       if (answered) {
         card.dataset.entryKind = data.entry_kind || "";
         card.dataset.stardateEra = data.stardate_era || "";
@@ -367,13 +441,7 @@
         if (answered) {
           verBadge.textContent = data.entry_kind_label + " \u00b7 " + data.version_label;
           verBadge.style.display = "";
-          if (data.entry_kind === "post_action_report") {
-            verBadge.style.background = "#dcfce7";
-            verBadge.style.color = "#166534";
-          } else {
-            verBadge.style.background = "#ede9fe";
-            verBadge.style.color = "#5b21b6";
-          }
+          verBadge.classList.toggle("is-ok", data.entry_kind === "post_action_report");
         } else {
           verBadge.style.display = "none";
         }

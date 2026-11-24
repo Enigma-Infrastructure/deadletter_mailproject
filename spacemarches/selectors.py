@@ -3,19 +3,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from .models import AgentSaveSlot, CharacterDossier, DiscordLink, FieldAgent
+from .models import AgentSaveSlot, CharacterDossier, DiscordLink, FieldAgent, GeneratedCharacter
 
 
 def get_user_spacemarches_summary(user) -> dict[str, Any]:
     """
     Return a safe, template-ready summary dict for a user's Spacemarches state:
-    active dossiers, agent clearance summary, and unlocked logs.
+    active dossiers, generated characters, agent clearance summary, and unlocked logs.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return {
             "authenticated": False,
             "active_dossiers": [],
             "dossier_count": 0,
+            "generated_characters": [],
+            "generated_character_count": 0,
             "clearance_summary": {},
             "unlocked_logs": [],
             "save_slots_count": 0,
@@ -76,10 +78,25 @@ def get_user_spacemarches_summary(user) -> dict[str, Any]:
     discord_link = DiscordLink.objects.filter(user=user).first()
     discord_linked = bool(discord_link and discord_link.discord_user_id)
 
+    gen_qs = GeneratedCharacter.objects.filter(user=user).select_related("dossier").order_by("-updated_at")
+    generated_characters = [
+        {
+            "id": gc.pk,
+            "character_name": gc.character_name,
+            "source_system": gc.source_system,
+            "dossier_slug": gc.dossier.slug if gc.dossier_id and gc.dossier else None,
+            "dossier_name": gc.dossier.character_name if gc.dossier_id and gc.dossier else None,
+            "updated_at": gc.updated_at,
+        }
+        for gc in gen_qs[:5]
+    ]
+
     return {
         "authenticated": True,
         "active_dossiers": active_dossiers,
         "dossier_count": dossiers_qs.count(),
+        "generated_characters": generated_characters,
+        "generated_character_count": gen_qs.count(),
         "clearance_summary": clearance_summary,
         "unlocked_logs": unlocked_logs,
         "save_slots_count": AgentSaveSlot.objects.filter(user=user).count(),
