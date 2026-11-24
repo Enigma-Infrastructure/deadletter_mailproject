@@ -153,6 +153,10 @@ class GeneratedCharacterTests(TestCase):
             self.assertContains(gen_resp, "Log in to Save")
             self.assertContains(gen_resp, "sm-palette-panel")
             self.assertContains(gen_resp, "spacemarches-palette.js")
+            self.assertContains(gen_resp, 'Mesh<span class="sm-brand-sector-accent">Net</span>')
+            self.assertContains(gen_resp, f'href="{reverse("spacemarches:portal")}" rel="external"')
+            self.assertContains(gen_resp, f'href="{reverse("spacemarches:archive_list")}" rel="external"')
+            self.assertContains(gen_resp, f'href="{reverse("spacemarches:forum_list")}" rel="external"')
 
         for name, kwargs in [
             ("spacemarches:portal", {}),
@@ -168,6 +172,8 @@ class GeneratedCharacterTests(TestCase):
             self.assertNotContains(resp, "Terminal Shell")
             self.assertContains(resp, "sm-palette-panel")
             self.assertContains(resp, 'data-sm-set-contrast="1"')
+            self.assertContains(resp, 'Mesh<span class="sm-brand-sector-accent">Net</span>')
+            self.assertContains(resp, f'href="{reverse("spacemarches:meshnet")}" rel="external"')
 
     def test_anonymous_blocked_from_cloud_roster_and_apis(self):
         protected = [

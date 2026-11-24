@@ -1,1 +1,0 @@
-import{r as o,c as s,a7 as i,a8 as l,B as n}from"./index-XVJUGaRL.js";import{B as m}from"./BrowseDesignsLayout-D0slmk_M.js";function u(){const[e,r]=o["/browse-designs/skills"].useSearchParams();return s(m,{documentTitle:{id:"A7pnZ3",message:"Browse Skills"},types:i,children:(a,t)=>s(l,n({get designs(){return a()},filters:e,setFilters:r},t))})}export{u as default};

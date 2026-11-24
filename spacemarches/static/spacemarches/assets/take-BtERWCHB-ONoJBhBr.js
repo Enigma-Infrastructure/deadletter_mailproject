@@ -1,0 +1,1 @@
+import{aE as e,fz as o}from"./index-DWFY2fkD.js";function s(...n){return e(i,n,u)}const i=(n,t)=>t<0?[]:n.slice(0,t);function u(n){if(n<=0)return o;let t=n;return r=>(--t,{done:t<=0,hasNext:!0,next:r})}export{s as n};

@@ -1,0 +1,1 @@
+import{t,bF as a,B as n}from"./index-DWFY2fkD.js";var l=t("<a target=_blank>");function m(r){return(()=>{var e=l();return a(e,n(r,{get rel(){return`noreferrer ${r.rel||""}`.trimEnd()}}),!1,!1),e})()}export{m as E};

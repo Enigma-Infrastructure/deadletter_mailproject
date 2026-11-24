@@ -1,0 +1,24 @@
+<script>
+  (function () {
+    try {
+      var raw = localStorage.getItem("sm-style-cache-v1");
+      if (!raw) return;
+      var cached = JSON.parse(raw);
+      var root = document.documentElement;
+      if (cached && cached.styleVars && typeof cached.styleVars === "object") {
+        for (var prop in cached.styleVars) {
+          if (Object.prototype.hasOwnProperty.call(cached.styleVars, prop)) {
+            root.style.setProperty(prop, cached.styleVars[prop]);
+          }
+        }
+      }
+      if (cached && cached.mode) {
+        root.style.colorScheme = cached.mode;
+        root.setAttribute("data-sm-mode", cached.mode);
+      }
+      if (cached && cached.contrast) root.setAttribute("data-sm-contrast", cached.contrast);
+      if (cached && cached.scale) root.setAttribute("data-sm-scale", cached.scale);
+      if (cached && cached.reducedMotion) root.setAttribute("data-sm-reduced-motion", "true");
+    } catch (e) {}
+  })();
+</script>

@@ -1,1 +1,0 @@
-import{B as r,O as o}from"./Page-pZgZAaUD.js";import{c as e}from"./index-XVJUGaRL.js";import"./take-BtERWCHB-DPUZ2KKp.js";import"./AnimateChildren-DDwer-Jn.js";import"./DesignPackTags-D1sAfOH4.js";function m(){return e(o,{documentTitle:{id:"wo7Ngg",message:"Browse Designs Overview"},get children(){return e(r,{allowOverflow:!0})}})}export{m as default};
