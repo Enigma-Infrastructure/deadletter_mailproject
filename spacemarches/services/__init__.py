@@ -1,3 +1,16 @@
+from .design_pack_service import (
+    can_edit_design_pack,
+    create_custom_design_pack,
+    create_or_update_custom_entry,
+    ensure_canonical_design_packs,
+    export_design_pack_payload,
+    get_design_packs_with_counts,
+    import_design_pack_payload,
+    is_storyteller_entry_payload,
+    serialize_design_pack,
+    visible_design_packs_qs,
+    visible_ep2_entries_qs,
+)
 from .dossier_service import (
     complete_discord_link,
     compute_dossier_stats,
@@ -17,18 +30,29 @@ from .ep2_service import (
 from .game_sync_service import load_agent_save, sync_agent_save
 
 __all__ = [
+    "can_edit_design_pack",
     "complete_discord_link",
     "compute_dossier_stats",
+    "create_custom_design_pack",
+    "create_or_update_custom_entry",
+    "ensure_canonical_design_packs",
+    "export_design_pack_payload",
     "export_dossier_markdown",
     "extract_ep2_highlights",
     "format_pack_label",
     "generate_discord_link_code",
+    "get_design_packs_with_counts",
     "get_ep2_catalog_summary",
     "get_ep2_source_url",
+    "import_design_pack_payload",
+    "is_storyteller_entry_payload",
     "load_agent_save",
     "order_ep2_queryset",
     "sanitize_ep2_html",
     "save_dossier_answer",
+    "serialize_design_pack",
     "strip_ep2_text",
     "sync_agent_save",
+    "visible_design_packs_qs",
+    "visible_ep2_entries_qs",
 ]

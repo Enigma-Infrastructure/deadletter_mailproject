@@ -1,0 +1,159 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ pack.name }} | Design Packs | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 1rem; margin-bottom: 1.15rem;">
+  <div>
+    <p class="sm-eyebrow">Design Pack // {{ pack.get_tier_display }}</p>
+    <h1>{{ pack.name }}</h1>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem;">
+      <span class="sm-code-tag">{{ pack.slug }}</span>
+      <span class="sm-stat-chip">{{ total_entries }} entr{{ total_entries|pluralize:"y,ies" }}</span>
+      {% if pack.is_storyteller_only %}
+        <span class="sm-stat-chip">Storyteller-only</span>
+      {% endif %}
+      {% if pack.is_official %}
+        <span class="sm-stat-chip">Official</span>
+      {% else %}
+        <span class="sm-stat-chip">Custom</span>
+      {% endif %}
+      {% if not pack.is_public %}
+        <span class="sm-stat-chip">Private</span>
+      {% endif %}
+    </div>
+    {% if pack.description %}
+      <p class="text-muted" style="max-width: 72ch; margin-top: 0.65rem;">{{ pack.description }}</p>
+    {% endif %}
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:design_pack_list' %}">All Packs</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?design_pack={{ pack.slug|urlencode }}{% if pack.is_storyteller_only %}&amp;storyteller=1{% endif %}">Browse in Compendium</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:design_pack_export' slug=pack.slug %}">Export JSON</a>
+  </div>
+</div>
+
+{% if can_edit %}
+  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <section class="sm-card">
+      <h2 style="margin-top: 0; font-size: 1.1rem;">Add Custom Entry to {{ pack.name }}</h2>
+      <form method="post" style="display: flex; flex-direction: column; gap: 0.65rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="add_entry">
+        <div>
+          <label for="id-entry-name">Entry Name</label>
+          <input id="id-entry-name" type="text" name="name" maxlength="255" required placeholder="e.g. Void-Walker Rig">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+          <div>
+            <label for="id-entry-cat">Category</label>
+            <select id="id-entry-cat" name="category">
+              {% for val, lbl in category_choices %}
+                <option value="{{ val }}">{{ lbl }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div>
+            <label for="id-entry-pack">Sub-Section / Group</label>
+            <input id="id-entry-pack" type="text" name="pack" maxlength="64" value="{{ pack.slug }}" placeholder="e.g. armor, biomorphs">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem;">
+          <div>
+            <label for="id-entry-type">Entry Type (optional)</label>
+            <input id="id-entry-type" type="text" name="entry_type" maxlength="64" placeholder="e.g. armor, trait, biological">
+          </div>
+          <div>
+            <label for="id-entry-ref">Reference (optional)</label>
+            <input id="id-entry-ref" type="text" name="reference" maxlength="255" placeholder="e.g. Spacemarches Session 4">
+          </div>
+        </div>
+        <div>
+          <label for="id-entry-desc">Description</label>
+          <textarea id="id-entry-desc" name="description" rows="3" placeholder="Rules text, flavor, or usage notes…"></textarea>
+        </div>
+        <div>
+          <label for="id-entry-sys">System Stats JSON (optional)</label>
+          <textarea id="id-entry-sys" name="system_json" rows="3" placeholder='{"complexity": "moderate", "armorValues": {"energy": 4, "kinetic": 6}}'>{}</textarea>
+        </div>
+        <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0;">
+          <input type="checkbox" name="is_storyteller_only" value="1" {% if pack.is_storyteller_only %}checked{% endif %} style="width: auto;"> Storyteller-only entry
+        </label>
+        <div>
+          <button type="submit" class="btn btn-sm">Save Entry</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="sm-card" style="display: flex; flex-direction: column; gap: 0.75rem;">
+      <div>
+        <h2 style="margin-top: 0; font-size: 1.1rem;">Import Entries into {{ pack.name }}</h2>
+        <p class="text-muted" style="font-size: 0.85rem;">Merge entries from a <code>spacemarches-design-pack/v1</code> JSON export into this pack.</p>
+      </div>
+      <form method="post" enctype="multipart/form-data" style="display: flex; flex-direction: column; gap: 0.65rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="import_into_pack">
+        <div>
+          <label for="id-merge-file">JSON File (optional)</label>
+          <input id="id-merge-file" type="file" name="pack_file" accept=".json,application/json">
+        </div>
+        <div>
+          <label for="id-merge-json">Or Paste JSON</label>
+          <textarea id="id-merge-json" name="pack_json" rows="5" placeholder='{"entries": [{"name": "...", "category": "gear"}]}'></textarea>
+        </div>
+        <div>
+          <button type="submit" class="btn btn-sm">Import Into Pack</button>
+        </div>
+      </form>
+      {% if can_delete_pack %}
+        <form method="post" style="margin-top: auto; padding-top: 0.75rem; border-top: 1px solid var(--sm-outline-variant);">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="delete_pack">
+          <button type="submit" class="btn btn-secondary btn-sm">Delete Custom Pack</button>
+        </form>
+      {% endif %}
+    </section>
+  </div>
+{% endif %}
+
+<section>
+  <h2 style="font-size: 1.15rem; margin-bottom: 0.75rem;">Entries in {{ pack.name }} ({{ total_entries }})</h2>
+  {% if entries %}
+    <div class="sm-card-grid">
+      {% for entry in entries %}
+        <article class="sm-card" style="display: flex; flex-direction: column; gap: 0.45rem;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+            <h3 style="margin: 0; font-size: 1rem;">
+              <a href="{% url 'spacemarches:compendium_detail' entry_id=entry.entry_id %}">{{ entry.name }}</a>
+            </h3>
+            <span class="sm-code-tag">{{ entry.get_category_display }}</span>
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+            <span class="sm-stat-chip">{{ entry.pack }}</span>
+            {% if entry.is_storyteller_only %}
+              <span class="sm-stat-chip">Storyteller-only</span>
+            {% endif %}
+            {% if entry.reference %}
+              <span class="text-muted" style="font-size: 0.78rem;">{{ entry.reference }}</span>
+            {% endif %}
+          </div>
+          <div style="margin-top: auto; padding-top: 0.35rem; display: flex; gap: 0.45rem; flex-wrap: wrap; align-items: center;">
+            <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_detail' entry_id=entry.entry_id %}">Inspect</a>
+            {% if can_edit and entry.is_custom %}
+              <form method="post" style="margin: 0;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="delete_entry">
+                <input type="hidden" name="entry_id" value="{{ entry.entry_id }}">
+                <button type="submit" class="btn btn-secondary btn-sm">Delete</button>
+              </form>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="sm-card">
+      <p class="text-muted" style="margin: 0;">No entries in this pack yet.</p>
+    </div>
+  {% endif %}
+</section>
+{% endblock %}

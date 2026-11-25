@@ -7,25 +7,26 @@
     <p class="sm-eyebrow">Eclipse Phase 2e // Reference Datamodel</p>
     <h1>EP2E Reference Compendium</h1>
     <p class="text-muted" style="max-width: 68ch;">
-      Live searchable index of seeded <code>Ep2Entry</code> records ({{ catalog.total_entries }} total entries across {{ catalog.pack_count }} packs).
+      Searchable index of rulebook &amp; custom <code>Ep2Entry</code> records ({{ catalog.total_entries }} visible entries across {{ catalog.pack_count }} packs{% if catalog.storyteller_hidden_count %}; {{ catalog.storyteller_hidden_count }} Storyteller-only hidden{% endif %}).
     </p>
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:meshnet' %}">Open MeshNet</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:design_pack_list' %}">Custom Packs</a>
     {% if not browse_all %}
-      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?browse=all">Browse All ({{ catalog.total_entries }})</a>
+      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?browse=all{% if include_storyteller %}&amp;storyteller=1{% endif %}">Browse All ({{ catalog.total_entries }})</a>
     {% endif %}
-    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:api_ep2_data' %}{% if selected_category or selected_pack or query %}?category={{ selected_category|urlencode }}&amp;pack={{ selected_pack|urlencode }}&amp;q={{ query|urlencode }}{% endif %}">View JSON API</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:api_ep2_data' %}{% if selected_category or selected_pack or selected_design_pack or query or include_storyteller %}?category={{ selected_category|urlencode }}&amp;pack={{ selected_pack|urlencode }}&amp;design_pack={{ selected_design_pack|urlencode }}&amp;q={{ query|urlencode }}{% if include_storyteller %}&amp;storyteller=1{% endif %}{% endif %}">View JSON API</a>
   </div>
 </div>
 
 {% if catalog.categories %}
   <div class="sm-pill-row" role="navigation" aria-label="Filter by category">
-    <a class="sm-pill {% if not selected_category and not browse_all %}is-active{% endif %}" href="{% url 'spacemarches:compendium_list' %}{% if query %}?q={{ query|urlencode }}{% endif %}">
+    <a class="sm-pill {% if not selected_category and not browse_all %}is-active{% endif %}" href="{% url 'spacemarches:compendium_list' %}{% if query or selected_design_pack or include_storyteller %}?{% if selected_design_pack %}design_pack={{ selected_design_pack|urlencode }}&amp;{% endif %}{% if query %}q={{ query|urlencode }}&amp;{% endif %}{% if include_storyteller %}storyteller=1{% endif %}{% endif %}">
       Directory <span class="sm-pill-count">{{ catalog.total_entries }}</span>
     </a>
     {% for cat in catalog.categories %}
-      <a class="sm-pill {% if selected_category == cat.value %}is-active{% endif %}" href="{% url 'spacemarches:compendium_list' %}?category={{ cat.value|urlencode }}{% if query %}&amp;q={{ query|urlencode }}{% endif %}">
+      <a class="sm-pill {% if selected_category == cat.value %}is-active{% endif %}" href="{% url 'spacemarches:compendium_list' %}?category={{ cat.value|urlencode }}{% if selected_design_pack %}&amp;design_pack={{ selected_design_pack|urlencode }}{% endif %}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if include_storyteller %}&amp;storyteller=1{% endif %}">
         {{ cat.label }} <span class="sm-pill-count">{{ cat.count }}</span>
       </a>
     {% endfor %}
@@ -36,28 +37,88 @@
   {% if selected_category %}
     <input type="hidden" name="category" value="{{ selected_category }}">
   {% endif %}
-  <div style="flex: 2 1 240px;">
+  <div style="flex: 2 1 220px;">
     <label for="compendium-q">Search entries</label>
     <input id="compendium-q" type="text" name="q" value="{{ query }}" placeholder="Name, description, page reference, pack…">
   </div>
-  <div style="flex: 1 1 200px;">
-    <label for="compendium-pack">Pack</label>
+  <div style="flex: 1 1 180px;">
+    <label for="compendium-design-pack">Design Pack</label>
+    <select id="compendium-design-pack" name="design_pack">
+      <option value="">All visible Design Packs</option>
+      {% for dp in catalog.design_packs %}
+        <option value="{{ dp.slug }}" {% if selected_design_pack == dp.slug %}selected{% endif %}>{{ dp.name }} ({{ dp.entry_count }})</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div style="flex: 1 1 180px;">
+    <label for="compendium-pack">Section / Pack</label>
     <select id="compendium-pack" name="pack">
-      <option value="">All packs ({{ catalog.packs|length }})</option>
+      <option value="">All sections ({{ catalog.packs|length }})</option>
       {% for p in catalog.packs %}
         <option value="{{ p.pack }}" {% if selected_pack == p.pack %}selected{% endif %}>{{ p.label }} ({{ p.count }})</option>
       {% endfor %}
     </select>
   </div>
-  <div style="display: flex; align-items: flex-end; gap: 0.45rem;">
+  <div style="display: flex; align-items: flex-end; gap: 0.65rem; flex-wrap: wrap;">
+    <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; padding: 0.42rem 0.65rem; border: 1px solid var(--sm-outline-variant); border-radius: 8px; cursor: pointer; font-size: 0.84rem;">
+      <input type="checkbox" name="storyteller" value="1" {% if include_storyteller %}checked{% endif %} style="width: auto; margin: 0;">
+      Show Storyteller content
+    </label>
     <button class="btn btn-sm" type="submit">Filter</button>
-    {% if has_active_filter %}
+    {% if has_active_filter or include_storyteller %}
       <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}">Reset</a>
     {% endif %}
   </div>
 </form>
 
 {% if not has_active_filter %}
+  {% if catalog.design_packs %}
+    <section style="margin-bottom: 1.5rem;">
+      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; margin-bottom: 0.75rem;">
+        <h2 style="margin: 0; font-size: 1.15rem;">Rulebook &amp; Custom Design Packs</h2>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          {% if not include_storyteller and catalog.storyteller_hidden_count %}
+            <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?storyteller=1">Show Storyteller Packs (+{{ catalog.storyteller_hidden_count }})</a>
+          {% endif %}
+          <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:design_pack_list' %}">Manage / Create Packs</a>
+        </div>
+      </div>
+      <div class="sm-card-grid">
+        {% for dp in catalog.design_packs %}
+          <article class="sm-card" style="display: flex; flex-direction: column; gap: 0.45rem;">
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 0.5rem;">
+              <h3 style="margin: 0; font-size: 1rem;">
+                <a href="{% url 'spacemarches:design_pack_detail' slug=dp.slug %}">{{ dp.name }}</a>
+              </h3>
+              <span class="sm-code-tag">{{ dp.entry_count }}</span>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 0.35rem;">
+              <span class="sm-stat-chip">{{ dp.tier_label }}</span>
+              {% if dp.is_storyteller_only %}
+                <span class="sm-stat-chip">Storyteller-only</span>
+              {% endif %}
+              {% if not dp.is_official %}
+                <span class="sm-stat-chip">Custom</span>
+              {% endif %}
+              {% if dp.slug == "ep-copt" and dp.entry_count == 0 %}
+                <span class="sm-stat-chip">Queued Import</span>
+              {% endif %}
+            </div>
+            {% if dp.description %}
+              <p class="text-muted" style="font-size: 0.84rem; margin: 0;">{{ dp.description }}</p>
+            {% endif %}
+            <div style="margin-top: auto; padding-top: 0.3rem; display: flex; gap: 0.45rem; flex-wrap: wrap;">
+              {% if dp.entry_count > 0 %}
+                <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?design_pack={{ dp.slug|urlencode }}{% if dp.is_storyteller_only or include_storyteller %}&amp;storyteller=1{% endif %}">Browse Entries</a>
+              {% endif %}
+              <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:design_pack_detail' slug=dp.slug %}">Pack Details</a>
+            </div>
+          </article>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
   {% if catalog.total_entries == 0 %}
     <section class="sm-card">
       <h2>No EP2E data seeded yet</h2>
@@ -67,11 +128,11 @@
     <section style="margin-bottom: 1.5rem;">
       <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; margin-bottom: 0.75rem;">
         <h2 style="margin: 0; font-size: 1.15rem;">Browse by Category</h2>
-        <span class="text-muted" style="font-size: 0.84rem;">Pick a category or pack below, or search above.</span>
+        <span class="text-muted" style="font-size: 0.84rem;">Pick a category or section below, or search above.</span>
       </div>
       <div class="sm-card-grid">
         {% for cat in catalog.categories %}
-          <a class="sm-card" href="{% url 'spacemarches:compendium_list' %}?category={{ cat.value|urlencode }}" style="display: flex; justify-content: space-between; align-items: center; text-decoration: none;">
+          <a class="sm-card" href="{% url 'spacemarches:compendium_list' %}?category={{ cat.value|urlencode }}{% if include_storyteller %}&amp;storyteller=1{% endif %}" style="display: flex; justify-content: space-between; align-items: center; text-decoration: none;">
             <strong>{{ cat.label }}</strong>
             <span class="sm-code-tag">{{ cat.count }}</span>
           </a>
@@ -80,10 +141,10 @@
     </section>
 
     <section>
-      <h2 style="margin: 0 0 0.75rem; font-size: 1.15rem;">Packs ({{ catalog.packs|length }})</h2>
+      <h2 style="margin: 0 0 0.75rem; font-size: 1.15rem;">Sections ({{ catalog.packs|length }})</h2>
       <div class="sm-card-grid">
         {% for p in catalog.packs %}
-          <a class="sm-card" href="{% url 'spacemarches:compendium_list' %}?pack={{ p.pack|urlencode }}" style="display: flex; flex-direction: column; gap: 0.35rem; text-decoration: none;">
+          <a class="sm-card" href="{% url 'spacemarches:compendium_list' %}?pack={{ p.pack|urlencode }}{% if include_storyteller %}&amp;storyteller=1{% endif %}" style="display: flex; flex-direction: column; gap: 0.35rem; text-decoration: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;">
               <strong>{{ p.label }}</strong>
               <span class="sm-code-tag">{{ p.count }}</span>
@@ -97,7 +158,7 @@
 {% else %}
   <p class="text-muted" style="font-size: 0.85rem; margin-bottom: 0.9rem;">
     {% if browse_all %}
-      Browsing all <strong>{{ total_matching }}</strong> entries{% if page_obj.paginator.num_pages > 1 %} (page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}){% endif %}.
+      Browsing all <strong>{{ total_matching }}</strong> visible entries{% if page_obj.paginator.num_pages > 1 %} (page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}){% endif %}.
     {% else %}
       Showing <strong>{{ total_matching }}</strong> matching entr{{ total_matching|pluralize:"y,ies" }}{% if page_obj.paginator.num_pages > 1 %} (page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}){% endif %}.
     {% endif %}
@@ -115,7 +176,13 @@
               <span class="sm-code-tag">{{ entry.get_category_display }}</span>
             </div>
             <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
+              {% if entry.design_pack %}
+                <span class="sm-stat-chip">{{ entry.design_pack.name }}</span>
+              {% endif %}
               <span class="sm-stat-chip">{{ item.pack_label }}</span>
+              {% if entry.is_storyteller_only %}
+                <span class="sm-stat-chip">Storyteller-only</span>
+              {% endif %}
               {% if entry.entry_type %}
                 <span class="sm-stat-chip">{{ entry.entry_type }}</span>
               {% endif %}
@@ -145,18 +212,18 @@
     {% if page_obj.paginator.num_pages > 1 %}
       <nav class="sm-pagination" aria-label="Compendium pagination">
         {% if page_obj.has_previous %}
-          <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}{% if browse_all %}&amp;browse=all{% endif %}{% if selected_category %}&amp;category={{ selected_category|urlencode }}{% endif %}{% if selected_pack %}&amp;pack={{ selected_pack|urlencode }}{% endif %}{% if query %}&amp;q={{ query|urlencode }}{% endif %}">Previous</a>
+          <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.previous_page_number }}{% if browse_all %}&amp;browse=all{% endif %}{% if selected_category %}&amp;category={{ selected_category|urlencode }}{% endif %}{% if selected_design_pack %}&amp;design_pack={{ selected_design_pack|urlencode }}{% endif %}{% if selected_pack %}&amp;pack={{ selected_pack|urlencode }}{% endif %}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if include_storyteller %}&amp;storyteller=1{% endif %}">Previous</a>
         {% endif %}
         <span class="text-muted" style="font-size: 0.86rem;">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
         {% if page_obj.has_next %}
-          <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.next_page_number }}{% if browse_all %}&amp;browse=all{% endif %}{% if selected_category %}&amp;category={{ selected_category|urlencode }}{% endif %}{% if selected_pack %}&amp;pack={{ selected_pack|urlencode }}{% endif %}{% if query %}&amp;q={{ query|urlencode }}{% endif %}">Next</a>
+          <a class="btn btn-secondary btn-sm" href="?page={{ page_obj.next_page_number }}{% if browse_all %}&amp;browse=all{% endif %}{% if selected_category %}&amp;category={{ selected_category|urlencode }}{% endif %}{% if selected_design_pack %}&amp;design_pack={{ selected_design_pack|urlencode }}{% endif %}{% if selected_pack %}&amp;pack={{ selected_pack|urlencode }}{% endif %}{% if query %}&amp;q={{ query|urlencode }}{% endif %}{% if include_storyteller %}&amp;storyteller=1{% endif %}">Next</a>
         {% endif %}
       </nav>
     {% endif %}
   {% else %}
     <section class="sm-card">
       <h2>No entries match this filter</h2>
-      <p class="text-muted">Try clearing the pack filter or broadening your search query.</p>
+      <p class="text-muted">Try clearing the pack filter, toggling Storyteller content, or broadening your search query.</p>
     </section>
   {% endif %}
 {% endif %}

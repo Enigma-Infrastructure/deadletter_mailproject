@@ -98,9 +98,13 @@
           <option value="">All Categories</option>
         </select>
         <select id="sm-ep2-pack" aria-label="Filter by pack">
-          <option value="">All Packs</option>
+          <option value="">All Sections</option>
         </select>
       </div>
+      <label style="display: inline-flex; align-items: center; gap: 0.4rem; font-size: 0.8rem; margin: 0.35rem 0 0; cursor: pointer;">
+        <input id="sm-ep2-storyteller" type="checkbox" style="width: auto; margin: 0;">
+        Include Storyteller content
+      </label>
     </div>
     <div id="sm-ep2-status" class="text-muted" style="font-size: 0.8rem; padding: 0 0.9rem 0.4rem;"></div>
     <div id="sm-ep2-results" class="sm-compendium-drawer-results"></div>
@@ -271,6 +275,7 @@
     const ep2Search = document.getElementById("sm-ep2-search");
     const ep2Category = document.getElementById("sm-ep2-category");
     const ep2Pack = document.getElementById("sm-ep2-pack");
+    const ep2Storyteller = document.getElementById("sm-ep2-storyteller");
     const ep2Status = document.getElementById("sm-ep2-status");
     const ep2Results = document.getElementById("sm-ep2-results");
     const ep2ApiUrl = bootData.ep2_api_url || "{% url 'spacemarches:api_ep2_data' %}";
@@ -402,9 +407,11 @@
 
     async function loadEp2Meta(selectedCategory) {
       if (!ep2Category || !ep2Pack) return;
-      const url = selectedCategory
-        ? ep2MetaUrl + "?category=" + encodeURIComponent(selectedCategory)
-        : ep2MetaUrl;
+      const metaParams = new URLSearchParams();
+      if (selectedCategory) metaParams.set("category", selectedCategory);
+      if (ep2Storyteller && ep2Storyteller.checked) metaParams.set("storyteller", "1");
+      const qsMeta = metaParams.toString();
+      const url = qsMeta ? ep2MetaUrl + "?" + qsMeta : ep2MetaUrl;
       try {
         const resp = await fetch(url, { credentials: "same-origin" });
         if (!resp.ok) return;
@@ -461,6 +468,7 @@
       if (catVal) params.set("category", catVal);
       if (packVal) params.set("pack", packVal);
       if (qVal) params.set("q", qVal);
+      if (ep2Storyteller && ep2Storyteller.checked) params.set("storyteller", "1");
       try {
         const resp = await fetch(ep2ApiUrl + "?" + params.toString(), { credentials: "same-origin" });
         if (!resp.ok) throw new Error("HTTP " + resp.status);
@@ -507,6 +515,12 @@
     }
     if (ep2Pack) {
       ep2Pack.addEventListener("change", fetchEp2Entries);
+    }
+    if (ep2Storyteller) {
+      ep2Storyteller.addEventListener("change", () => {
+        ep2MetaLoaded = false;
+        loadEp2Meta(ep2Category ? ep2Category.value : "").then(fetchEp2Entries);
+      });
     }
   })();
 </script>

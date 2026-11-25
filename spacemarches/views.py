@@ -7,6 +7,7 @@ from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -16,7 +17,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .markdown_utils import render_markdown_safe
-from .models import ArchiveEntry, CharacterDossier, DiscordLink, Ep2Entry, ForumPost, ForumThread, GeneratedCharacter
+from .models import ArchiveEntry, CharacterDossier, DesignPack, DiscordLink, Ep2Entry, ForumPost, ForumThread, GeneratedCharacter
 from .questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -48,6 +49,18 @@ from .services.dossier_service import (
     get_dossier_progression_summary,
     reassign_dossier_control,
     save_dossier_answer,
+)
+from .services.design_pack_service import (
+    can_edit_design_pack,
+    create_custom_design_pack,
+    create_or_update_custom_entry,
+    ensure_canonical_design_packs,
+    export_design_pack_payload,
+    get_design_packs_with_counts,
+    import_design_pack_payload,
+    serialize_design_pack,
+    visible_design_packs_qs,
+    visible_ep2_entries_qs,
 )
 from .services.ep2_service import (
     extract_ep2_highlights,
@@ -1008,16 +1021,24 @@ def dossier_reassign_by_id(request, pk: int):
 
 
 # --------------------------------------------------
-# EP2E Reference Compendium (Ep2Entry)
+# EP2E Reference Compendium & Design Packs (Ep2Entry / DesignPack)
 # --------------------------------------------------
 
 
+def _truthy_param(value: str | None) -> bool:
+    return (value or "").strip().lower() in {"1", "true", "yes", "on"}
+
+
 def _filter_ep2_queryset(request):
-    """Filter Ep2Entry queryset using shared query params (category, pack, q)."""
-    qs = Ep2Entry.objects.all()
+    """Filter visible Ep2Entry queryset using shared query params."""
+    include_storyteller = _truthy_param(request.GET.get("storyteller"))
+    qs = visible_ep2_entries_qs(request.user, include_storyteller=include_storyteller)
     pack = (request.GET.get("pack") or "").strip()
+    design_pack = (request.GET.get("design_pack") or "").strip()
     category = (request.GET.get("category") or "").strip()
     q = (request.GET.get("q") or "").strip()
+    if design_pack:
+        qs = qs.filter(design_pack__slug=design_pack)
     if category:
         qs = qs.filter(category=category)
     if pack:
@@ -1029,18 +1050,24 @@ def _filter_ep2_queryset(request):
             | Q(reference__icontains=q)
             | Q(pack__icontains=q)
             | Q(entry_type__icontains=q)
+            | Q(design_pack__name__icontains=q)
         )
-    return qs, category, pack, q
+    return qs, category, pack, design_pack, q, include_storyteller
 
 
 def compendium_list(request):
-    """Public searchable browser for seeded Eclipse Phase 2e reference entries."""
-    qs, selected_category, selected_pack, query = _filter_ep2_queryset(request)
+    """Public searchable browser for seeded & custom Eclipse Phase 2e reference entries."""
+    qs, selected_category, selected_pack, selected_design_pack, query, include_storyteller = _filter_ep2_queryset(request)
     browse_all = (request.GET.get("browse") or "").strip().lower() in {"1", "true", "all"} or bool(
         (request.GET.get("page") or "").strip()
     )
-    has_active_filter = bool(selected_category or selected_pack or query or browse_all)
-    catalog = get_ep2_catalog_summary(selected_category=selected_category)
+    has_active_filter = bool(selected_category or selected_pack or selected_design_pack or query or browse_all)
+    catalog = get_ep2_catalog_summary(
+        selected_category=selected_category,
+        selected_design_pack=selected_design_pack,
+        include_storyteller=include_storyteller,
+        user=request.user,
+    )
 
     cards = []
     page_obj = None
@@ -1068,10 +1095,12 @@ def compendium_list(request):
             "page_obj": page_obj,
             "total_matching": total_matching,
             "has_active_filter": has_active_filter,
-            "browse_all": browse_all and not (selected_category or selected_pack or query),
+            "browse_all": browse_all and not (selected_category or selected_pack or selected_design_pack or query),
             "catalog": catalog,
             "selected_category": selected_category,
             "selected_pack": selected_pack,
+            "selected_design_pack": selected_design_pack,
+            "include_storyteller": include_storyteller,
             "query": query,
         },
     )
@@ -1079,9 +1108,13 @@ def compendium_list(request):
 
 def compendium_detail(request, entry_id: str):
     """Detailed view for a single Ep2Entry with sanitized description, stats, and raw system JSON."""
-    entry = get_object_or_404(Ep2Entry, entry_id=entry_id)
+    entry = get_object_or_404(
+        visible_ep2_entries_qs(request.user, include_storyteller=True),
+        entry_id=entry_id,
+    )
     related_entries = list(
-        Ep2Entry.objects.filter(pack=entry.pack)
+        visible_ep2_entries_qs(request.user, include_storyteller=entry.is_storyteller_only)
+        .filter(pack=entry.pack)
         .exclude(pk=entry.pk)
         .order_by("name")[:8]
     )
@@ -1102,31 +1135,35 @@ def compendium_detail(request, entry_id: str):
 
 @require_http_methods(["GET"])
 def api_ep2_meta(request):
-    """Return category and pack inventory counts for seeded Ep2Entry records."""
+    """Return category, sub-pack, and DesignPack inventory counts for visible Ep2Entry records."""
     category = (request.GET.get("category") or "").strip()
-    return JsonResponse(get_ep2_catalog_summary(selected_category=category))
+    design_pack = (request.GET.get("design_pack") or "").strip()
+    include_storyteller = _truthy_param(request.GET.get("storyteller"))
+    return JsonResponse(
+        get_ep2_catalog_summary(
+            selected_category=category,
+            selected_design_pack=design_pack,
+            include_storyteller=include_storyteller,
+            user=request.user,
+        )
+    )
 
 
 @require_http_methods(["GET"])
 def api_ep2_entries(request, entry_id: str | None = None):
-    """Read-only access to seeded Eclipse Phase 2e reference data.
+    """Read-only access to Eclipse Phase 2e reference & custom pack data.
 
     GET /spacemarches/api/ep2/ — list/search entries.
     GET /spacemarches/api/ep2/<entry_id>/ — single entry (404 if missing).
-
-    Query params (list endpoint):
-        pack      — filter to one source pack (e.g. "armor", "biomorphs")
-        category  — filter to one category (morph, gear, trait, …)
-        q         — case-insensitive search over name/description/reference
-        limit     — max entries to return (default 100, cap 500)
-        offset    — pagination offset (default 0)
     """
     if entry_id is not None:
-        entry = get_object_or_404(Ep2Entry, entry_id=entry_id)
+        entry = get_object_or_404(
+            visible_ep2_entries_qs(request.user, include_storyteller=True),
+            entry_id=entry_id,
+        )
         return JsonResponse(_serialize_ep2_entry(entry))
 
-    qs, _, _, _ = _filter_ep2_queryset(request)
-
+    qs, _, _, _, _, _ = _filter_ep2_queryset(request)
     total = qs.count()
     try:
         limit = min(max(int(request.GET.get("limit") or 100), 1), 500)
@@ -1136,7 +1173,6 @@ def api_ep2_entries(request, entry_id: str | None = None):
         offset = max(int(request.GET.get("offset") or 0), 0)
     except (TypeError, ValueError):
         offset = 0
-
     entries = order_ep2_queryset(qs)[offset:offset + limit]
     return JsonResponse(
         {
@@ -1152,6 +1188,8 @@ def _serialize_ep2_entry(entry) -> dict:
     """JSON-safe view of an Ep2Entry — the shape consumed by the MeshNet creator/export path."""
     return {
         "entry_id": entry.entry_id,
+        "design_pack": entry.design_pack.slug if entry.design_pack_id else "",
+        "design_pack_name": entry.design_pack.name if entry.design_pack_id else "",
         "pack": entry.pack,
         "pack_label": format_pack_label(entry.pack),
         "category": entry.category,
@@ -1161,9 +1199,191 @@ def _serialize_ep2_entry(entry) -> dict:
         "description": entry.description,
         "excerpt": strip_ep2_text(entry.description, max_length=200),
         "reference": entry.reference,
+        "is_storyteller_only": entry.is_storyteller_only,
+        "is_custom": entry.is_custom,
         "highlights": extract_ep2_highlights(entry),
         "system": entry.system,
         "source": entry.source,
         "source_url": get_ep2_source_url(entry.source),
         "compendium_url": reverse("spacemarches:compendium_detail", kwargs={"entry_id": entry.entry_id}),
     }
+
+
+def design_pack_list(request):
+    """Browse official & custom DesignPacks, create custom packs, or import pack JSON."""
+    ensure_canonical_design_packs()
+
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return redirect(f"{reverse('login')}?next={request.get_full_path()}")
+        action = (request.POST.get("action") or "").strip()
+        if action == "create_pack":
+            try:
+                pack_obj = create_custom_design_pack(
+                    request.user,
+                    name=request.POST.get("name") or "",
+                    slug=request.POST.get("slug") or "",
+                    description=request.POST.get("description") or "",
+                    is_storyteller_only=_truthy_param(request.POST.get("is_storyteller_only")),
+                    is_public=_truthy_param(request.POST.get("is_public") or "on"),
+                )
+                messages.success(request, f"Created custom pack '{pack_obj.name}'.")
+                return redirect("spacemarches:design_pack_detail", slug=pack_obj.slug)
+            except ValueError as exc:
+                messages.error(request, str(exc))
+        elif action == "import_pack":
+            raw_json = ""
+            upload = request.FILES.get("pack_file")
+            if upload is not None:
+                if upload.size > 2 * 1024 * 1024:
+                    messages.error(request, "Pack JSON file exceeds 2 MB limit.")
+                    return redirect("spacemarches:design_pack_list")
+                raw_json = upload.read().decode("utf-8", errors="replace")
+            else:
+                raw_json = request.POST.get("pack_json") or ""
+            try:
+                pack_obj, created_n, updated_n = import_design_pack_payload(request.user, raw_json)
+                messages.success(
+                    request,
+                    f"Imported '{pack_obj.name}' ({created_n} created, {updated_n} updated).",
+                )
+                return redirect("spacemarches:design_pack_detail", slug=pack_obj.slug)
+            except (ValueError, PermissionError) as exc:
+                messages.error(request, str(exc))
+        else:
+            messages.error(request, "Unknown pack action.")
+
+    packs = get_design_packs_with_counts(request.user, include_storyteller=True)
+    official_packs = [p for p in packs if p["is_official"]]
+    custom_packs = [p for p in packs if not p["is_official"]]
+    return render(
+        request,
+        "spacemarches/design_pack_list.html",
+        {
+            "official_packs": official_packs,
+            "custom_packs": custom_packs,
+        },
+    )
+
+
+def design_pack_detail(request, slug: str):
+    """Inspect a DesignPack and manage custom entries when permitted."""
+    pack = get_object_or_404(
+        visible_design_packs_qs(request.user, include_storyteller=True),
+        slug=slug,
+    )
+    can_edit = can_edit_design_pack(request.user, pack)
+
+    if request.method == "POST":
+        if not request.user.is_authenticated:
+            return redirect(f"{reverse('login')}?next={request.get_full_path()}")
+        if not can_edit:
+            messages.error(request, "This design pack is read-only.")
+            return redirect("spacemarches:design_pack_detail", slug=pack.slug)
+
+        action = (request.POST.get("action") or "").strip()
+        if action == "add_entry":
+            try:
+                entry, created_flag = create_or_update_custom_entry(
+                    request.user,
+                    pack,
+                    {
+                        "name": request.POST.get("name") or "",
+                        "category": request.POST.get("category") or Ep2Entry.CATEGORY_GEAR,
+                        "pack": request.POST.get("pack") or pack.slug,
+                        "entry_type": request.POST.get("entry_type") or "",
+                        "reference": request.POST.get("reference") or "",
+                        "description": request.POST.get("description") or "",
+                        "is_storyteller_only": _truthy_param(request.POST.get("is_storyteller_only")),
+                        "system": request.POST.get("system_json") or "{}",
+                    },
+                )
+                verb = "Added" if created_flag else "Updated"
+                messages.success(request, f"{verb} entry '{entry.name}'.")
+                return redirect("spacemarches:design_pack_detail", slug=pack.slug)
+            except (ValueError, PermissionError) as exc:
+                messages.error(request, str(exc))
+        elif action == "import_into_pack":
+            raw_json = request.POST.get("pack_json") or ""
+            upload = request.FILES.get("pack_file")
+            if upload is not None:
+                if upload.size > 2 * 1024 * 1024:
+                    messages.error(request, "Pack JSON file exceeds 2 MB limit.")
+                    return redirect("spacemarches:design_pack_detail", slug=pack.slug)
+                raw_json = upload.read().decode("utf-8", errors="replace")
+            try:
+                _, created_n, updated_n = import_design_pack_payload(
+                    request.user,
+                    raw_json,
+                    target_pack=pack,
+                )
+                messages.success(request, f"Imported into '{pack.name}' ({created_n} created, {updated_n} updated).")
+                return redirect("spacemarches:design_pack_detail", slug=pack.slug)
+            except (ValueError, PermissionError) as exc:
+                messages.error(request, str(exc))
+        elif action == "delete_entry":
+            entry_id = (request.POST.get("entry_id") or "").strip()
+            deleted, _ = pack.entries.filter(entry_id=entry_id, is_custom=True).delete()
+            if deleted:
+                messages.success(request, f"Deleted entry '{entry_id}'.")
+            else:
+                messages.error(request, "Entry not found or cannot be deleted.")
+            return redirect("spacemarches:design_pack_detail", slug=pack.slug)
+        elif action == "delete_pack":
+            if pack.is_official:
+                messages.error(request, "Official design packs cannot be deleted.")
+                return redirect("spacemarches:design_pack_detail", slug=pack.slug)
+            pack_name = pack.name
+            with transaction.atomic():
+                pack.entries.filter(is_custom=True).delete()
+                pack.delete()
+            messages.success(request, f"Deleted custom pack '{pack_name}'.")
+            return redirect("spacemarches:design_pack_list")
+
+    entries = list(order_ep2_queryset(pack.entries.all())[:120])
+    total_entries = pack.entries.count()
+    return render(
+        request,
+        "spacemarches/design_pack_detail.html",
+        {
+            "pack": pack,
+            "entries": entries,
+            "total_entries": total_entries,
+            "can_edit": can_edit,
+            "can_delete_pack": can_edit and not pack.is_official,
+            "category_choices": Ep2Entry.CATEGORY_CHOICES,
+        },
+    )
+
+
+@require_http_methods(["GET"])
+def design_pack_export(request, slug: str):
+    """Download a DesignPack and its entries as portable spacemarches-design-pack/v1 JSON."""
+    pack = get_object_or_404(
+        visible_design_packs_qs(request.user, include_storyteller=True),
+        slug=slug,
+    )
+    resp = JsonResponse(
+        export_design_pack_payload(pack),
+        json_dumps_params={"indent": 2, "ensure_ascii": False},
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{pack.slug}.designpack.json"'
+    return resp
+
+
+@require_http_methods(["GET"])
+def api_design_packs(request):
+    """List visible DesignPacks (rulebook tiers + public/owned custom packs)."""
+    include_storyteller = _truthy_param(request.GET.get("storyteller"))
+    packs = get_design_packs_with_counts(request.user, include_storyteller=include_storyteller)
+    return JsonResponse({"count": len(packs), "packs": packs})
+
+
+@require_http_methods(["GET"])
+def api_design_pack_detail(request, slug: str):
+    """Return full portable JSON payload for a single visible DesignPack."""
+    pack = get_object_or_404(
+        visible_design_packs_qs(request.user, include_storyteller=True),
+        slug=slug,
+    )
+    return JsonResponse(export_design_pack_payload(pack))

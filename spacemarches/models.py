@@ -364,13 +364,55 @@ class DiscordIntakeInvite(models.Model):
         return f"IntakeInvite(discord:{self.discord_user_id}, by={inviter})"
 
 
-class Ep2Entry(models.Model):
-    """A seeded Eclipse Phase 2e reference data entry (item, tech, morph, trait, …).
+class DesignPack(models.Model):
+    """Rulebook or custom content pack grouping Ep2Entry records for Compendium & MeshNet."""
 
-    Sourced from the Bubz43/ep2e Foundry packs (CC BY 4.0) and later intended
-    to be expanded with gear sheets / additional sources. One row per pack entry;
-    the full pack ``system`` payload is preserved in the ``system`` JSONField so
-    data is lossless even before dedicated typed fields exist.
+    TIER_CRB = "crb"
+    TIER_CRB_STORYTELLER = "crb_storyteller"
+    TIER_COPT = "copt"
+    TIER_SPACEMARCHES = "spacemarches"
+    TIER_CUSTOM = "custom"
+    TIER_CHOICES = [
+        (TIER_CRB, "EP2e Core Rulebook"),
+        (TIER_CRB_STORYTELLER, "EP2e CRB (Storyteller)"),
+        (TIER_COPT, "EP2e Character Options"),
+        (TIER_SPACEMARCHES, "Spacemarches Official"),
+        (TIER_CUSTOM, "Custom Pack"),
+    ]
+
+    slug = models.SlugField(max_length=64, unique=True)
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True, default="")
+    tier = models.CharField(max_length=24, choices=TIER_CHOICES, default=TIER_CUSTOM)
+    is_storyteller_only = models.BooleanField(default=False)
+    is_official = models.BooleanField(default=False)
+    is_public = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=True)
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="design_packs",
+    )
+    source_url = models.URLField(blank=True, default="")
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-is_official", "tier", "name"]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.slug})"
+
+
+class Ep2Entry(models.Model):
+    """A seeded or custom Eclipse Phase 2e reference data entry (item, tech, morph, trait, …).
+
+    Sourced from the Bubz43/ep2e Foundry packs (CC BY 4.0) or custom DesignPacks.
+    One row per pack entry; the full pack ``system`` payload is preserved in the
+    ``system`` JSONField so data is lossless even before dedicated typed fields exist.
     """
 
     CATEGORY_MORPH = "morph"
@@ -393,6 +435,13 @@ class Ep2Entry(models.Model):
         (CATEGORY_MISC, "Other"),
     ]
 
+    design_pack = models.ForeignKey(
+        DesignPack,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="entries",
+    )
     source = models.CharField(max_length=64, default="bubz-ep2e")
     pack = models.CharField(max_length=64)
     entry_id = models.CharField(max_length=64, unique=True)
@@ -401,6 +450,15 @@ class Ep2Entry(models.Model):
     category = models.CharField(max_length=16, choices=CATEGORY_CHOICES)
     description = models.TextField(blank=True, default="")
     reference = models.CharField(max_length=255, blank=True, default="")
+    is_storyteller_only = models.BooleanField(default=False)
+    is_custom = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="custom_ep2_entries",
+    )
     system = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -411,6 +469,8 @@ class Ep2Entry(models.Model):
             models.Index(fields=["category"]),
             models.Index(fields=["pack"]),
             models.Index(fields=["name"]),
+            models.Index(fields=["is_storyteller_only"], name="sm_ep2_st_idx"),
+            models.Index(fields=["is_custom"], name="sm_ep2_custom_idx"),
         ]
 
     def __str__(self) -> str:

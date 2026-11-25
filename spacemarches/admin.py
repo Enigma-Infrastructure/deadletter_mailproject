@@ -4,6 +4,7 @@ from .models import (
     AgentSaveSlot,
     ArchiveEntry,
     CharacterDossier,
+    DesignPack,
     DiscordIntakeInvite,
     DiscordLink,
     Ep2Entry,
@@ -92,10 +93,18 @@ class CharacterDossierAdmin(admin.ModelAdmin):
     search_fields = ("character_name", "slug", "user__username", "discord_owner_id")
 
 
+@admin.register(DesignPack)
+class DesignPackAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "tier", "is_official", "is_storyteller_only", "is_public", "is_active", "owner", "updated_at")
+    list_filter = ("tier", "is_official", "is_storyteller_only", "is_public", "is_active")
+    search_fields = ("name", "slug", "description", "owner__username")
+    prepopulated_fields = {"slug": ("name",)}
+
+
 @admin.register(Ep2Entry)
 class Ep2EntryAdmin(admin.ModelAdmin):
-    list_display = ("name", "pack", "category", "entry_type", "reference")
-    list_filter = ("category", "pack")
-    search_fields = ("name", "description", "reference")
-    readonly_fields = ("entry_id", "source", "pack", "entry_type", "system")
+    list_display = ("name", "design_pack", "pack", "category", "is_storyteller_only", "is_custom", "reference")
+    list_filter = ("design_pack", "category", "is_storyteller_only", "is_custom", "pack")
+    search_fields = ("name", "description", "reference", "entry_id")
+    readonly_fields = ("entry_id", "source", "system")
     date_hierarchy = "updated_at"

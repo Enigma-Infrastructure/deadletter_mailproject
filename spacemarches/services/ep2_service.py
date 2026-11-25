@@ -18,6 +18,8 @@ _SOURCE_URL_MAP = {
     "bubz-ep2e": "https://github.com/Bubz43/ep2e/tree/master/src/packs",
     "mesh-net": "https://github.com/TheGam1ngWizard/mesh-net",
     "ep2e-virtual": "https://github.com/TheGam1ngWizard/ep2e-virtual",
+    "spacemarches": "",
+    "custom": "",
 }
 
 _ALLOWED_TAGS = {
@@ -247,12 +249,27 @@ def format_ep2_system_json(entry: Ep2Entry) -> str:
     return json.dumps(payload, indent=2, ensure_ascii=False)
 
 
-def get_ep2_catalog_summary(*, selected_category: str = "") -> dict[str, Any]:
-    """Return category and pack breakdowns for seeded Ep2Entry rows."""
-    total_entries = Ep2Entry.objects.count()
+def get_ep2_catalog_summary(
+    *,
+    selected_category: str = "",
+    selected_design_pack: str = "",
+    include_storyteller: bool = False,
+    user=None,
+) -> dict[str, Any]:
+    """Return category, sub-pack, and DesignPack breakdowns for visible Ep2Entry rows."""
+    from spacemarches.services.design_pack_service import (
+        get_design_packs_with_counts,
+        visible_ep2_entries_qs,
+    )
+
+    base_qs = visible_ep2_entries_qs(user, include_storyteller=include_storyteller)
+    if selected_design_pack:
+        base_qs = base_qs.filter(design_pack__slug=selected_design_pack)
+
+    total_entries = base_qs.count()
     cat_counts_raw = {
         row["category"]: row["total"]
-        for row in Ep2Entry.objects.values("category").annotate(total=Count("id"))
+        for row in base_qs.values("category").annotate(total=Count("id"))
     }
     categories = [
         {
@@ -264,7 +281,7 @@ def get_ep2_catalog_summary(*, selected_category: str = "") -> dict[str, Any]:
         if cat_counts_raw.get(value, 0) > 0
     ]
 
-    packs_qs = Ep2Entry.objects.all()
+    packs_qs = base_qs
     if selected_category:
         packs_qs = packs_qs.filter(category=selected_category)
     category_labels = dict(Ep2Entry.CATEGORY_CHOICES)
@@ -278,10 +295,22 @@ def get_ep2_catalog_summary(*, selected_category: str = "") -> dict[str, Any]:
         }
         for row in packs_qs.values("pack", "category").annotate(total=Count("id")).order_by("pack")
     ]
-    all_pack_count = Ep2Entry.objects.values("pack").distinct().count()
+    all_pack_count = base_qs.values("pack").distinct().count()
+
+    design_packs = get_design_packs_with_counts(user, include_storyteller=include_storyteller)
+    storyteller_hidden_count = 0
+    if not include_storyteller:
+        all_visible_qs = visible_ep2_entries_qs(user, include_storyteller=True)
+        if selected_design_pack:
+            all_visible_qs = all_visible_qs.filter(design_pack__slug=selected_design_pack)
+        storyteller_hidden_count = max(0, all_visible_qs.count() - total_entries)
+
     return {
         "total_entries": total_entries,
         "pack_count": all_pack_count,
         "categories": categories,
         "packs": packs,
+        "design_packs": design_packs,
+        "storyteller_hidden_count": storyteller_hidden_count,
+        "include_storyteller": include_storyteller,
     }

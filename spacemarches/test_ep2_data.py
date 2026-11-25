@@ -6,7 +6,9 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 from django.urls import reverse
 
-from spacemarches.models import Ep2Entry
+import json
+from spacemarches.models import DesignPack, Ep2Entry
+from spacemarches.services.design_pack_service import ensure_canonical_design_packs
 from spacemarches.services.ep2_service import (
     extract_ep2_highlights,
     format_pack_label,
@@ -227,12 +229,19 @@ class Ep2CompendiumViewsTests(TestCase):
             category=Ep2Entry.CATEGORY_GEAR,
             entry_type="armor",
         )
+        packs = ensure_canonical_design_packs()
+        self.morph.design_pack = packs["ep-crb"]
+        self.morph.save(update_fields=["design_pack"])
+        self.gear.design_pack = packs["ep-crb"]
+        self.gear.save(update_fields=["design_pack"])
         self.creature = make_entry(
             entry_id="view-char-0001",
             name="Clown Sprite",
             pack="creatures",
             category=Ep2Entry.CATEGORY_CHARACTER,
             entry_type="creature",
+            design_pack=packs["ep-crb-storyteller"],
+            is_storyteller_only=True,
         )
 
     def test_compendium_list_directory_and_filters(self):
@@ -240,16 +249,22 @@ class Ep2CompendiumViewsTests(TestCase):
         resp = self.client.get(reverse("spacemarches:compendium_list"))
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Browse by Category")
+        self.assertContains(resp, "Rulebook &amp; Custom Design Packs")
         self.assertContains(resp, "Biomorphs")
         self.assertNotContains(resp, "matching entr")
         self.assertNotContains(resp, "Clown Sprite")
 
-        # Explicit browse=all displays entries in player-first category order (morph before character)
+        # Default browse=all hides Storyteller-only entries
         browse_resp = self.client.get(reverse("spacemarches:compendium_list"), {"browse": "all"})
         self.assertEqual(browse_resp.status_code, 200)
         self.assertContains(browse_resp, "Ghost Biomorph")
         self.assertContains(browse_resp, "Chameleon Cloak")
-        body = browse_resp.content.decode("utf-8")
+        self.assertNotContains(browse_resp, "Clown Sprite")
+
+        # storyteller=1 reveals Storyteller-only entries after player-first categories
+        st_resp = self.client.get(reverse("spacemarches:compendium_list"), {"browse": "all", "storyteller": "1"})
+        self.assertEqual(st_resp.status_code, 200)
+        body = st_resp.content.decode("utf-8")
         self.assertLess(body.index("Ghost Biomorph"), body.index("Chameleon Cloak"))
         self.assertLess(body.index("Chameleon Cloak"), body.index("Clown Sprite"))
 
@@ -261,11 +276,16 @@ class Ep2CompendiumViewsTests(TestCase):
         self.assertContains(searched, "Chameleon Cloak")
         self.assertNotContains(searched, "Ghost Biomorph")
 
-    def test_api_orders_player_categories_before_characters(self):
+    def test_api_orders_player_categories_before_characters_and_gates_storyteller(self):
         resp = self.client.get(reverse("spacemarches:api_ep2_data"))
         self.assertEqual(resp.status_code, 200)
         names = [row["name"] for row in resp.json()["results"]]
-        self.assertEqual(names[:3], ["Ghost Biomorph", "Chameleon Cloak", "Clown Sprite"])
+        self.assertEqual(names, ["Ghost Biomorph", "Chameleon Cloak"])
+
+        st_resp = self.client.get(reverse("spacemarches:api_ep2_data"), {"storyteller": "1"})
+        self.assertEqual(st_resp.status_code, 200)
+        st_names = [row["name"] for row in st_resp.json()["results"]]
+        self.assertEqual(st_names[:3], ["Ghost Biomorph", "Chameleon Cloak", "Clown Sprite"])
 
     def test_compendium_detail_sanitizes_html_and_shows_system_json(self):
         resp = self.client.get(reverse("spacemarches:compendium_detail", kwargs={"entry_id": "view-morph-0001"}))
@@ -297,3 +317,92 @@ class Ep2CompendiumViewsTests(TestCase):
         self.assertEqual(hub_resp.status_code, 200)
         self.assertContains(hub_resp, "/spacemarches/compendium/")
         self.assertContains(hub_resp, "/admin/spacemarches/ep2entry/")
+
+
+
+class DesignPackToolingTests(TestCase):
+    def setUp(self):
+        self.packs = ensure_canonical_design_packs()
+        self.owner = User.objects.create_user(username="pack_owner", password="pw")
+        self.other = User.objects.create_user(username="pack_other", password="pw")
+        self.staff = User.objects.create_user(username="pack_staff", password="pw", is_staff=True)
+
+    def test_canonical_packs_exist_and_seed_links_storyteller(self):
+        self.assertEqual(
+            set(self.packs.keys()),
+            {"ep-crb", "ep-crb-storyteller", "ep-copt", "spacemarches"},
+        )
+        self.assertTrue(self.packs["ep-crb-storyteller"].is_storyteller_only)
+        self.assertFalse(self.packs["ep-crb"].is_storyteller_only)
+        call_command("seed_ep2_data", verbosity=0)
+        self.assertTrue(
+            Ep2Entry.objects.filter(pack="creatures", is_storyteller_only=True, design_pack__slug="ep-crb-storyteller").exists()
+        )
+        self.assertTrue(
+            Ep2Entry.objects.filter(pack="biomorphs", is_storyteller_only=False, design_pack__slug="ep-crb").exists()
+        )
+
+    def test_custom_pack_create_entry_export_import_and_privacy(self):
+        self.client.force_login(self.owner)
+        create_resp = self.client.post(
+            reverse("spacemarches:design_pack_list"),
+            {
+                "action": "create_pack",
+                "name": "Gatecrasher Gear",
+                "description": "Custom frontier hardware",
+            },
+        )
+        self.assertEqual(create_resp.status_code, 302)
+        pack = DesignPack.objects.get(name="Gatecrasher Gear")
+        self.assertFalse(pack.is_official)
+        self.assertEqual(pack.owner, self.owner)
+
+        add_resp = self.client.post(
+            reverse("spacemarches:design_pack_detail", kwargs={"slug": pack.slug}),
+            {
+                "action": "add_entry",
+                "name": "Horizon Suit",
+                "category": Ep2Entry.CATEGORY_GEAR,
+                "pack": "armor",
+                "entry_type": "armor",
+                "reference": "House Rules p. 2",
+                "description": "Dust-sealed vacsuit.",
+                "system_json": json.dumps({"complexity": "moderate", "armorValues": {"energy": 4, "kinetic": 6}}),
+            },
+        )
+        self.assertEqual(add_resp.status_code, 302)
+        entry = Ep2Entry.objects.get(design_pack=pack, name="Horizon Suit")
+        self.assertTrue(entry.is_custom)
+
+        # Export portable JSON
+        export_resp = self.client.get(reverse("spacemarches:design_pack_export", kwargs={"slug": pack.slug}))
+        self.assertEqual(export_resp.status_code, 200)
+        exported = json.loads(export_resp.content.decode("utf-8"))
+        self.assertEqual(exported["schema"], "spacemarches-design-pack/v1")
+        self.assertEqual(len(exported["entries"]), 1)
+
+        # Private pack cannot be viewed or mutated by another user
+        pack.is_public = False
+        pack.save(update_fields=["is_public"])
+        self.client.force_login(self.other)
+        hidden_resp = self.client.get(reverse("spacemarches:design_pack_detail", kwargs={"slug": pack.slug}))
+        self.assertEqual(hidden_resp.status_code, 404)
+
+        # Non-staff cannot mutate official ep-crb pack
+        forbid_resp = self.client.post(
+            reverse("spacemarches:design_pack_detail", kwargs={"slug": "ep-crb"}),
+            {"action": "add_entry", "name": "Illegal Edit", "category": Ep2Entry.CATEGORY_GEAR},
+        )
+        self.assertEqual(forbid_resp.status_code, 302)
+        self.assertFalse(Ep2Entry.objects.filter(name="Illegal Edit").exists())
+
+        # Re-import exported pack as another user creates their own copy cleanly
+        import_resp = self.client.post(
+            reverse("spacemarches:design_pack_list"),
+            {
+                "action": "import_pack",
+                "pack_json": json.dumps(exported),
+            },
+        )
+        self.assertEqual(import_resp.status_code, 302)
+        self.assertEqual(DesignPack.objects.filter(name="Gatecrasher Gear").count(), 2)
