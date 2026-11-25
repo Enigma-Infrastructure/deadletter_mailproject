@@ -1,0 +1,1 @@
+import{gY as r,gZ as a,x as s,c as o}from"./index-_2AospXH.js";const n=a(()=>!1);function i(e){const t=s(()=>e.value);return o(n.Provider,{value:t,get children(){return e.children}})}function u(e){const t=r(n);return()=>e?.()??t()}export{i as D,u};

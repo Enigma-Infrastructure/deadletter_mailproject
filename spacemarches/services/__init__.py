@@ -28,6 +28,7 @@ from .ep2_service import (
     strip_ep2_text,
 )
 from .game_sync_service import load_agent_save, sync_agent_save
+from .meshnet_adapter_service import export_meshnet_pack_payload, get_meshnet_packs_payload
 
 __all__ = [
     "can_edit_design_pack",
@@ -46,6 +47,8 @@ __all__ = [
     "get_ep2_source_url",
     "import_design_pack_payload",
     "is_storyteller_entry_payload",
+    "export_meshnet_pack_payload",
+    "get_meshnet_packs_payload",
     "load_agent_save",
     "order_ep2_queryset",
     "sanitize_ep2_html",

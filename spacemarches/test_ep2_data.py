@@ -406,3 +406,123 @@ class DesignPackToolingTests(TestCase):
         )
         self.assertEqual(import_resp.status_code, 302)
         self.assertEqual(DesignPack.objects.filter(name="Gatecrasher Gear").count(), 2)
+
+
+class MeshNetAdapterServiceTests(TestCase):
+    def setUp(self):
+        self.packs = ensure_canonical_design_packs()
+        self.owner = User.objects.create_user(username="mesh_owner", password="pw")
+        self.other = User.objects.create_user(username="mesh_other", password="pw")
+
+    def test_export_meshnet_pack_payload_converts_core_categories_and_skips_npc(self):
+        from spacemarches.services.meshnet_adapter_service import export_meshnet_pack_payload
+
+        crb = self.packs["ep-crb"]
+        make_entry(
+            entry_id="mn-morph-1",
+            design_pack=crb,
+            pack="biomorphs",
+            category=Ep2Entry.CATEGORY_MORPH,
+            entry_type="biological",
+            name="Exalt",
+            system={
+                "subtype": "Biomorph",
+                "acquisition": {"cost": 3, "availability": 70},
+                "pools": {"insight": 2, "moxie": 1, "vigor": 1, "flex": 1},
+                "movementRates": [{"type": "walker", "base": 4, "full": 20}],
+            },
+        )
+        make_entry(
+            entry_id="mn-armor-1",
+            design_pack=crb,
+            pack="armor",
+            category=Ep2Entry.CATEGORY_GEAR,
+            entry_type="armor",
+            name="Vacsuit Light",
+            system={"complexity": "moderate", "armorValues": {"energy": 5, "kinetic": 5}},
+        )
+        make_entry(
+            entry_id="mn-gun-1",
+            design_pack=crb,
+            pack="kinetic-weapons",
+            category=Ep2Entry.CATEGORY_GEAR,
+            entry_type="firearm",
+            name="Light Pistol",
+            system={
+                "complexity": "minor",
+                "range": 10,
+                "ammo": 14,
+                "attack": {"damageFormula": "2d6", "armorUsed": "kinetic", "modes": ["ss", "sa"]},
+            },
+        )
+        make_entry(
+            entry_id="mn-npc-skip",
+            design_pack=crb,
+            pack="creatures",
+            category=Ep2Entry.CATEGORY_CHARACTER,
+            entry_type="character",
+            name="Skip Raw NPC",
+            system={},
+        )
+
+        payload = export_meshnet_pack_payload(crb)
+        self.assertEqual(payload["id"], "ep-crb")
+        designs = payload["pack"]["designs"]
+        self.assertIn("biologicalBody", designs)
+        self.assertIn("armorMod", designs)
+        self.assertIn("firearm", designs)
+        self.assertNotIn("character", designs)
+
+    def test_api_meshnet_packs_gates_storyteller_and_private_packs(self):
+        st_pack = self.packs["ep-crb-storyteller"]
+        make_entry(
+            entry_id="mn-eps-1",
+            design_pack=st_pack,
+            pack="psi-epsilon",
+            category=Ep2Entry.CATEGORY_SLEIGHT,
+            entry_type="epsilon",
+            name="Exsurgent Pulse",
+            is_storyteller_only=True,
+            system={"infectionMod": 2, "duration": "instant", "action": "complex"},
+        )
+        priv = DesignPack.objects.create(
+            slug="private-house",
+            name="Private House",
+            owner=self.owner,
+            is_public=False,
+        )
+        make_entry(
+            entry_id="mn-priv-1",
+            design_pack=priv,
+            pack="hardware",
+            category=Ep2Entry.CATEGORY_GEAR,
+            entry_type="tech",
+            name="Secret Tool",
+            system={"complexity": "minor"},
+        )
+
+        # Anonymous user without storyteller=1 omits ep-crb-storyteller and private packs
+        anon_resp = self.client.get(reverse("spacemarches:api_meshnet_packs"), {"storyteller": "0"})
+        self.assertEqual(anon_resp.status_code, 200)
+        anon_ids = {p["id"] for p in anon_resp.json()["packs"]}
+        self.assertIn("ep-crb", anon_ids)
+        self.assertNotIn("ep-crb-storyteller", anon_ids)
+        self.assertNotIn("private-house", anon_ids)
+
+        # Default or storyteller=1 reveals ep-crb-storyteller
+        st_resp = self.client.get(reverse("spacemarches:api_meshnet_packs"), {"storyteller": "1"})
+        st_ids = {p["id"] for p in st_resp.json()["packs"]}
+        self.assertIn("ep-crb-storyteller", st_ids)
+        self.assertNotIn("private-house", st_ids)
+
+        # Owner sees their own private custom pack
+        self.client.force_login(self.owner)
+        owner_resp = self.client.get(reverse("spacemarches:api_meshnet_packs"))
+        owner_ids = {p["id"] for p in owner_resp.json()["packs"]}
+        self.assertIn("private-house", owner_ids)
+
+    def test_generator_boot_payload_exposes_compendium_and_pack_urls(self):
+        resp = self.client.get(reverse("spacemarches:meshnet"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, reverse("spacemarches:api_meshnet_packs"))
+        self.assertContains(resp, reverse("spacemarches:design_pack_list"))

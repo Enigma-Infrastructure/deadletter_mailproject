@@ -1,1 +1,0 @@
-import{h5 as r,h6 as a,w as s,c as o}from"./index-DWFY2fkD.js";const n=a(()=>!1);function i(e){const t=s(()=>e.value);return o(n.Provider,{value:t,get children(){return e.children}})}function u(e){const t=r(n);return()=>e?.()??t()}export{i as D,u};

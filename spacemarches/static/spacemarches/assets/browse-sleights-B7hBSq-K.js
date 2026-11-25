@@ -1,1 +1,0 @@
-import{r as o,c as s,af as i,ag as n,B as g}from"./index-DWFY2fkD.js";import{B as l}from"./BrowseDesignsLayout-CQLVbwpF.js";function h(){const[e,r]=o["/browse-designs/sleights"].useSearchParams();return s(l,{documentTitle:{id:"S8XJj4",message:"Browse Sleights"},types:i,children:(t,a)=>s(n,g({get designs(){return t()},filters:e,setFilters:r},a))})}export{h as default};

@@ -329,3 +329,42 @@ class GeneratedCharacterTests(TestCase):
         del_resp = self.client.post(reverse("spacemarches:character_delete", kwargs={"pk": ch.pk}))
         self.assertEqual(del_resp.status_code, 302)
         self.assertFalse(GeneratedCharacter.objects.filter(pk=ch.pk).exists())
+
+    def test_extract_point_buy_summary_resolves_meshnet_v2_designs_and_tagged_strings(self):
+        payload = {
+            "type": "point-buy-exported",
+            "createdAt": "2026-11-25T12:00:00Z",
+            "packs": {
+                "ep-crb": {
+                    "name": "i_EP2e Core Rulebook",
+                    "designs": {
+                        "biologicalBody": {
+                            "k001": {"name": "i_Ghost"},
+                        },
+                        "trait": {
+                            "tr1": {"name": "i_Situational Awareness"},
+                        },
+                        "epsilonSleight": {
+                            "ep1": {"name": "i_Neural Shunt"},
+                        },
+                    },
+                }
+            },
+            "pointBuy": {
+                "name": "i_Nyx",
+                "fullName": "i_Nyx Vesper",
+                "concept": "m_Async courier",
+                "egoType": "i_Neo-Avian",
+                "flexPoints": 1,
+                "aptitudes": {"cog": 15, "int": 20, "ref": 15, "sav": 10, "som": 10, "wil": 20},
+                "morphs": {"m1": {"design": {"uid": "ep-crb:biologicalBody:k001"}}},
+                "egoTraits": {"t1": {"design": {"uid": "ep-crb:trait:tr1"}}},
+                "sleights": {"s1": {"design": {"uid": "ep-crb:epsilonSleight:ep1"}}},
+            },
+        }
+        summary = extract_point_buy_summary(payload)
+        self.assertEqual(summary["character_name"], "Nyx")
+        self.assertEqual(summary["concept"], "Async courier")
+        self.assertEqual(summary["morphs"], ["Ghost"])
+        self.assertEqual(summary["traits"], ["Situational Awareness"])
+        self.assertEqual(summary["sleights"], ["Neural Shunt"])

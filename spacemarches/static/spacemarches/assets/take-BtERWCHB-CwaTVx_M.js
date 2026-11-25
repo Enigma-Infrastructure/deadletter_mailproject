@@ -1,0 +1,1 @@
+import{aj as e,fs as o}from"./index-_2AospXH.js";function f(...n){return e(i,n,s)}const i=(n,t)=>t<0?[]:n.slice(0,t);function s(n){if(n<=0)return o;let t=n;return r=>(--t,{done:t<=0,hasNext:!0,next:r})}export{f as n};

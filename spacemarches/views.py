@@ -73,6 +73,7 @@ from .services.ep2_service import (
     strip_ep2_text,
 )
 from .services.game_sync_service import load_agent_save, sync_agent_save
+from .services.meshnet_adapter_service import get_meshnet_packs_payload
 
 User = get_user_model()
 
@@ -260,6 +261,8 @@ def _build_generator_boot_payload(request, *, route_url: str) -> dict[str, Any]:
         "characters_api_url": reverse("spacemarches:api_characters"),
         "ep2_api_url": reverse("spacemarches:api_ep2_data"),
         "ep2_meta_api_url": reverse("spacemarches:api_ep2_meta"),
+        "meshnet_packs_api_url": reverse("spacemarches:api_meshnet_packs"),
+        "packs_url": reverse("spacemarches:design_pack_list"),
         "compendium_url": reverse("spacemarches:compendium_list"),
         "saved_characters": saved_characters,
         "dossiers": dossiers,
@@ -1387,3 +1390,11 @@ def api_design_pack_detail(request, slug: str):
         slug=slug,
     )
     return JsonResponse(export_design_pack_payload(pack))
+
+
+@require_http_methods(["GET"])
+def api_meshnet_packs(request):
+    """Return visible DesignPacks formatted as MeshNet DesignPackPartial payloads."""
+    include_storyteller = True if "storyteller" not in request.GET else _truthy_param(request.GET.get("storyteller"))
+    packs = get_meshnet_packs_payload(request.user, include_storyteller=include_storyteller)
+    return JsonResponse({"count": len(packs), "packs": packs})

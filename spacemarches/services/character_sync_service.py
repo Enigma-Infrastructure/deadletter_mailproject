@@ -19,7 +19,10 @@ def _unwrap_tagged_text(value: Any, default: str = "") -> str:
     if value is None:
         return default
     if isinstance(value, str):
-        return value.strip() or default
+        cleaned = value.strip()
+        if cleaned.startswith(("i_", "m_", "h_")):
+            cleaned = cleaned[2:].strip()
+        return cleaned or default
     if isinstance(value, dict):
         for key in ("custom", "text", "value", "name", "en", "en-US"):
             candidate = value.get(key)
@@ -56,18 +59,34 @@ def _extract_design_label(entry: Any, packs: dict[str, Any]) -> str:
             return direct or name
     uid = (design.get("uid") or design.get("id")) if isinstance(design, dict) else (entry.get("uid") or entry.get("id"))
     if isinstance(uid, str) and uid:
+        uid_parts = uid.split(":", 2)
+        design_type = uid_parts[0] if len(uid_parts) == 3 else ""
+        design_key = uid_parts[2] if len(uid_parts) == 3 else ""
         # Attempt lookup inside bundled partial packs if exported
         for pack in packs.values():
             if not isinstance(pack, dict):
                 continue
-            collections = pack.get("collections") if isinstance(pack.get("collections"), dict) else pack
+            collections = (
+                pack.get("designs")
+                if isinstance(pack.get("designs"), dict)
+                else (pack.get("collections") if isinstance(pack.get("collections"), dict) else pack)
+            )
             if not isinstance(collections, dict):
                 continue
-            for col in collections.values():
-                if isinstance(col, dict) and uid in col and isinstance(col[uid], dict):
-                    label = _unwrap_tagged_text(col[uid].get("name"))
+            if design_type and design_key and isinstance(collections.get(design_type), dict):
+                typed_col = collections[design_type]
+                if isinstance(typed_col.get(design_key), dict):
+                    label = _unwrap_tagged_text(typed_col[design_key].get("name"))
                     if label:
                         return direct or label
+            for col in collections.values():
+                if not isinstance(col, dict):
+                    continue
+                for candidate_key in (uid, design_key):
+                    if candidate_key and isinstance(col.get(candidate_key), dict):
+                        label = _unwrap_tagged_text(col[candidate_key].get("name"))
+                        if label:
+                            return direct or label
         return direct or _format_uid_label(uid)
     return direct
 

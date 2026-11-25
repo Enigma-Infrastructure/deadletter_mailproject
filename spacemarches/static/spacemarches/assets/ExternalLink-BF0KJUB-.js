@@ -1,0 +1,1 @@
+import{t,bl as a,E as l}from"./index-_2AospXH.js";var n=t("<a target=_blank>");function m(r){return(()=>{var e=n();return a(e,l(r,{get rel(){return`noreferrer ${r.rel||""}`.trimEnd()}}),!1,!1),e})()}export{m as E};

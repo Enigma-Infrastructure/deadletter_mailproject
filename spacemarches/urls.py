@@ -33,6 +33,7 @@ urlpatterns = [
     path("api/ep2/<str:entry_id>/", views.api_ep2_entries, name="api_ep2_entry"),
     path("api/packs/", views.api_design_packs, name="api_design_packs"),
     path("api/packs/<slug:slug>/", views.api_design_pack_detail, name="api_design_pack_detail"),
+    path("api/meshnet/packs/", views.api_meshnet_packs, name="api_meshnet_packs"),
     path("api/characters/", views.api_characters, name="api_characters"),
     path("api/characters/<int:pk>/", views.api_character_detail, name="api_character_detail"),
     path("api/characters/<int:pk>/link-dossier/", views.api_character_link_dossier, name="api_character_link_dossier"),
