@@ -165,3 +165,26 @@ python manage.py runserver
 - `markdown`
 - `nh3`
 - `Pillow`
+
+## Spacemarches, MeshNet & Cross-Agent Tracking
+
+> **Active focus & cross-agent status:** See `docs/spacemarches-meshnet-handoff.md` for the live status matrix across MeshNet/EP2E content migration, Lifepath, Discord bot, Misago SSO, Deadletter Mail, and deployment tracks.
+
+### Current Track Status (as of 2026-11-25)
+- **Active focus:** **MeshNet / Spacemarches** — migrating Eclipse Phase 2e CRB & Character Options data from `Bubz43/ep2e` (Foundry 1.0) and `TheGam1ngWizard/ep2e-virtual` into `TheGam1ngWizard/mesh-net` (SolidJS), then dropping compiled bundles into `spacemarches/static/spacemarches/`.
+- **Queued after EP2E core + creator:** **Life-Path** character creator (`GeneratedCharacter.SOURCE_LIFE_PATH`).
+- **Paused / Backburner:** **Misago SSO** (paused on Docker setup), **Discord bot** (paused until character creator & EP2E content stabilize), **Deadletter Mail** (backburner during Spacemarches focus), **Production deployment** (paused waiting on InMotion server migration).
+
+### `spacemarches` App Conventions & Key Entry Points
+- **Models (`spacemarches/models.py`):** `AgentSaveSlot` (cloud `localStorage` sync), `GeneratedCharacter` (Point-Buy v2 / future Life-Path sheets + `CharacterDossier` link), `CharacterDossier` (98-question progressive-disclosure questionnaire from `spacemarches/fixtures/ep_questionnaire_schema.json`), `Ep2Entry` (1,042 seeded EP2E reference entries from `spacemarches/fixtures/ep2_entries.json` via `python manage.py seed_ep2_data`), `DiscordLink`, `DiscordIntakeInvite`, `ArchiveEntry`, `ForumThread`, `ForumPost`, `OperationSession`, `FieldAgent`.
+- **MeshNet static bundle (`spacemarches/static/spacemarches/`):** Holds the **compiled** SolidJS/UnoCSS/Lingui bundle only (see `spacemarches/static/spacemarches/README_DROPIN.md`). `views._resolve_meshnet_bundle()` auto-discovers `assets/index-*.js` and `assets/index-*.css`. Service workers (`sw.js`, `workbox-*.js`) must stay stripped so Django auth/CSRF is never intercepted.
+- **Spacemarches URLs:**
+  - `/spacemarches/` — Portal
+  - `/spacemarches/meshnet/` & `/spacemarches/generator/` — Public MeshNet Point-Buy v2 creator
+  - `/spacemarches/terminal/` — Authenticated terminal shell
+  - `/spacemarches/characters/` & `/spacemarches/api/characters/` — Saved character roster & JSON API
+  - `/spacemarches/api/ep2/` & `/spacemarches/api/ep2/<entry_id>/` — Seeded EP2E reference data API (`Ep2Entry`)
+  - `/spacemarches/dossier/` — Character dossiers & Discord link codes
+  - `/spacemarches/archives/` & `/spacemarches/forums/` — Public archives & threads
+- **OAuth2 / Misago IdP (`accounts/oauth.py`):** `/o/` (`django-oauth-toolkit>=3.4`, `PKCE_REQUIRED=False`) and `/accounts/oauth/userinfo/`. See `docs/misago-oauth-setup.md`.
+- **Discord Bot:** `python manage.py run_discord_bot` (or Windows `start_discord.cmd`, which loads `.env` into Conda env `DeadletterMail`). Requires `discord.py>=2.3` and `DISCORD_BOT_TOKEN`.

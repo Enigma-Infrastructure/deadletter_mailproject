@@ -79,7 +79,7 @@ Run these to confirm the project is healthy:
 ```
 python manage.py check          # validates settings, models, URLs
 python manage.py migrate        # applies any pending migrations
-python manage.py test           # runs the test suite (currently empty)
+python manage.py test           # runs the full test suite (accounts, letters, spacemarches)
 python manage.py runserver      # start the server
 ```
 
@@ -110,3 +110,16 @@ Then visit the entry points below and confirm each renders.
   releases the letters into the physical world.
 - **Game layer** — logged-in couriers earn points for keeping letters moving;
   leaderboard at `/leaderboard/`.
+
+## Spacemarches & MeshNet
+
+Active development on the `production-readiness` branch includes the **Spacemarches** portal, **MeshNet** Eclipse Phase 2e Point-Buy v2 character builder, narrative **Character Dossiers**, **Discord bot** (`run_discord_bot` / `start_discord.cmd`), and **OAuth2 Identity Provider** (`/o/`, `/accounts/oauth/userinfo/`).
+
+- **Cross-agent status & handoff:** [`docs/spacemarches-meshnet-handoff.md`](docs/spacemarches-meshnet-handoff.md)
+- **MeshNet static bundle drop-in notes:** [`spacemarches/static/spacemarches/README_DROPIN.md`](spacemarches/static/spacemarches/README_DROPIN.md)
+- **Misago OAuth2 SSO setup:** [`docs/misago-oauth-setup.md`](docs/misago-oauth-setup.md)
+- **Key Spacemarches entry points:**
+  - Portal: `http://127.0.0.1:8000/spacemarches/`
+  - MeshNet Point-Buy v2: `http://127.0.0.1:8000/spacemarches/meshnet/`
+  - Saved Characters Roster: `http://127.0.0.1:8000/spacemarches/characters/`
+  - Character Dossiers: `http://127.0.0.1:8000/spacemarches/dossier/`
