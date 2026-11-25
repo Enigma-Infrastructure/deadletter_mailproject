@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from spacemarches.models import Ep2Entry
 
@@ -37,8 +37,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         fixture = Path(settings.BASE_DIR) / "spacemarches" / (options["fixture"] or FIXTURE_RELATIVE)
         if not fixture.is_file():
-            self.stderr.write(self.style.ERROR(f"Fixture not found: {fixture}"))
-            self.exit(1)
+            raise CommandError(f"Fixture not found: {fixture}")
 
         with open(fixture, encoding="utf-8") as fp:
             data = json.load(fp)

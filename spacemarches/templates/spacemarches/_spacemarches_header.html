@@ -15,6 +15,7 @@
       <a class="sm-nav-link {% if 'archive' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:archive_list' %}" rel="external">Archives</a>
       <a class="sm-nav-link {% if 'forum' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:forum_list' %}" rel="external">Forums</a>
       <a class="sm-nav-link {% if request.resolver_match.url_name == 'meshnet' or request.resolver_match.url_name == 'generator' or request.resolver_match.url_name == 'terminal' %}is-active{% endif %}" href="{% url 'spacemarches:meshnet' %}" rel="external">MeshNet</a>
+      <a class="sm-nav-link {% if 'compendium' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:compendium_list' %}" rel="external">Compendium</a>
       {% if user.is_authenticated %}
         <a class="sm-nav-link {% if 'character' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:character_roster' %}" rel="external">Characters</a>
         <a class="sm-nav-link {% if 'dossier' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:dossier_list' %}" rel="external">Dossiers</a>
@@ -22,6 +23,15 @@
     </nav>
 
     <div class="sm-header-actions">
+      {% if is_meshnet_view %}
+        <button
+          type="button"
+          id="sm-compendium-toggle"
+          class="btn btn-secondary btn-sm"
+          aria-expanded="false"
+          aria-controls="sm-compendium-drawer"
+        >EP2E Lookup</button>
+      {% endif %}
       <button
         type="button"
         id="sm-palette-toggle"

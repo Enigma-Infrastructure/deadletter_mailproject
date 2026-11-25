@@ -183,7 +183,8 @@ python manage.py runserver
   - `/spacemarches/meshnet/` & `/spacemarches/generator/` — Public MeshNet Point-Buy v2 creator
   - `/spacemarches/terminal/` — Authenticated terminal shell
   - `/spacemarches/characters/` & `/spacemarches/api/characters/` — Saved character roster & JSON API
-  - `/spacemarches/api/ep2/` & `/spacemarches/api/ep2/<entry_id>/` — Seeded EP2E reference data API (`Ep2Entry`)
+  - `/spacemarches/compendium/` & `/spacemarches/compendium/<entry_id>/` — Searchable EP2E Reference Compendium (`Ep2Entry`)
+  - `/spacemarches/api/ep2/`, `/spacemarches/api/ep2/meta/`, & `/spacemarches/api/ep2/<entry_id>/` — Seeded EP2E reference data & catalog metadata API (`Ep2Entry`)
   - `/spacemarches/dossier/` — Character dossiers & Discord link codes
   - `/spacemarches/archives/` & `/spacemarches/forums/` — Public archives & threads
 - **OAuth2 / Misago IdP (`accounts/oauth.py`):** `/o/` (`django-oauth-toolkit>=3.4`, `PKCE_REQUIRED=False`) and `/accounts/oauth/userinfo/`. See `docs/misago-oauth-setup.md`.

@@ -26,6 +26,27 @@
   </section>
 
   <section class="sm-card" style="display: flex; flex-direction: column; gap: 0.6rem;">
+    <h2>EP2E Compendium</h2>
+    {% if ep2_summary.total_entries %}
+      <div class="sm-meta-strip">
+        <span><span class="sm-meta-key">Entries</span> <span class="sm-meta-val">{{ ep2_summary.total_entries }}</span></span>
+        <span><span class="sm-meta-key">Packs</span> <span class="sm-meta-val">{{ ep2_summary.pack_count }}</span></span>
+      </div>
+      <p class="text-muted">Search seeded Eclipse Phase 2e morphs, gear, augmentations, traits, sleights, and substances.</p>
+      <div style="margin-top: auto; display: flex; flex-wrap: wrap; gap: 0.45rem;">
+        <a class="btn btn-sm" href="{% url 'spacemarches:compendium_list' %}">Browse All</a>
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?category=morph">Morphs</a>
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?category=gear">Gear</a>
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:api_ep2_data' %}">JSON API</a>
+      </div>
+    {% else %}
+      <p class="text-muted">Reference table is empty. Run <code>python manage.py seed_ep2_data</code> to load the 1,042 EP2E entries.</p>
+      <div style="margin-top: auto;">
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}">Open Compendium</a>
+      </div>
+    {% endif %}
+  </section>
+  <section class="sm-card" style="display: flex; flex-direction: column; gap: 0.6rem;">
     <h2>Declassified Archives</h2>
     <p class="text-muted">Public containment briefings, incident logs, and lore fragments cleared for external release.</p>
     <div style="margin-top: auto;">

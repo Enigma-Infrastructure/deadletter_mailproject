@@ -6,10 +6,12 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
@@ -47,6 +49,15 @@ from .services.dossier_service import (
     reassign_dossier_control,
     save_dossier_answer,
 )
+from .services.ep2_service import (
+    extract_ep2_highlights,
+    format_ep2_system_json,
+    format_pack_label,
+    get_ep2_catalog_summary,
+    get_ep2_source_url,
+    sanitize_ep2_html,
+    strip_ep2_text,
+)
 from .services.game_sync_service import load_agent_save, sync_agent_save
 
 User = get_user_model()
@@ -62,6 +73,7 @@ def portal(request):
     recent_archives = ArchiveEntry.objects.filter(is_public=True).order_by("-created_at")[:5]
     recent_threads = ForumThread.objects.filter(is_public=True).select_related("author")[:5]
     summary = get_user_spacemarches_summary(request.user)
+    ep2_summary = get_ep2_catalog_summary()
     return render(
         request,
         "spacemarches/portal.html",
@@ -69,6 +81,7 @@ def portal(request):
             "recent_archives": recent_archives,
             "recent_threads": recent_threads,
             "summary": summary,
+            "ep2_summary": ep2_summary,
         },
     )
 
@@ -231,6 +244,9 @@ def _build_generator_boot_payload(request, *, route_url: str) -> dict[str, Any]:
         "roster_url": reverse("spacemarches:character_roster"),
         "dossier_list_url": reverse("spacemarches:dossier_list"),
         "characters_api_url": reverse("spacemarches:api_characters"),
+        "ep2_api_url": reverse("spacemarches:api_ep2_data"),
+        "ep2_meta_api_url": reverse("spacemarches:api_ep2_meta"),
+        "compendium_url": reverse("spacemarches:compendium_list"),
         "saved_characters": saved_characters,
         "dossiers": dossiers,
         "initial_load_id": (request.GET.get("load") or "").strip(),
@@ -990,6 +1006,96 @@ def dossier_reassign_by_id(request, pk: int):
     return redirect("spacemarches:dossier_detail_by_id", pk=dossier.pk)
 
 
+# --------------------------------------------------
+# EP2E Reference Compendium (Ep2Entry)
+# --------------------------------------------------
+
+
+def _filter_ep2_queryset(request):
+    """Filter Ep2Entry queryset using shared query params (category, pack, q)."""
+    qs = Ep2Entry.objects.all()
+    pack = (request.GET.get("pack") or "").strip()
+    category = (request.GET.get("category") or "").strip()
+    q = (request.GET.get("q") or "").strip()
+    if category:
+        qs = qs.filter(category=category)
+    if pack:
+        qs = qs.filter(pack=pack)
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q)
+            | Q(description__icontains=q)
+            | Q(reference__icontains=q)
+            | Q(pack__icontains=q)
+            | Q(entry_type__icontains=q)
+        )
+    return qs, category, pack, q
+
+
+def compendium_list(request):
+    """Public searchable browser for seeded Eclipse Phase 2e reference entries."""
+    qs, selected_category, selected_pack, query = _filter_ep2_queryset(request)
+    qs = qs.order_by("category", "pack", "name")
+    catalog = get_ep2_catalog_summary(selected_category=selected_category)
+
+    paginator = Paginator(qs, 48)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    cards = [
+        {
+            "entry": entry,
+            "pack_label": format_pack_label(entry.pack),
+            "highlights": extract_ep2_highlights(entry)[:4],
+            "excerpt": strip_ep2_text(entry.description, max_length=180),
+        }
+        for entry in page_obj.object_list
+    ]
+
+    return render(
+        request,
+        "spacemarches/compendium_list.html",
+        {
+            "cards": cards,
+            "page_obj": page_obj,
+            "total_matching": paginator.count,
+            "catalog": catalog,
+            "selected_category": selected_category,
+            "selected_pack": selected_pack,
+            "query": query,
+        },
+    )
+
+
+def compendium_detail(request, entry_id: str):
+    """Detailed view for a single Ep2Entry with sanitized description, stats, and raw system JSON."""
+    entry = get_object_or_404(Ep2Entry, entry_id=entry_id)
+    related_entries = list(
+        Ep2Entry.objects.filter(pack=entry.pack)
+        .exclude(pk=entry.pk)
+        .order_by("name")[:8]
+    )
+    return render(
+        request,
+        "spacemarches/compendium_detail.html",
+        {
+            "entry": entry,
+            "pack_label": format_pack_label(entry.pack),
+            "source_url": get_ep2_source_url(entry.source),
+            "highlights": extract_ep2_highlights(entry),
+            "rendered_description": mark_safe(sanitize_ep2_html(entry.description)),
+            "system_json": format_ep2_system_json(entry),
+            "related_entries": related_entries,
+        },
+    )
+
+
+@require_http_methods(["GET"])
+def api_ep2_meta(request):
+    """Return category and pack inventory counts for seeded Ep2Entry records."""
+    category = (request.GET.get("category") or "").strip()
+    return JsonResponse(get_ep2_catalog_summary(selected_category=category))
+
+
 @require_http_methods(["GET"])
 def api_ep2_entries(request, entry_id: str | None = None):
     """Read-only access to seeded Eclipse Phase 2e reference data.
@@ -1008,23 +1114,11 @@ def api_ep2_entries(request, entry_id: str | None = None):
         entry = get_object_or_404(Ep2Entry, entry_id=entry_id)
         return JsonResponse(_serialize_ep2_entry(entry))
 
-    qs = Ep2Entry.objects.all()
-    pack = (request.GET.get("pack") or "").strip()
-    category = (request.GET.get("category") or "").strip()
-    q = (request.GET.get("q") or "").strip()
-
-    if pack:
-        qs = qs.filter(pack=pack)
-    if category:
-        qs = qs.filter(category=category)
-    if q:
-        qs = qs.filter(
-            Q(name__icontains=q) | Q(description__icontains=q) | Q(reference__icontains=q)
-        )
+    qs, _, _, _ = _filter_ep2_queryset(request)
 
     total = qs.count()
     try:
-        limit = min(int(request.GET.get("limit") or 100), 500)
+        limit = min(max(int(request.GET.get("limit") or 100), 1), 500)
     except (TypeError, ValueError):
         limit = 100
     try:
@@ -1048,12 +1142,17 @@ def _serialize_ep2_entry(entry) -> dict:
     return {
         "entry_id": entry.entry_id,
         "pack": entry.pack,
+        "pack_label": format_pack_label(entry.pack),
         "category": entry.category,
+        "category_label": entry.get_category_display(),
         "entry_type": entry.entry_type,
         "name": entry.name,
         "description": entry.description,
+        "excerpt": strip_ep2_text(entry.description, max_length=200),
         "reference": entry.reference,
+        "highlights": extract_ep2_highlights(entry),
         "system": entry.system,
         "source": entry.source,
-        "source_url": "https://github.com/Bubz43/ep2e/tree/master/src/packs",
+        "source_url": get_ep2_source_url(entry.source),
+        "compendium_url": reverse("spacemarches:compendium_detail", kwargs={"entry_id": entry.entry_id}),
     }

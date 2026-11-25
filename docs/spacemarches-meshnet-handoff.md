@@ -13,7 +13,7 @@ This document is the single cross-agent tracking and handoff source for **Spacem
 
 | Track | Status | Scope / Blocker | Next Action |
 | --- | --- | --- | --- |
-| **MeshNet (Point-Buy v2 + EP2E Content Migration)** | **IN PROGRESS (Active Focus)** | **Backend DB seeding landed in `822b5b6`:** `Ep2Entry` (`0006_ep2entry`), `ep2_entries.json` (**1,042 entries across all 55 `Bubz43/ep2e` Foundry packs**), `seed_ep2_data`, and `/spacemarches/api/ep2/`. **Frontend gap remains:** the compiled MeshNet bundle in `spacemarches/static/spacemarches/` still uses its partial built-in `data-crb`/`data-copt` packs (infomorphs only, partial gear) and does not yet consume `/spacemarches/api/ep2/` or include COPT / MeshNet-specific packs. | Run `migrate` + `seed_ep2_data` + `test_ep2_data` locally; decide whether MeshNet consumes `/spacemarches/api/ep2/` at runtime or ports missing CRB/COPT packs from `ep2e-virtual` / `Ep2Entry` into `mesh-net` and rebuilds the static bundle; review committed binary source docs in `822b5b6`. |
+| **MeshNet (Point-Buy v2 + EP2E Content Migration)** | **IN PROGRESS (Active Focus)** | **Wired in Django + MeshNet frame:** `Ep2Entry` (`0006_ep2entry`, 1,042 entries across 55 packs) now powers `/spacemarches/compendium/`, `/spacemarches/compendium/<entry_id>/`, `/spacemarches/api/ep2/meta/`, Portal/Admin Hub cards, and the live **EP2E Lookup** drawer inside `/spacemarches/meshnet/`. Remaining upstream work: porting missing CRB/COPT packs from `Ep2Entry` / `ep2e-virtual` directly into the `mesh-net` SolidJS builder calculations. | Run full local tests + browser QA on `/spacemarches/compendium/` and `/spacemarches/meshnet/` EP2E Lookup drawer; then port missing CRB/COPT packs into `TheGam1ngWizard/mesh-net` as needed. |
 | **Life-Path Character Creator** | **QUEUED (After EP2E Core + MeshNet)** | `GeneratedCharacter.SOURCE_LIFE_PATH` enum/scaffolding already exists in `spacemarches/models.py` and `character_sync_service.py`; full 15-step Life-Path UI & 14 tables live in `TheGam1ngWizard/ep2e-virtual` (`packages/life-path`, `packages/character-options`). | Port Life-Path tables and 15-step wizard after EP2E core content & Point-Buy v2 creator are complete. |
 | **Spacemarches Discord Bot (`run_discord_bot.py`)** | **PAUSED** | Persistent views, `/link`, `/dossier`, `/intake`, `/debrief`, and `start_discord.cmd` are implemented. Paused until character creator & EP2E content stabilize. | Later: add read/sheet commands (`/dossier sheet` / stats lookup) pulling linked `GeneratedCharacter` summaries. |
 | **Misago Forum SSO (OAuth2 IdP)** | **PAUSED** | Phase 1 (Django `django-oauth-toolkit` IdP + `/accounts/oauth/userinfo/` + `docs/misago-oauth-setup.md`) is complete on `production-readiness`. Paused while user sets up Docker for Misago. | Later: register Misago OAuth2 app in `/admin/oauth2_provider/application/` and test end-to-end SSO login. |
@@ -33,11 +33,11 @@ Never commit GitHub tokens or secrets into any repository file. Local agents ins
 
 ### Review Findings & Follow-Ups from `822b5b6`
 1. **Binary source files committed:** `822b5b6` also committed `EP2_MultiplicityandSynthesis_Patreon.pdf` (986 KB) and a `.docx` questionnaire in `spacemarches/`. Confirm whether the Patreon PDF should stay in git or be moved out / `.gitignore`d for licensing hygiene.
-2. **Minor backend cleanups in `822b5b6`:**
-   - `spacemarches/management/commands/seed_ep2_data.py` calls `self.exit(1)` on missing fixture; Django `BaseCommand` expects `raise CommandError(...)`.
-   - `views._serialize_ep2_entry()` hardcodes `"source_url": "https://github.com/Bubz43/ep2e/tree/master/src/packs"` — once `mesh-net` / `ep2e-virtual` / Character Options rows are added with a distinct `source` value, derive `source_url` from `entry.source`.
-3. **Frontend wiring gap (MeshNet ↔ `Ep2Entry`):**
-   - `spacemarches/static/spacemarches/assets/` still runs the compiled `TheGam1ngWizard/mesh-net` bundle, which does not yet query `/spacemarches/api/ep2/`.
+2. **Resolved backend cleanups from `822b5b6`:**
+   - Fixed `seed_ep2_data.py` to raise `CommandError` on missing fixture.
+   - Updated `views._serialize_ep2_entry()` to derive `source_url` from `entry.source` (`ep2_service.get_ep2_source_url`), expose extracted `highlights`, `category_label`, `pack_label`, `excerpt`, and `compendium_url`.
+3. **Compendium & MeshNet Lookup Wiring:**
+   - Added `spacemarches/services/ep2_service.py` (using `nh3` HTML sanitization + per-category stat extraction), `/spacemarches/compendium/`, `/spacemarches/compendium/<entry_id>/`, `/spacemarches/api/ep2/meta/`, Portal & Admin Hub links, and the live **EP2E Lookup** drawer in `terminal.html`.
 
 ### Upstream Reference Repositories Reviewed (2026-11-25)
 
@@ -141,5 +141,6 @@ python manage.py test accounts.test_oauth_idp
 4. **Update Section 1 & add a checkpoint entry below** whenever a MeshNet bundle drop-in, EP2E content pack, or Django schema change lands.
 
 ### Checkpoints
+- **Latest (2026-11-25):** Wired `Ep2Entry` end-to-end into Spacemarches (`/spacemarches/compendium/`, `/spacemarches/api/ep2/meta/`, Portal card, Admin Hub links, `ep2_service.py` sanitization/stat extraction, `seed_ep2_data` `CommandError` fix, and the live **EP2E Lookup** drawer inside `/spacemarches/meshnet/`).
 - **`822b5b6` (2026-11-25):** Local agentic work — added `Ep2Entry` (`0006_ep2entry`), 1,042-entry `ep2_entries.json` fixture (`Bubz43/ep2e`), `seed_ep2_data`, `/spacemarches/api/ep2/`, `test_ep2_data.py`, and source PDF/DOCX attachments (needs local review & test run).
 - **`338751d` (2026-11-25):** Fixed stuck palette indicator and single-scroll MeshNet layout (`spacemarches-palette.js`, `spacemarches-theme.css`, `terminal.html`). Follows `466906e` (`Powered by MeshNet` header + `run-django-site.cmd`), `aada6f4` (M3 theme normalization & unified header), and `5d41aaa` (MeshNet Point-Buy v2 + `GeneratedCharacter` persistence).

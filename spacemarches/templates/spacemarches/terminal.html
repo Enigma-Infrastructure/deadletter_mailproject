@@ -80,6 +80,31 @@
       {% endif %}
     </div>
   </main>
+  <aside id="sm-compendium-drawer" class="sm-compendium-drawer" aria-label="EP2E Reference Lookup" hidden>
+    <div class="sm-compendium-drawer-head">
+      <div>
+        <p class="sm-eyebrow" style="margin: 0;">EP2E Datamodel Lookup</p>
+        <h2 style="margin: 0.1rem 0 0; font-size: 1rem;">Compendium Reference</h2>
+      </div>
+      <div style="display: flex; gap: 0.4rem; align-items: center;">
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}" rel="external">Full View</a>
+        <button type="button" id="sm-compendium-close" class="btn btn-secondary btn-sm">Close</button>
+      </div>
+    </div>
+    <div class="sm-compendium-drawer-controls">
+      <input id="sm-ep2-search" type="text" placeholder="Search morphs, armor, augments, sleights…" aria-label="Search EP2E entries">
+      <div style="display: flex; gap: 0.45rem;">
+        <select id="sm-ep2-category" aria-label="Filter by category">
+          <option value="">All Categories</option>
+        </select>
+        <select id="sm-ep2-pack" aria-label="Filter by pack">
+          <option value="">All Packs</option>
+        </select>
+      </div>
+    </div>
+    <div id="sm-ep2-status" class="text-muted" style="font-size: 0.8rem; padding: 0 0.9rem 0.4rem;"></div>
+    <div id="sm-ep2-results" class="sm-compendium-drawer-results"></div>
+  </aside>
 </div>
 
 {{ initial_save|json_script:"spacemarches-initial-save" }}
@@ -237,6 +262,197 @@
       manualBtn.addEventListener("click", () => {
         syncNow().catch(() => {});
       });
+    }
+
+    // Live EP2E Reference Compendium Drawer inside MeshNet workspace
+    const ep2Toggle = document.getElementById("sm-compendium-toggle");
+    const ep2Close = document.getElementById("sm-compendium-close");
+    const ep2Drawer = document.getElementById("sm-compendium-drawer");
+    const ep2Search = document.getElementById("sm-ep2-search");
+    const ep2Category = document.getElementById("sm-ep2-category");
+    const ep2Pack = document.getElementById("sm-ep2-pack");
+    const ep2Status = document.getElementById("sm-ep2-status");
+    const ep2Results = document.getElementById("sm-ep2-results");
+    const ep2ApiUrl = bootData.ep2_api_url || "{% url 'spacemarches:api_ep2_data' %}";
+    const ep2MetaUrl = bootData.ep2_meta_api_url || "{% url 'spacemarches:api_ep2_meta' %}";
+    let ep2MetaLoaded = false;
+    let ep2FetchTimer = null;
+
+    function renderEp2Results(items, totalCount) {
+      if (!ep2Results) return;
+      ep2Results.textContent = "";
+      if (ep2Status) {
+        ep2Status.textContent = items.length
+          ? "Showing " + items.length + " of " + totalCount + " matching entries"
+          : "No matching EP2E entries found.";
+      }
+      items.forEach((item) => {
+        const card = document.createElement("article");
+        card.className = "sm-card";
+        card.style.padding = "0.75rem 0.85rem";
+
+        const top = document.createElement("div");
+        top.style.display = "flex";
+        top.style.justifyContent = "space-between";
+        top.style.gap = "0.5rem";
+        top.style.alignItems = "flex-start";
+
+        const title = document.createElement("strong");
+        title.textContent = item.name || item.entry_id;
+        top.appendChild(title);
+
+        const badge = document.createElement("span");
+        badge.className = "sm-code-tag";
+        badge.textContent = item.pack_label || item.pack || item.category;
+        top.appendChild(badge);
+        card.appendChild(top);
+
+        if (item.reference) {
+          const refEl = document.createElement("div");
+          refEl.className = "text-muted";
+          refEl.style.fontSize = "0.76rem";
+          refEl.style.marginTop = "0.2rem";
+          refEl.textContent = item.reference;
+          card.appendChild(refEl);
+        }
+
+        if (Array.isArray(item.highlights) && item.highlights.length) {
+          const chips = document.createElement("div");
+          chips.className = "sm-stat-grid";
+          chips.style.marginTop = "0.4rem";
+          item.highlights.slice(0, 4).forEach((h) => {
+            const chip = document.createElement("span");
+            chip.className = "sm-stat-chip";
+            chip.textContent = h.label + ": " + h.value;
+            chips.appendChild(chip);
+          });
+          card.appendChild(chips);
+        }
+
+        if (item.excerpt) {
+          const desc = document.createElement("p");
+          desc.className = "text-muted";
+          desc.style.fontSize = "0.8rem";
+          desc.style.margin = "0.4rem 0 0";
+          desc.textContent = item.excerpt;
+          card.appendChild(desc);
+        }
+
+        if (item.compendium_url) {
+          const actions = document.createElement("div");
+          actions.style.marginTop = "0.45rem";
+          const link = document.createElement("a");
+          link.className = "btn btn-secondary btn-sm";
+          link.href = item.compendium_url;
+          link.setAttribute("rel", "external");
+          link.textContent = "Inspect Full Entry";
+          actions.appendChild(link);
+          card.appendChild(actions);
+        }
+
+        ep2Results.appendChild(card);
+      });
+    }
+
+    async function loadEp2Meta(selectedCategory) {
+      if (!ep2Category || !ep2Pack) return;
+      const url = selectedCategory
+        ? ep2MetaUrl + "?category=" + encodeURIComponent(selectedCategory)
+        : ep2MetaUrl;
+      try {
+        const resp = await fetch(url, { credentials: "same-origin" });
+        if (!resp.ok) return;
+        const meta = await resp.json();
+        if (!ep2MetaLoaded && Array.isArray(meta.categories)) {
+          ep2Category.textContent = "";
+          const allOpt = document.createElement("option");
+          allOpt.value = "";
+          allOpt.textContent = "All Categories (" + (meta.total_entries || 0) + ")";
+          ep2Category.appendChild(allOpt);
+          meta.categories.forEach((c) => {
+            const opt = document.createElement("option");
+            opt.value = c.value;
+            opt.textContent = c.label + " (" + c.count + ")";
+            ep2Category.appendChild(opt);
+          });
+          ep2MetaLoaded = true;
+        }
+        if (Array.isArray(meta.packs)) {
+          const prevPack = ep2Pack.value;
+          ep2Pack.textContent = "";
+          const allPacks = document.createElement("option");
+          allPacks.value = "";
+          allPacks.textContent = "All Packs (" + meta.packs.length + ")";
+          ep2Pack.appendChild(allPacks);
+          meta.packs.forEach((p) => {
+            const opt = document.createElement("option");
+            opt.value = p.pack;
+            opt.textContent = p.label + " (" + p.count + ")";
+            ep2Pack.appendChild(opt);
+          });
+          if (prevPack && meta.packs.some((p) => p.pack === prevPack)) {
+            ep2Pack.value = prevPack;
+          }
+        }
+      } catch (err) {
+        console.warn("EP2E meta load failed:", err);
+      }
+    }
+
+    async function fetchEp2Entries() {
+      if (!ep2Drawer || ep2Drawer.hasAttribute("hidden")) return;
+      if (ep2Status) ep2Status.textContent = "Loading EP2E entries…";
+      const params = new URLSearchParams();
+      params.set("limit", "40");
+      if (ep2Category && ep2Category.value) params.set("category", ep2Category.value);
+      if (ep2Pack && ep2Pack.value) params.set("pack", ep2Pack.value);
+      if (ep2Search && ep2Search.value.trim()) params.set("q", ep2Search.value.trim());
+      try {
+        const resp = await fetch(ep2ApiUrl + "?" + params.toString(), { credentials: "same-origin" });
+        if (!resp.ok) throw new Error("HTTP " + resp.status);
+        const data = await resp.json();
+        renderEp2Results(data.results || [], data.count || 0);
+      } catch (err) {
+        if (ep2Status) ep2Status.textContent = "Failed to load EP2E entries.";
+      }
+    }
+
+    function scheduleEp2Fetch() {
+      if (ep2FetchTimer) window.clearTimeout(ep2FetchTimer);
+      ep2FetchTimer = window.setTimeout(fetchEp2Entries, 180);
+    }
+
+    function setEp2DrawerOpen(open) {
+      if (!ep2Drawer || !ep2Toggle) return;
+      if (open) {
+        ep2Drawer.removeAttribute("hidden");
+        ep2Toggle.setAttribute("aria-expanded", "true");
+        loadEp2Meta(ep2Category ? ep2Category.value : "").then(fetchEp2Entries);
+      } else {
+        ep2Drawer.setAttribute("hidden", "");
+        ep2Toggle.setAttribute("aria-expanded", "false");
+      }
+    }
+
+    if (ep2Toggle && ep2Drawer) {
+      ep2Toggle.addEventListener("click", () => {
+        setEp2DrawerOpen(ep2Drawer.hasAttribute("hidden"));
+      });
+    }
+    if (ep2Close) {
+      ep2Close.addEventListener("click", () => setEp2DrawerOpen(false));
+    }
+    if (ep2Search) {
+      ep2Search.addEventListener("input", scheduleEp2Fetch);
+    }
+    if (ep2Category) {
+      ep2Category.addEventListener("change", () => {
+        if (ep2Pack) ep2Pack.value = "";
+        loadEp2Meta(ep2Category.value).then(fetchEp2Entries);
+      });
+    }
+    if (ep2Pack) {
+      ep2Pack.addEventListener("change", fetchEp2Entries);
     }
   })();
 </script>

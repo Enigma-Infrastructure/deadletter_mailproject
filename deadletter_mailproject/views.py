@@ -39,10 +39,13 @@ def admin_hub(request):
         {'title': 'Spacemarches', 'links': [
             {'label': 'Spacemarches portal', 'url': '/spacemarches/'},
             {'label': 'MeshNet (Point-Buy v2)', 'url': '/spacemarches/meshnet/'},
+            {'label': 'EP2E Compendium', 'url': '/spacemarches/compendium/'},
             {'label': 'Declassified archives', 'url': '/spacemarches/archives/'},
             {'label': 'Archive entries (admin)', 'url': '/admin/spacemarches/archiveentry/'},
             {'label': 'Forum threads (admin)', 'url': '/admin/spacemarches/forumthread/'},
             {'label': 'Character dossiers (admin)', 'url': '/admin/spacemarches/characterdossier/'},
+            {'label': 'Generated characters (admin)', 'url': '/admin/spacemarches/generatedcharacter/'},
+            {'label': 'EP2E reference entries (admin)', 'url': '/admin/spacemarches/ep2entry/'},
             {'label': 'Operation sessions (admin)', 'url': '/admin/spacemarches/operationsession/'},
         ]},
     ]

@@ -1,0 +1,86 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ entry.name }} | EP2E Compendium | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 1rem; margin-bottom: 1rem;">
+  <div>
+    <p class="sm-eyebrow">
+      <a href="{% url 'spacemarches:compendium_list' %}">Compendium</a>
+      / <a href="{% url 'spacemarches:compendium_list' %}?category={{ entry.category|urlencode }}">{{ entry.get_category_display }}</a>
+      / <a href="{% url 'spacemarches:compendium_list' %}?pack={{ entry.pack|urlencode }}">{{ pack_label }}</a>
+    </p>
+    <h1>{{ entry.name }}</h1>
+    <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center;">
+      <span class="sm-code-tag">{{ entry.get_category_display }}</span>
+      <span class="sm-stat-chip">Pack: {{ entry.pack }}</span>
+      {% if entry.entry_type %}
+        <span class="sm-stat-chip">Type: {{ entry.entry_type }}</span>
+      {% endif %}
+      <span class="sm-stat-chip">ID: <code>{{ entry.entry_id }}</code></span>
+      {% if entry.reference %}
+        <span class="text-muted" style="font-size: 0.85rem;">{{ entry.reference }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.5rem;">
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:api_ep2_entry' entry_id=entry.entry_id %}">Raw API JSON</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:compendium_list' %}?pack={{ entry.pack|urlencode }}">More in {{ pack_label }}</a>
+  </div>
+</div>
+
+{% if highlights %}
+  <section class="sm-card" style="margin-bottom: 1rem;">
+    <h2 style="margin-top: 0;">Extracted Stats</h2>
+    <div class="sm-meta-strip">
+      {% for h in highlights %}
+        <span><span class="sm-meta-key">{{ h.label }}</span> <span class="sm-meta-val">{{ h.value }}</span></span>
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+
+<section class="sm-card" style="margin-bottom: 1rem;">
+  <h2 style="margin-top: 0;">Description</h2>
+  {% if rendered_description %}
+    <div class="sm-prose">{{ rendered_description }}</div>
+  {% else %}
+    <p class="text-muted">No narrative description is stored on this pack entry; inspect the system payload below.</p>
+  {% endif %}
+</section>
+
+<section class="sm-card" style="margin-bottom: 1rem;">
+  <details open>
+    <summary style="cursor: pointer; font-weight: 600;">Raw <code>Ep2Entry.system</code> Payload (Datamodel Inspector)</summary>
+    <pre class="sm-json-pre">{{ system_json }}</pre>
+  </details>
+</section>
+
+<div class="sm-split-grid">
+  <section class="sm-card">
+    <h2 style="margin-top: 0;">Attribution &amp; Provenance</h2>
+    <p class="text-muted" style="margin-bottom: 0.4rem;">
+      Source: <code>{{ entry.source }}</code>
+      {% if source_url %}
+        &middot; <a href="{{ source_url }}" target="_blank" rel="noopener noreferrer">Upstream Pack Repository</a>
+      {% endif %}
+    </p>
+    <p class="text-muted" style="font-size: 0.84rem; margin: 0;">
+      Eclipse Phase Second Edition content derived under CC BY 4.0 attribution from Bubz43/ep2e.
+    </p>
+  </section>
+
+  {% if related_entries %}
+    <section class="sm-card">
+      <h2 style="margin-top: 0;">Related in {{ pack_label }}</h2>
+      <ul style="padding-left: 1.2rem; margin: 0;">
+        {% for rel in related_entries %}
+          <li style="margin-bottom: 0.35rem;">
+            <a href="{% url 'spacemarches:compendium_detail' entry_id=rel.entry_id %}">{{ rel.name }}</a>
+            {% if rel.reference %}<span class="text-muted" style="font-size: 0.8rem;">({{ rel.reference }})</span>{% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endif %}
+</div>
+{% endblock %}
