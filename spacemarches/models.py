@@ -362,3 +362,56 @@ class DiscordIntakeInvite(models.Model):
     def __str__(self) -> str:
         inviter = str(self.invited_by) if self.invited_by_id else "Discord ST"
         return f"IntakeInvite(discord:{self.discord_user_id}, by={inviter})"
+
+
+class Ep2Entry(models.Model):
+    """A seeded Eclipse Phase 2e reference data entry (item, tech, morph, trait, …).
+
+    Sourced from the Bubz43/ep2e Foundry packs (CC BY 4.0) and later intended
+    to be expanded with gear sheets / additional sources. One row per pack entry;
+    the full pack ``system`` payload is preserved in the ``system`` JSONField so
+    data is lossless even before dedicated typed fields exist.
+    """
+
+    CATEGORY_MORPH = "morph"
+    CATEGORY_GEAR = "gear"
+    CATEGORY_TRAIT = "trait"
+    CATEGORY_SUBSTANCE = "substance"
+    CATEGORY_SLEIGHT = "sleight"
+    CATEGORY_CHARACTER = "character"
+    CATEGORY_SPECIAL = "special"
+    CATEGORY_MISC = "misc"
+
+    CATEGORY_CHOICES = [
+        (CATEGORY_MORPH, "Morph"),
+        (CATEGORY_GEAR, "Gear / Tech"),
+        (CATEGORY_TRAIT, "Trait"),
+        (CATEGORY_SUBSTANCE, "Substance"),
+        (CATEGORY_SLEIGHT, "Sleight"),
+        (CATEGORY_CHARACTER, "Character / Creature"),
+        (CATEGORY_SPECIAL, "Special"),
+        (CATEGORY_MISC, "Other"),
+    ]
+
+    source = models.CharField(max_length=64, default="bubz-ep2e")
+    pack = models.CharField(max_length=64)
+    entry_id = models.CharField(max_length=64, unique=True)
+    name = models.CharField(max_length=255)
+    entry_type = models.CharField(max_length=64, blank=True, default="")
+    category = models.CharField(max_length=16, choices=CATEGORY_CHOICES)
+    description = models.TextField(blank=True, default="")
+    reference = models.CharField(max_length=255, blank=True, default="")
+    system = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["category", "pack", "name"]
+        indexes = [
+            models.Index(fields=["category"]),
+            models.Index(fields=["pack"]),
+            models.Index(fields=["name"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.pack})"

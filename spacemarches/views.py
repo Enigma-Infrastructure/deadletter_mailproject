@@ -14,7 +14,7 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .markdown_utils import render_markdown_safe
-from .models import ArchiveEntry, CharacterDossier, DiscordLink, ForumPost, ForumThread, GeneratedCharacter
+from .models import ArchiveEntry, CharacterDossier, DiscordLink, Ep2Entry, ForumPost, ForumThread, GeneratedCharacter
 from .questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -988,3 +988,72 @@ def dossier_reassign_by_id(request, pk: int):
         f"Updated control for {dossier.character_name}: {dossier.owner_display}.",
     )
     return redirect("spacemarches:dossier_detail_by_id", pk=dossier.pk)
+
+
+@require_http_methods(["GET"])
+def api_ep2_entries(request, entry_id: str | None = None):
+    """Read-only access to seeded Eclipse Phase 2e reference data.
+
+    GET /spacemarches/api/ep2/ — list/search entries.
+    GET /spacemarches/api/ep2/<entry_id>/ — single entry (404 if missing).
+
+    Query params (list endpoint):
+        pack      — filter to one source pack (e.g. "armor", "biomorphs")
+        category  — filter to one category (morph, gear, trait, …)
+        q         — case-insensitive search over name/description/reference
+        limit     — max entries to return (default 100, cap 500)
+        offset    — pagination offset (default 0)
+    """
+    if entry_id is not None:
+        entry = get_object_or_404(Ep2Entry, entry_id=entry_id)
+        return JsonResponse(_serialize_ep2_entry(entry))
+
+    qs = Ep2Entry.objects.all()
+    pack = (request.GET.get("pack") or "").strip()
+    category = (request.GET.get("category") or "").strip()
+    q = (request.GET.get("q") or "").strip()
+
+    if pack:
+        qs = qs.filter(pack=pack)
+    if category:
+        qs = qs.filter(category=category)
+    if q:
+        qs = qs.filter(
+            Q(name__icontains=q) | Q(description__icontains=q) | Q(reference__icontains=q)
+        )
+
+    total = qs.count()
+    try:
+        limit = min(int(request.GET.get("limit") or 100), 500)
+    except (TypeError, ValueError):
+        limit = 100
+    try:
+        offset = max(int(request.GET.get("offset") or 0), 0)
+    except (TypeError, ValueError):
+        offset = 0
+
+    entries = qs.order_by("category", "pack", "name")[offset:offset + limit]
+    return JsonResponse(
+        {
+            "count": total,
+            "limit": limit,
+            "offset": offset,
+            "results": [_serialize_ep2_entry(e) for e in entries],
+        }
+    )
+
+
+def _serialize_ep2_entry(entry) -> dict:
+    """JSON-safe view of an Ep2Entry — the shape consumed by the MeshNet creator/export path."""
+    return {
+        "entry_id": entry.entry_id,
+        "pack": entry.pack,
+        "category": entry.category,
+        "entry_type": entry.entry_type,
+        "name": entry.name,
+        "description": entry.description,
+        "reference": entry.reference,
+        "system": entry.system,
+        "source": entry.source,
+        "source_url": "https://github.com/Bubz43/ep2e/tree/master/src/packs",
+    }

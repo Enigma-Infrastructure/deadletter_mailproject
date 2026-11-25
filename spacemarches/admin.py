@@ -6,6 +6,7 @@ from .models import (
     CharacterDossier,
     DiscordIntakeInvite,
     DiscordLink,
+    Ep2Entry,
     FieldAgent,
     ForumPost,
     ForumThread,
@@ -89,3 +90,12 @@ class CharacterDossierAdmin(admin.ModelAdmin):
     )
     list_filter = ("narrative_voice", "show_sensitive_appendix")
     search_fields = ("character_name", "slug", "user__username", "discord_owner_id")
+
+
+@admin.register(Ep2Entry)
+class Ep2EntryAdmin(admin.ModelAdmin):
+    list_display = ("name", "pack", "category", "entry_type", "reference")
+    list_filter = ("category", "pack")
+    search_fields = ("name", "description", "reference")
+    readonly_fields = ("entry_id", "source", "pack", "entry_type", "system")
+    date_hierarchy = "updated_at"
