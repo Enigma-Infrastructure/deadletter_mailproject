@@ -247,7 +247,7 @@ class Ep2CompendiumViewsTests(TestCase):
         self.assertEqual(resp.status_code, 200)
         self.assertContains(resp, "Ghost Biomorph")
         self.assertContains(resp, "<p>Stealth shell</p>")
-        self.assertNotContains(resp, "<script>")
+        self.assertNotContains(resp, 'alert("xss")')
         self.assertContains(resp, '"subtype": "Biomorph"')
 
         missing = self.client.get(reverse("spacemarches:compendium_detail", kwargs={"entry_id": "nope"}))
