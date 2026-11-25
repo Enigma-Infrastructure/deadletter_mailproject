@@ -369,6 +369,9 @@ html[data-sm-contrast="high"] .dossier-card {
   background: var(--sm-surface-container);
   color: var(--sm-on-surface);
   border-top: 1px solid var(--sm-outline-variant);
+  max-height: 70vh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .sm-palette-inner {

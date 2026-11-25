@@ -16,6 +16,7 @@
     html, body {
       height: 100%;
       margin: 0;
+      overflow: hidden;
     }
     .sm-generator-viewport {
       display: grid;
@@ -46,6 +47,12 @@
       grid-template-columns: minmax(0, 1fr);
       overflow: hidden;
       color: var(--sm-on-surface);
+    }
+    /* MeshNet's internal main content row is sized against the full viewport; make it
+       fill the available mount area instead, so its own internal scroll
+       (overflow-y-auto) is the single scroll region inside the Django frame. */
+    #root .h-\[calc\(100dvh-var\(--root-header-height\)\)\] {
+      height: 100%;
     }
   </style>
 </head>
