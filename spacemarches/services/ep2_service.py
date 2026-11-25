@@ -8,9 +8,11 @@ import re
 from typing import Any
 
 import nh3
-from django.db.models import Count
+from django.db.models import Case, Count, IntegerField, QuerySet, When
 
 from spacemarches.models import Ep2Entry
+
+EP2_CATEGORY_ORDER = [choice[0] for choice in Ep2Entry.CATEGORY_CHOICES]
 
 _SOURCE_URL_MAP = {
     "bubz-ep2e": "https://github.com/Bubz43/ep2e/tree/master/src/packs",
@@ -55,6 +57,16 @@ def format_pack_label(pack: str | None) -> str:
     acronyms = {"qe": "QE", "psi": "Psi", "ep2": "EP2", "ali": "ALI"}
     parts = [acronyms.get(p.lower(), p.capitalize()) for p in raw.split("-") if p]
     return " ".join(parts)
+
+
+def order_ep2_queryset(qs: QuerySet[Ep2Entry]) -> QuerySet[Ep2Entry]:
+    """Order Ep2Entry rows with player-first categories before NPC/creature entries."""
+    category_rank = Case(
+        *[When(category=cat, then=idx) for idx, cat in enumerate(EP2_CATEGORY_ORDER)],
+        default=len(EP2_CATEGORY_ORDER),
+        output_field=IntegerField(),
+    )
+    return qs.order_by(category_rank, "pack", "name")
 
 
 def sanitize_ep2_html(raw_html: str | None) -> str:
@@ -255,11 +267,13 @@ def get_ep2_catalog_summary(*, selected_category: str = "") -> dict[str, Any]:
     packs_qs = Ep2Entry.objects.all()
     if selected_category:
         packs_qs = packs_qs.filter(category=selected_category)
+    category_labels = dict(Ep2Entry.CATEGORY_CHOICES)
     packs = [
         {
             "pack": row["pack"],
             "label": format_pack_label(row["pack"]),
             "category": row["category"],
+            "category_label": category_labels.get(row["category"], row["category"]),
             "count": row["total"],
         }
         for row in packs_qs.values("pack", "category").annotate(total=Count("id")).order_by("pack")

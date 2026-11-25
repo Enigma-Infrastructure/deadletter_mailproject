@@ -276,7 +276,53 @@
     const ep2ApiUrl = bootData.ep2_api_url || "{% url 'spacemarches:api_ep2_data' %}";
     const ep2MetaUrl = bootData.ep2_meta_api_url || "{% url 'spacemarches:api_ep2_meta' %}";
     let ep2MetaLoaded = false;
+    let ep2LatestMeta = null;
+    let ep2ForceBrowseAll = false;
     let ep2FetchTimer = null;
+
+    function renderEp2Prompt() {
+      if (!ep2Results) return;
+      ep2Results.textContent = "";
+      const total = (ep2LatestMeta && ep2LatestMeta.total_entries) || 0;
+      if (ep2Status) {
+        ep2Status.textContent = total
+          ? "Pick a category, select a pack, or type to search " + total + " EP2E entries."
+          : "Pick a category, select a pack, or type to search EP2E entries.";
+      }
+      const categories = (ep2LatestMeta && Array.isArray(ep2LatestMeta.categories))
+        ? ep2LatestMeta.categories
+        : [];
+      if (categories.length) {
+        const card = document.createElement("div");
+        card.className = "sm-card";
+        card.style.padding = "0.75rem 0.85rem";
+        const heading = document.createElement("p");
+        heading.className = "text-muted";
+        heading.style.fontSize = "0.82rem";
+        heading.style.margin = "0 0 0.55rem";
+        heading.textContent = "Quick browse by category:";
+        card.appendChild(heading);
+        const grid = document.createElement("div");
+        grid.style.display = "flex";
+        grid.style.flexWrap = "wrap";
+        grid.style.gap = "0.4rem";
+        categories.forEach((c) => {
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = "btn btn-secondary btn-sm";
+          btn.textContent = c.label + " (" + c.count + ")";
+          btn.addEventListener("click", () => {
+            if (ep2Category) ep2Category.value = c.value;
+            if (ep2Pack) ep2Pack.value = "";
+            ep2ForceBrowseAll = false;
+            loadEp2Meta(c.value).then(fetchEp2Entries);
+          });
+          grid.appendChild(btn);
+        });
+        card.appendChild(grid);
+        ep2Results.appendChild(card);
+      }
+    }
 
     function renderEp2Results(items, totalCount) {
       if (!ep2Results) return;
@@ -363,6 +409,7 @@
         const resp = await fetch(url, { credentials: "same-origin" });
         if (!resp.ok) return;
         const meta = await resp.json();
+        ep2LatestMeta = meta;
         if (!ep2MetaLoaded && Array.isArray(meta.categories)) {
           ep2Category.textContent = "";
           const allOpt = document.createElement("option");
@@ -401,12 +448,19 @@
 
     async function fetchEp2Entries() {
       if (!ep2Drawer || ep2Drawer.hasAttribute("hidden")) return;
+      const catVal = ep2Category ? ep2Category.value : "";
+      const packVal = ep2Pack ? ep2Pack.value : "";
+      const qVal = ep2Search ? ep2Search.value.trim() : "";
+      if (!catVal && !packVal && !qVal && !ep2ForceBrowseAll) {
+        renderEp2Prompt();
+        return;
+      }
       if (ep2Status) ep2Status.textContent = "Loading EP2E entries…";
       const params = new URLSearchParams();
       params.set("limit", "40");
-      if (ep2Category && ep2Category.value) params.set("category", ep2Category.value);
-      if (ep2Pack && ep2Pack.value) params.set("pack", ep2Pack.value);
-      if (ep2Search && ep2Search.value.trim()) params.set("q", ep2Search.value.trim());
+      if (catVal) params.set("category", catVal);
+      if (packVal) params.set("pack", packVal);
+      if (qVal) params.set("q", qVal);
       try {
         const resp = await fetch(ep2ApiUrl + "?" + params.toString(), { credentials: "same-origin" });
         if (!resp.ok) throw new Error("HTTP " + resp.status);

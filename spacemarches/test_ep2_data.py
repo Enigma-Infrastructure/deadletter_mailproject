@@ -227,12 +227,31 @@ class Ep2CompendiumViewsTests(TestCase):
             category=Ep2Entry.CATEGORY_GEAR,
             entry_type="armor",
         )
+        self.creature = make_entry(
+            entry_id="view-char-0001",
+            name="Clown Sprite",
+            pack="creatures",
+            category=Ep2Entry.CATEGORY_CHARACTER,
+            entry_type="creature",
+        )
 
-    def test_compendium_list_and_filters(self):
+    def test_compendium_list_directory_and_filters(self):
+        # Default unfiltered landing renders category/pack directory without dumping matching entries
         resp = self.client.get(reverse("spacemarches:compendium_list"))
         self.assertEqual(resp.status_code, 200)
-        self.assertContains(resp, "Ghost Biomorph")
-        self.assertContains(resp, "Chameleon Cloak")
+        self.assertContains(resp, "Browse by Category")
+        self.assertContains(resp, "Biomorphs")
+        self.assertNotContains(resp, "matching entr")
+        self.assertNotContains(resp, "Clown Sprite")
+
+        # Explicit browse=all displays entries in player-first category order (morph before character)
+        browse_resp = self.client.get(reverse("spacemarches:compendium_list"), {"browse": "all"})
+        self.assertEqual(browse_resp.status_code, 200)
+        self.assertContains(browse_resp, "Ghost Biomorph")
+        self.assertContains(browse_resp, "Chameleon Cloak")
+        body = browse_resp.content.decode("utf-8")
+        self.assertLess(body.index("Ghost Biomorph"), body.index("Chameleon Cloak"))
+        self.assertLess(body.index("Chameleon Cloak"), body.index("Clown Sprite"))
 
         morph_only = self.client.get(reverse("spacemarches:compendium_list"), {"category": "morph"})
         self.assertContains(morph_only, "Ghost Biomorph")
@@ -241,6 +260,12 @@ class Ep2CompendiumViewsTests(TestCase):
         searched = self.client.get(reverse("spacemarches:compendium_list"), {"q": "Chameleon"})
         self.assertContains(searched, "Chameleon Cloak")
         self.assertNotContains(searched, "Ghost Biomorph")
+
+    def test_api_orders_player_categories_before_characters(self):
+        resp = self.client.get(reverse("spacemarches:api_ep2_data"))
+        self.assertEqual(resp.status_code, 200)
+        names = [row["name"] for row in resp.json()["results"]]
+        self.assertEqual(names[:3], ["Ghost Biomorph", "Chameleon Cloak", "Clown Sprite"])
 
     def test_compendium_detail_sanitizes_html_and_shows_system_json(self):
         resp = self.client.get(reverse("spacemarches:compendium_detail", kwargs={"entry_id": "view-morph-0001"}))
@@ -263,6 +288,7 @@ class Ep2CompendiumViewsTests(TestCase):
         self.assertEqual(meshnet_resp.status_code, 200)
         self.assertContains(meshnet_resp, "sm-compendium-drawer")
         self.assertContains(meshnet_resp, "EP2E Lookup")
+        self.assertContains(meshnet_resp, "Quick browse by category:")
         self.assertContains(meshnet_resp, reverse("spacemarches:api_ep2_meta"))
 
         staff = User.objects.create_user(username="staff_ep2", password="pw", is_staff=True)

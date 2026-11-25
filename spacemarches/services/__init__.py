@@ -10,6 +10,7 @@ from .ep2_service import (
     format_pack_label,
     get_ep2_catalog_summary,
     get_ep2_source_url,
+    order_ep2_queryset,
     sanitize_ep2_html,
     strip_ep2_text,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "get_ep2_catalog_summary",
     "get_ep2_source_url",
     "load_agent_save",
+    "order_ep2_queryset",
     "sanitize_ep2_html",
     "save_dossier_answer",
     "strip_ep2_text",

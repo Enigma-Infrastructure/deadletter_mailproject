@@ -55,6 +55,7 @@ from .services.ep2_service import (
     format_pack_label,
     get_ep2_catalog_summary,
     get_ep2_source_url,
+    order_ep2_queryset,
     sanitize_ep2_html,
     strip_ep2_text,
 )
@@ -1035,21 +1036,29 @@ def _filter_ep2_queryset(request):
 def compendium_list(request):
     """Public searchable browser for seeded Eclipse Phase 2e reference entries."""
     qs, selected_category, selected_pack, query = _filter_ep2_queryset(request)
-    qs = qs.order_by("category", "pack", "name")
+    browse_all = (request.GET.get("browse") or "").strip().lower() in {"1", "true", "all"} or bool(
+        (request.GET.get("page") or "").strip()
+    )
+    has_active_filter = bool(selected_category or selected_pack or query or browse_all)
     catalog = get_ep2_catalog_summary(selected_category=selected_category)
 
-    paginator = Paginator(qs, 48)
-    page_obj = paginator.get_page(request.GET.get("page"))
-
-    cards = [
-        {
-            "entry": entry,
-            "pack_label": format_pack_label(entry.pack),
-            "highlights": extract_ep2_highlights(entry)[:4],
-            "excerpt": strip_ep2_text(entry.description, max_length=180),
-        }
-        for entry in page_obj.object_list
-    ]
+    cards = []
+    page_obj = None
+    total_matching = 0
+    if has_active_filter:
+        qs = order_ep2_queryset(qs)
+        paginator = Paginator(qs, 48)
+        page_obj = paginator.get_page(request.GET.get("page"))
+        total_matching = paginator.count
+        cards = [
+            {
+                "entry": entry,
+                "pack_label": format_pack_label(entry.pack),
+                "highlights": extract_ep2_highlights(entry)[:4],
+                "excerpt": strip_ep2_text(entry.description, max_length=180),
+            }
+            for entry in page_obj.object_list
+        ]
 
     return render(
         request,
@@ -1057,7 +1066,9 @@ def compendium_list(request):
         {
             "cards": cards,
             "page_obj": page_obj,
-            "total_matching": paginator.count,
+            "total_matching": total_matching,
+            "has_active_filter": has_active_filter,
+            "browse_all": browse_all and not (selected_category or selected_pack or query),
             "catalog": catalog,
             "selected_category": selected_category,
             "selected_pack": selected_pack,
@@ -1126,7 +1137,7 @@ def api_ep2_entries(request, entry_id: str | None = None):
     except (TypeError, ValueError):
         offset = 0
 
-    entries = qs.order_by("category", "pack", "name")[offset:offset + limit]
+    entries = order_ep2_queryset(qs)[offset:offset + limit]
     return JsonResponse(
         {
             "count": total,
