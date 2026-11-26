@@ -143,6 +143,9 @@ python manage.py test accounts.test_oauth_idp
 4. **Update Section 1 & add a checkpoint entry below** whenever a MeshNet bundle drop-in, EP2E content pack, or Django schema change lands.
 
 ### Checkpoints
+- **Eclipse Phase Census companion document (2026-11-26):**
+  - Added `EclipsePhaseCensus` (`0010_eclipsephasecensus.py`) + `ProtectionAccessLog.TARGET_CENSUS`, `spacemarches/fixtures/ep_census_schema.json` (126 community headings / 124 answerable prompts across 10 guided chapters verbatim from ShadowDragon8685 / GearheadLydia with CC BY-NC-SA 3.0 legalese & Tracked Changes), `spacemarches/census.py`, and `spacemarches/services/census_service.py`.
+  - Added `/spacemarches/census/`, `/spacemarches/census/<pk>/` (chapter stepper + view-all + AJAX save/clear + optional 13c/13e toggle + explicit opt-in 13d appendix + Dossier/Character linking), `/spacemarches/census/<pk>/review/` (public review honoring `none`/`secret`/`st_only` locks + Security Log), and MD/HTML/JSON exports, plus cross-links from Portal, Header, Dossier, and Roster. Tests added in `spacemarches/test_census.py` (syntax/schema/parity checked in container; full Django migrate/test pending local run).
 
 - **MeshNet-native fixture, `01e94e7` review fixes & polish (2026-11-26):**
   - Landed `spacemarches/fixtures/meshnet-pack-designs.json` (`840` entries: `738 ep-crb` + `11 ep-crb-storyteller` seeded via `seed_meshnet_data`, `91 ep-copt` skipped → `1,791` total `Ep2Entry` rows), migration `0008_ep2entry_new_categories`, `0009_characterdossier_protection_and_more`, `_meshnet_native_partial` / hashed-key adapter, `home`/locale label scrub, and `test_meshnet_native.py`.

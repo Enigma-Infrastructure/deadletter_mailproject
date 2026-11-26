@@ -1,0 +1,77 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ census.character_name }} — Census Review | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<div style="max-width: 880px; margin: 0 auto;">
+  <p style="margin: 0 0 0.6rem;"><a href="{% url 'spacemarches:portal' %}">&larr; Back to Portal</a></p>
+
+  <header style="margin-bottom: 1.25rem;">
+    <p class="sm-eyebrow">Public Review &mdash; Eclipse Phase Census</p>
+    <h1 style="margin: 0.15rem 0 0.35rem;">{{ census.character_name }}</h1>
+    <div class="sm-meta-strip" style="margin-bottom: 0.4rem;">
+      <span>Owner: <strong>{{ census.user }}</strong></span>
+      <span>Voice: <strong>{{ census.get_narrative_voice_display }}</strong></span>
+      <span>Answered: <strong>{{ stats.answered_count }}/{{ stats.total_questions }}</strong></span>
+      {% if census_protection.locked and census_protection.protection == "secret" %}
+        <span class="sm-status-flag is-warn">Sealed &mdash; Secret</span>
+      {% elif census_protection.locked and census_protection.protection == "st_only" %}
+        <span class="sm-status-flag is-warn">ST-Only</span>
+      {% endif %}
+    </div>
+    <p class="text-muted" style="margin: 0;">{{ attribution_notice }}</p>
+  </header>
+
+  {% if census_protection.locked and census_protection.protection == "secret" %}
+    <section class="sm-panel" aria-label="Secret lock" style="border-color: var(--sm-tertiary);">
+      <p class="sm-eyebrow">Secret Locked</p>
+      <h2 style="margin: 0.3rem 0 0.6rem; font-size: 1.05rem;">This Census review is sealed.</h2>
+      {% if census_protection.secret_puzzle_prompt %}
+        <p style="font-size: 0.92rem; font-style: italic;">{{ census_protection.secret_puzzle_prompt }}</p>
+      {% else %}
+        <p class="text-muted">The content is locked behind a secret cipher.</p>
+      {% endif %}
+      <form method="post" action="{{ review_url|default:request.path }}" style="display: flex; gap: 0.5rem; margin-top: 0.85rem; align-items: center; flex-wrap: wrap;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unlock_census">
+        <input type="text" name="answer" placeholder="Enter the cipher" autocomplete="off" style="flex: 1; min-width: 180px;" required>
+        <button type="submit" class="btn">Unlock</button>
+      </form>
+    </section>
+  {% elif census_protection.locked and census_protection.protection == "st_only" %}
+    <section class="sm-panel" aria-label="ST-only lock" style="border-color: var(--sm-tertiary);">
+      <p class="sm-eyebrow">ST-Only</p>
+      <h2 style="margin: 0.3rem 0 0.5rem; font-size: 1.05rem;">Storyteller Access Required</h2>
+      <p class="text-muted" style="margin: 0;">This Census review is restricted to Storyteller accounts. Storyteller views are logged in the security log for the owner.</p>
+    </section>
+  {% else %}
+    {% if grouped_chapters %}
+      {% for group in grouped_chapters %}
+        <section style="margin-bottom: 1.5rem;">
+          <h2>{{ group.chapter.number }} &mdash; {{ group.chapter.title }}</h2>
+          {% for node in group.nodes %}
+            <article class="sm-panel" style="margin-bottom: 0.75rem;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem;">
+                <h3 style="margin: 0; font-size: 1rem;">
+                  <span class="sm-code-tag">{{ node.display_id }}</span>
+                  {{ node.heading }}
+                </h3>
+                <span class="sm-code-tag">{% if node.voice == "omniscient" %}Omniscient{% else %}First-person{% endif %}</span>
+              </div>
+              {% if node.primer %}
+                <p class="text-muted" style="margin: 0 0 0.6rem; font-size: 0.86rem; white-space: pre-line;">{{ node.primer }}</p>
+              {% endif %}
+              <div style="white-space: pre-line; margin: 0;">{{ node.answer }}</div>
+            </article>
+          {% endfor %}
+        </section>
+      {% endfor %}
+    {% else %}
+      <section class="sm-panel">
+        <p class="text-muted" style="margin: 0;">No Eclipse Phase Census answers have been recorded yet.</p>
+      </section>
+    {% endif %}
+  {% endif %}
+
+  <p class="text-muted" style="margin-top: 1.5rem; font-size: 0.75rem;">{{ attribution_notice }}</p>
+</div>
+{% endblock %}

@@ -387,6 +387,95 @@ class CharacterDossier(models.Model):
         return f"{self.character_name} ({self.owner_display})"
 
 
+class EclipsePhaseCensus(models.Model):
+    """Guided Eclipse Phase setting walkthrough & character census (ShadowDragon8685 / GearheadLydia)."""
+
+    PROTECTION_TARGET_KIND = "census"
+
+    VOICE_FIRST_PERSON = "FIRST_PERSON"
+    VOICE_OMNISCIENT = "OMNISCIENT"
+    NARRATIVE_VOICE_CHOICES = [
+        (VOICE_FIRST_PERSON, "First-person (as character)"),
+        (VOICE_OMNISCIENT, "Omniscient narrative"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="eclipse_phase_censuses",
+    )
+    dossier = models.ForeignKey(
+        "CharacterDossier",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="censuses",
+    )
+    character = models.ForeignKey(
+        "GeneratedCharacter",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="censuses",
+    )
+    character_name = models.CharField(max_length=160)
+    slug = models.SlugField(max_length=160)
+    narrative_voice = models.CharField(
+        max_length=20,
+        choices=NARRATIVE_VOICE_CHOICES,
+        default=VOICE_FIRST_PERSON,
+    )
+    responses = models.JSONField(default=dict, blank=True)
+    show_sexuality_sections = models.BooleanField(
+        default=True,
+        help_text="Include optional sexuality and sexual-experience sections (13c, 13e).",
+    )
+    show_sensitive_appendix = models.BooleanField(
+        default=False,
+        help_text="Opt in to the Moved Questions appendix (13d1-13d6).",
+    )
+    public_view = models.BooleanField(
+        default=False,
+        help_text="Allow this Census to be publicly reviewed (respecting protection locks).",
+    )
+    protection = models.CharField(
+        max_length=16,
+        choices=GeneratedCharacter.PROTECTION_CHOICES,
+        default=GeneratedCharacter.PROTECTION_NONE,
+        help_text="Whole-section protection: none / secret / ST-only.",
+    )
+    secret_puzzle_prompt = models.TextField(
+        blank=True,
+        help_text="Secret lock: the puzzle/prompt shown to viewers.",
+    )
+    secret_answer_hash = models.CharField(
+        max_length=256,
+        blank=True,
+        help_text="Secret lock: hashed answer. Never exposed to clients.",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = (("user", "slug"),)
+        ordering = ["-updated_at"]
+
+    def save(self, *args, **kwargs):
+        if not self.slug and self.character_name:
+            base = slugify(self.character_name)[:140] or "census"
+            candidate = base
+            counter = 1
+            qs = EclipsePhaseCensus.objects.filter(user=self.user)
+            while qs.filter(slug=candidate).exclude(pk=self.pk).exists():
+                counter += 1
+                candidate = f"{base[:140]}-{counter}"
+            self.slug = candidate
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.character_name} Census ({self.user})"
+
+
 class ProtectionAccessLog(models.Model):
     """Append-only log of ST-only / secret view access (an Eclipse Phase-themed security log).
 
@@ -396,9 +485,11 @@ class ProtectionAccessLog(models.Model):
 
     TARGET_CHARACTER = "character"
     TARGET_DOSSIER = "dossier"
+    TARGET_CENSUS = "census"
     TARGET_CHOICES = [
         (TARGET_CHARACTER, "Character Sheet"),
         (TARGET_DOSSIER, "Character Dossier"),
+        (TARGET_CENSUS, "Eclipse Phase Census"),
     ]
 
     target_kind = models.CharField(max_length=16, choices=TARGET_CHOICES)

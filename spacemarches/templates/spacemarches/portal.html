@@ -69,11 +69,13 @@
       <div class="sm-meta-strip">
         <span><span class="sm-meta-key">Characters</span> <span class="sm-meta-val">{{ summary.generated_character_count }}</span></span>
         <span><span class="sm-meta-key">Dossiers</span> <span class="sm-meta-val">{{ summary.dossier_count }}</span></span>
+        <span><span class="sm-meta-key">Censuses</span> <span class="sm-meta-val">{{ summary.census_count }}</span></span>
         <span><span class="sm-meta-key">Saves</span> <span class="sm-meta-val">{{ summary.save_slots_count }}</span></span>
       </div>
       <div style="margin-top: auto; display: flex; flex-wrap: wrap; gap: 0.45rem;">
         <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_roster' %}">Characters</a>
         <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:dossier_list' %}">Dossiers</a>
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_list' %}">Census</a>
       </div>
     {% else %}
       <p class="text-muted">Sign in to sync Point-Buy characters to the database, match them with narrative Dossiers, and link Discord.</p>

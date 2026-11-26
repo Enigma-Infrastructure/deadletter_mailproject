@@ -88,7 +88,9 @@ def protection_state(obj, request, viewer=None) -> dict[str, Any]:
         return {"protection": "st_only", "locked": True, "unlocked": False, "secret_puzzle_prompt": "", "reason": "Storyteller accounts only.", "is_owner": is_owner}
 
     if protection == GeneratedCharacter.PROTECTION_SECRET:
-        kind = "character" if isinstance(obj, GeneratedCharacter) else "dossier"
+        kind = getattr(obj, "PROTECTION_TARGET_KIND", None) or (
+            "character" if isinstance(obj, GeneratedCharacter) else "dossier"
+        )
         unlocked = is_unlocked(request, kind, obj.pk)
         if unlocked:
             return {"protection": "secret", "locked": False, "unlocked": True, "secret_puzzle_prompt": "", "reason": "", "is_owner": is_owner}

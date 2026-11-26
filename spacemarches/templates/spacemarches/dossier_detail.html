@@ -22,6 +22,13 @@
   <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
     <a class="btn btn-secondary btn-sm" href="{{ dossier_export_url }}">Export Markdown</a>
     <a class="btn btn-secondary btn-sm" href="{{ dossier_export_url }}?include_private=1">Export incl. GM Only</a>
+    {% if linked_censuses %}
+      {% with first_census=linked_censuses.0 %}
+        <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_detail' pk=first_census.pk %}">Open Census</a>
+      {% endwith %}
+    {% elif dossier.user_id == user.pk %}
+      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_list' %}?dossier_id={{ dossier.pk }}">+ Start Census</a>
+    {% endif %}
   </div>
 </div>
 

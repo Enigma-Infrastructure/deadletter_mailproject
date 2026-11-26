@@ -18,7 +18,35 @@ from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .markdown_utils import render_markdown_safe
-from .models import ArchiveEntry, CharacterDossier, DesignPack, DiscordLink, Ep2Entry, ForumPost, ForumThread, GeneratedCharacter, ProtectionAccessLog
+from .models import (
+    ArchiveEntry,
+    CharacterDossier,
+    DesignPack,
+    DiscordLink,
+    EclipsePhaseCensus,
+    Ep2Entry,
+    ForumPost,
+    ForumThread,
+    GeneratedCharacter,
+    ProtectionAccessLog,
+)
+from .census import (
+    get_all_census_questions,
+    get_census_attribution,
+    get_census_chapter,
+    get_census_chapters,
+    get_census_meta,
+    get_chapter_questions,
+)
+from .services.census_service import (
+    compute_census_stats,
+    create_census,
+    export_census_html,
+    export_census_json,
+    export_census_markdown,
+    normalize_census_record,
+    save_census_answer,
+)
 from .questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -986,11 +1014,13 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
         else []
     )
 
+    linked_censuses = list(dossier.censuses.order_by("-updated_at"))
     return render(
         request,
         "spacemarches/dossier_detail.html",
         {
             "dossier": dossier,
+            "linked_censuses": linked_censuses,
             "linked_characters": linked_characters,
             "available_characters": available_characters,
             "core_nodes": core_nodes,
@@ -1702,3 +1732,496 @@ def api_meshnet_packs(request):
     include_storyteller = True if "storyteller" not in request.GET else _truthy_param(request.GET.get("storyteller"))
     packs = get_meshnet_packs_payload(request.user, include_storyteller=include_storyteller)
     return JsonResponse({"count": len(packs), "packs": packs})
+
+
+# --------------------------------------------------
+# Guided Eclipse Phase Census (Community Walkthrough)
+# --------------------------------------------------
+
+
+def _get_accessible_census(user, *, pk: int) -> EclipsePhaseCensus:
+    qs = EclipsePhaseCensus.objects.select_related("user", "dossier", "character")
+    if _is_admin(user):
+        return get_object_or_404(qs, pk=pk)
+    return get_object_or_404(qs, pk=pk, user=user)
+
+
+def _log_census_st_only_access(request, census: EclipsePhaseCensus) -> None:
+    if (census.protection or "none") != GeneratedCharacter.PROTECTION_ST_ONLY:
+        return
+    if not _is_st(request.user):
+        return
+    if request.user.is_authenticated and request.user.pk == census.user_id:
+        return
+    log_protection_access(
+        target_kind=ProtectionAccessLog.TARGET_CENSUS,
+        target_pk=census.pk,
+        owner=census.user,
+        viewer=request.user,
+        protection_type=GeneratedCharacter.PROTECTION_ST_ONLY,
+        note="Census view",
+    )
+
+
+def _build_census_question_nodes(census: EclipsePhaseCensus, questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    responses = census.responses if isinstance(census.responses, dict) else {}
+    default_voice = (
+        "omniscient"
+        if census.narrative_voice == EclipsePhaseCensus.VOICE_OMNISCIENT
+        else "first_person"
+    )
+    nodes = []
+    for q in questions:
+        qid = q["id"]
+        norm = normalize_census_record(responses.get(qid), default_voice=default_voice)
+        is_answered = bool(q.get("answerable", True) and norm["answer"].strip())
+        depth = 0
+        pid = q.get("parent_id")
+        if pid is not None:
+            depth = 2 if (pid.startswith("6.1f") or pid == "6.2a" or pid.startswith("13") and len(pid) >= 3) else 1
+        nodes.append(
+            {
+                "id": qid,
+                "display_id": q.get("display_id") or qid,
+                "chapter_id": q["chapter_id"],
+                "parent_id": pid,
+                "heading": q["heading"],
+                "primer": q.get("primer") or "",
+                "section_group": q.get("section_group", "main"),
+                "answerable": bool(q.get("answerable", True)),
+                "answer": norm["answer"],
+                "voice": norm["voice"],
+                "updated_at": norm["updated_at"],
+                "is_answered": is_answered,
+                "depth": depth,
+            }
+        )
+    return nodes
+
+
+@login_required
+@require_http_methods(["GET", "POST"])
+def census_list(request):
+    """List user's Eclipse Phase Census documents and initialize a new Census walkthrough."""
+    user_dossiers = list(CharacterDossier.objects.filter(user=request.user).order_by("-updated_at"))
+    user_characters = list(GeneratedCharacter.objects.filter(user=request.user).order_by("-updated_at"))
+
+    if request.method == "POST":
+        character_name = (request.POST.get("character_name") or "").strip()
+        narrative_voice = (request.POST.get("narrative_voice") or EclipsePhaseCensus.VOICE_FIRST_PERSON).strip()
+        dossier_id = (request.POST.get("dossier_id") or "").strip()
+        character_id = (request.POST.get("character_id") or "").strip()
+        show_sexuality = request.POST.get("show_sexuality_sections") != "0"
+        show_appendix = _truthy_param(request.POST.get("show_sensitive_appendix"))
+
+        dossier = None
+        if dossier_id:
+            dossier = get_object_or_404(CharacterDossier, pk=dossier_id, user=request.user)
+        character = None
+        if character_id:
+            character = get_object_or_404(GeneratedCharacter, pk=character_id, user=request.user)
+
+        try:
+            census = create_census(
+                request.user,
+                character_name=character_name,
+                narrative_voice=narrative_voice,
+                dossier=dossier,
+                character=character,
+                show_sexuality_sections=show_sexuality,
+                show_sensitive_appendix=show_appendix,
+            )
+        except ValueError as err:
+            messages.error(request, str(err))
+            return redirect("spacemarches:census_list")
+        return redirect("spacemarches:census_detail", pk=census.pk)
+
+    censuses = list(
+        EclipsePhaseCensus.objects.filter(user=request.user)
+        .select_related("dossier", "character")
+        .order_by("-updated_at")
+    )
+    census_cards = [{"census": c, "stats": compute_census_stats(c)} for c in censuses]
+    meta = get_census_meta()
+    return render(
+        request,
+        "spacemarches/census_list.html",
+        {
+            "census_cards": census_cards,
+            "dossiers": user_dossiers,
+            "characters": user_characters,
+            "voice_choices": EclipsePhaseCensus.NARRATIVE_VOICE_CHOICES,
+            "meta": meta,
+            "prefill_dossier_id": (request.GET.get("dossier_id") or "").strip(),
+            "prefill_character_id": (request.GET.get("character_id") or "").strip(),
+        },
+    )
+
+
+@login_required
+def census_detail(request, pk: int):
+    """Guided chapter-by-chapter Eclipse Phase Census walkthrough."""
+    census = _get_accessible_census(request.user, pk=pk)
+    _log_census_st_only_access(request, census)
+
+    meta = get_census_meta()
+    stats = compute_census_stats(census)
+    chapters = stats["chapters"]
+    include_sexuality = bool(census.show_sexuality_sections)
+    include_appendix = bool(census.show_sensitive_appendix)
+
+    requested_chapter = (request.GET.get("chapter") or "").strip()
+    view_all = requested_chapter == "all"
+    valid_chapter_ids = {ch["id"] for ch in chapters}
+    active_chapter_id = requested_chapter if requested_chapter in valid_chapter_ids else "origins"
+    active_chapter = get_census_chapter(active_chapter_id) if not view_all else None
+
+    if view_all:
+        raw_questions = get_all_census_questions(
+            include_sexuality=include_sexuality,
+            include_appendix=include_appendix,
+            answerable_only=False,
+        )
+        question_nodes = _build_census_question_nodes(census, raw_questions)
+        chapter_lookup = {ch["id"]: ch for ch in chapters}
+        grouped_chapters = []
+        for ch in chapters:
+            if ch["is_appendix"] and not include_appendix:
+                continue
+            nodes = [n for n in question_nodes if n["chapter_id"] == ch["id"]]
+            grouped_chapters.append({"chapter": ch, "nodes": nodes})
+        prev_chapter = None
+        next_chapter = None
+    else:
+        grouped_chapters = []
+        raw_questions = get_chapter_questions(
+            active_chapter_id,
+            include_sexuality=include_sexuality,
+            include_appendix=True,
+            answerable_only=False,
+        )
+        question_nodes = _build_census_question_nodes(census, raw_questions)
+        visible_chapters = [ch for ch in chapters if include_appendix or not ch["is_appendix"]]
+        if active_chapter_id == "appendix" and not include_appendix:
+            visible_chapters = chapters
+        idx = next((i for i, ch in enumerate(visible_chapters) if ch["id"] == active_chapter_id), 0)
+        prev_chapter = visible_chapters[idx - 1] if idx > 0 else None
+        next_chapter = visible_chapters[idx + 1] if idx + 1 < len(visible_chapters) else None
+
+    is_owner_view = census.user_id == request.user.pk
+    protection = protection_state(census, request, viewer=request.user)
+    access_log = (
+        list(
+            ProtectionAccessLog.objects.filter(
+                target_kind=ProtectionAccessLog.TARGET_CENSUS,
+                target_pk=census.pk,
+            )
+            .select_related("viewer")
+            .order_by("-created_at")[:20]
+        )
+        if is_owner_view
+        else []
+    )
+    user_dossiers = (
+        list(CharacterDossier.objects.filter(user=request.user).order_by("-updated_at"))
+        if is_owner_view
+        else []
+    )
+    user_characters = (
+        list(GeneratedCharacter.objects.filter(user=request.user).order_by("-updated_at"))
+        if is_owner_view
+        else []
+    )
+
+    return render(
+        request,
+        "spacemarches/census_detail.html",
+        {
+            "census": census,
+            "meta": meta,
+            "stats": stats,
+            "chapters": chapters,
+            "view_all": view_all,
+            "active_chapter_id": "all" if view_all else active_chapter_id,
+            "active_chapter": active_chapter,
+            "question_nodes": question_nodes,
+            "grouped_chapters": grouped_chapters,
+            "prev_chapter": prev_chapter,
+            "next_chapter": next_chapter,
+            "voice_choices": EclipsePhaseCensus.NARRATIVE_VOICE_CHOICES,
+            "user_dossiers": user_dossiers,
+            "user_characters": user_characters,
+            "is_owner_view": is_owner_view,
+            "is_admin_override": not is_owner_view,
+            "protection": protection,
+            "access_log": access_log,
+            "attribution_notice": get_census_attribution(),
+        },
+    )
+
+
+@login_required
+@require_POST
+def census_answer(request, pk: int):
+    """Save or clear an individual Eclipse Phase Census question response (JSON or form POST)."""
+    census = _get_accessible_census(request.user, pk=pk)
+    wants_json = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in (request.content_type or "")
+    )
+
+    if "application/json" in (request.content_type or ""):
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+    else:
+        payload = request.POST
+
+    question_id = str(payload.get("question_id") or "").strip()
+    if str(payload.get("action") or "").strip() == "clear":
+        answer = ""
+    else:
+        answer = str(payload.get("answer_text") if "answer_text" in payload else (payload.get("answer") or ""))
+    voice = str(payload.get("voice") or "").strip()
+    active_chapter = str(payload.get("chapter") or "").strip()
+
+    try:
+        saved = save_census_answer(census, question_id, answer, voice=voice)
+    except ValueError as err:
+        if wants_json:
+            return JsonResponse({"error": str(err)}, status=400)
+        messages.error(request, str(err))
+        target = reverse("spacemarches:census_detail", kwargs={"pk": census.pk})
+        return redirect(f"{target}?chapter={active_chapter}" if active_chapter else target)
+
+    stats = compute_census_stats(census)
+    if wants_json:
+        return JsonResponse({"status": "saved", **saved, "stats": stats})
+
+    if saved["answered"]:
+        messages.success(request, f"Saved response for [{question_id}].")
+    else:
+        messages.info(request, f"Cleared response for [{question_id}].")
+    target = reverse("spacemarches:census_detail", kwargs={"pk": census.pk})
+    return redirect(f"{target}?chapter={active_chapter}" if active_chapter else target)
+
+
+@login_required
+@require_POST
+def census_settings(request, pk: int):
+    """Update Census metadata, linked Dossier/Character, and optional section visibility toggles."""
+    census = _get_accessible_census(request.user, pk=pk)
+    active_chapter = (request.POST.get("chapter") or "").strip()
+    action = (request.POST.get("action") or "update_settings").strip()
+
+    if action == "toggle_sexuality":
+        census.show_sexuality_sections = not census.show_sexuality_sections
+        census.save(update_fields=["show_sexuality_sections", "updated_at"])
+        messages.success(
+            request,
+            "Optional sexuality & experience sections (13c, 13e) enabled."
+            if census.show_sexuality_sections
+            else "Optional sexuality & experience sections (13c, 13e) hidden.",
+        )
+    elif action == "toggle_appendix":
+        census.show_sensitive_appendix = not census.show_sensitive_appendix
+        census.save(update_fields=["show_sensitive_appendix", "updated_at"])
+        messages.success(
+            request,
+            "Moved Questions Appendix (13d1-13d6) opted in."
+            if census.show_sensitive_appendix
+            else "Moved Questions Appendix (13d1-13d6) hidden.",
+        )
+    elif action == "toggle_public":
+        census.public_view = not census.public_view
+        census.save(update_fields=["public_view", "updated_at"])
+        messages.success(
+            request,
+            f"Public review enabled for {census.character_name}."
+            if census.public_view
+            else f"Public review disabled for {census.character_name}.",
+        )
+    else:
+        new_name = (request.POST.get("character_name") or "").strip()
+        if new_name:
+            census.character_name = new_name[:160]
+        raw_voice = (request.POST.get("narrative_voice") or "").strip()
+        if raw_voice in {EclipsePhaseCensus.VOICE_FIRST_PERSON, EclipsePhaseCensus.VOICE_OMNISCIENT}:
+            census.narrative_voice = raw_voice
+
+        if census.user_id == request.user.pk:
+            dossier_id = (request.POST.get("dossier_id") or "").strip()
+            if dossier_id:
+                census.dossier = get_object_or_404(CharacterDossier, pk=dossier_id, user=request.user)
+            elif "dossier_id" in request.POST:
+                census.dossier = None
+
+            character_id = (request.POST.get("character_id") or "").strip()
+            if character_id:
+                census.character = get_object_or_404(GeneratedCharacter, pk=character_id, user=request.user)
+            elif "character_id" in request.POST:
+                census.character = None
+
+        if "show_sexuality_sections" in request.POST:
+            census.show_sexuality_sections = _truthy_param(request.POST.get("show_sexuality_sections"))
+        if "show_sensitive_appendix" in request.POST:
+            census.show_sensitive_appendix = _truthy_param(request.POST.get("show_sensitive_appendix"))
+        if "public_view" in request.POST:
+            census.public_view = _truthy_param(request.POST.get("public_view"))
+        census.save()
+        messages.success(request, "Census preferences updated.")
+
+    target = reverse("spacemarches:census_detail", kwargs={"pk": census.pk})
+    return redirect(f"{target}?chapter={active_chapter}" if active_chapter else target)
+
+
+@login_required
+@require_POST
+def census_protection(request, pk: int):
+    """Set the protection lock on an EclipsePhaseCensus, or unlock it with the cipher."""
+    census = get_object_or_404(EclipsePhaseCensus, pk=pk, user=request.user)
+    active_chapter = (request.POST.get("chapter") or "").strip()
+    target = reverse("spacemarches:census_detail", kwargs={"pk": census.pk})
+    back_url = f"{target}?chapter={active_chapter}" if active_chapter else target
+    action = (request.POST.get("action") or "save").strip()
+
+    if action == "unlock":
+        answer = (request.POST.get("answer") or "").strip()
+        if not verify_secret(census, answer):
+            messages.error(request, "Incorrect answer — the lock held.")
+            return redirect(back_url)
+        mark_unlocked(request, ProtectionAccessLog.TARGET_CENSUS, census.pk)
+        messages.success(request, "Authenticated — Census unlocked.")
+        return redirect(back_url)
+
+    protection = (request.POST.get("protection") or "none").strip()
+    if protection not in {choice[0] for choice in GeneratedCharacter.PROTECTION_CHOICES}:
+        protection = GeneratedCharacter.PROTECTION_NONE
+
+    puzzle_prompt = (request.POST.get("secret_puzzle_prompt") or "").strip()
+    answer = (request.POST.get("secret_answer") or "").strip()
+
+    census.protection = protection
+    census.save(update_fields=["protection", "updated_at"])
+
+    if protection == GeneratedCharacter.PROTECTION_SECRET:
+        set_secret(census, puzzle_prompt, answer)
+        messages.success(request, f"Secret lock armed for {census.character_name}.")
+    else:
+        clear_secret(census)
+        messages.success(request, f"Protection set to {protection}.")
+    return redirect(back_url)
+
+
+@login_required
+def census_export(request, pk: int):
+    """Export an accessible EclipsePhaseCensus in Markdown, HTML, or JSON format."""
+    census = _get_accessible_census(request.user, pk=pk)
+    fmt = (request.GET.get("format") or "md").strip().lower()
+    include_unanswered = _truthy_param(request.GET.get("include_unanswered"))
+
+    if fmt == "json":
+        payload = export_census_json(census)
+        resp = JsonResponse(payload, json_dumps_params={"indent": 2, "ensure_ascii": False})
+        resp["Content-Disposition"] = f'attachment; filename="{census.slug}-census.json"'
+        return resp
+    if fmt == "html":
+        html_text = export_census_html(census, include_unanswered=include_unanswered)
+        resp = HttpResponse(html_text, content_type="text/html; charset=utf-8")
+        resp["Content-Disposition"] = f'attachment; filename="{census.slug}-census.html"'
+        return resp
+    md_text = export_census_markdown(census, include_unanswered=include_unanswered)
+    resp = HttpResponse(md_text, content_type="text/markdown; charset=utf-8")
+    resp["Content-Disposition"] = f'attachment; filename="{census.slug}-census.md"'
+    return resp
+
+
+@require_http_methods(["GET", "POST"])
+def census_review(request, pk: int):
+    """Public read-only review surface for a shared EclipsePhaseCensus, honoring protection locks."""
+    census = get_object_or_404(
+        EclipsePhaseCensus.objects.select_related("user", "dossier", "character"),
+        pk=pk,
+    )
+    viewer = request.user if request.user.is_authenticated else None
+    is_owner = viewer is not None and viewer.pk == census.user_id
+    if not census.public_view and not is_owner:
+        raise Http404("Eclipse Phase Census is private.")
+
+    review_url = reverse("spacemarches:census_review", kwargs={"pk": census.pk})
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "unlock_census":
+            answer = (request.POST.get("answer") or "").strip()
+            if verify_secret(census, answer):
+                mark_unlocked(request, ProtectionAccessLog.TARGET_CENSUS, census.pk)
+                log_protection_access(
+                    target_kind=ProtectionAccessLog.TARGET_CENSUS,
+                    target_pk=census.pk,
+                    owner=census.user,
+                    viewer=viewer,
+                    protection_type=GeneratedCharacter.PROTECTION_SECRET,
+                    note="Secret unlocked",
+                )
+                return redirect(review_url)
+            messages.error(request, "Incorrect answer — the lock held.")
+            return redirect(review_url)
+        return redirect(review_url)
+
+    census_protection_state = protection_state(census, request, viewer=viewer)
+    if (
+        census_protection_state["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY
+        and census_protection_state["unlocked"]
+        and not is_owner
+    ):
+        log_protection_access(
+            target_kind=ProtectionAccessLog.TARGET_CENSUS,
+            target_pk=census.pk,
+            owner=census.user,
+            viewer=viewer,
+            protection_type=GeneratedCharacter.PROTECTION_ST_ONLY,
+            note="Census review view",
+        )
+
+    stats = compute_census_stats(census)
+    grouped_chapters = []
+    if not census_protection_state["locked"]:
+        all_qs = get_all_census_questions(
+            include_sexuality=bool(census.show_sexuality_sections),
+            include_appendix=bool(census.show_sensitive_appendix),
+            answerable_only=True,
+        )
+        nodes = _build_census_question_nodes(census, all_qs)
+        answered_nodes = [n for n in nodes if n["is_answered"]]
+        for ch in stats["chapters"]:
+            if ch["is_appendix"] and not census.show_sensitive_appendix:
+                continue
+            ch_nodes = [n for n in answered_nodes if n["chapter_id"] == ch["id"]]
+            if ch_nodes:
+                grouped_chapters.append({"chapter": ch, "nodes": ch_nodes})
+
+    return render(
+        request,
+        "spacemarches/census_review.html",
+        {
+            "census": census,
+            "census_protection": census_protection_state,
+            "stats": stats,
+            "grouped_chapters": grouped_chapters,
+            "meta": get_census_meta(),
+            "review_url": review_url,
+            "attribution_notice": get_census_attribution(),
+        },
+    )
+
+
+@login_required
+@require_POST
+def census_delete(request, pk: int):
+    """Delete an owned Eclipse Phase Census."""
+    census = get_object_or_404(EclipsePhaseCensus, pk=pk, user=request.user)
+    name = census.character_name
+    census.delete()
+    messages.info(request, f"Removed Census '{name}'.")
+    return redirect("spacemarches:census_list")

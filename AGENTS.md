@@ -186,6 +186,7 @@ python manage.py runserver
   - `/spacemarches/compendium/` & `/spacemarches/compendium/<entry_id>/` — Searchable EP2E Reference Compendium (`Ep2Entry`)
   - `/spacemarches/api/ep2/`, `/spacemarches/api/ep2/meta/`, & `/spacemarches/api/ep2/<entry_id>/` — Seeded EP2E reference data & catalog metadata API (`Ep2Entry`)
   - `/spacemarches/dossier/` — Character dossiers & Discord link codes
+  - `/spacemarches/census/` — Guided Eclipse Phase Census (ShadowDragon8685 / GearheadLydia companion walkthrough)
   - `/spacemarches/archives/` & `/spacemarches/forums/` — Public archives & threads
 - **OAuth2 / Misago IdP (`accounts/oauth.py`):** `/o/` (`django-oauth-toolkit>=3.4`, `PKCE_REQUIRED=False`) and `/accounts/oauth/userinfo/`. See `docs/misago-oauth-setup.md`.
 - **Discord Bot:** `python manage.py run_discord_bot` (or Windows `start_discord.cmd`, which loads `.env` into Conda env `DeadletterMail`). Requires `discord.py>=2.3` and `DISCORD_BOT_TOKEN`.

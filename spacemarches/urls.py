@@ -59,4 +59,13 @@ urlpatterns = [
     path("dossier/<slug:slug>/protection/", views.dossier_protection, name="dossier_protection"),
     path("dossier/<slug:slug>/review/", views.dossier_review, name="dossier_review"),
     path("dossier/id/<int:pk>/review/", views.dossier_review_by_id, name="dossier_review_by_id"),
+    # Guided Eclipse Phase Census (community questionnaire walkthrough)
+    path("census/", views.census_list, name="census_list"),
+    path("census/<int:pk>/", views.census_detail, name="census_detail"),
+    path("census/<int:pk>/answer/", views.census_answer, name="census_answer"),
+    path("census/<int:pk>/settings/", views.census_settings, name="census_settings"),
+    path("census/<int:pk>/protection/", views.census_protection, name="census_protection"),
+    path("census/<int:pk>/export/", views.census_export, name="census_export"),
+    path("census/<int:pk>/review/", views.census_review, name="census_review"),
+    path("census/<int:pk>/delete/", views.census_delete, name="census_delete"),
 ]

@@ -11,6 +11,14 @@ from .design_pack_service import (
     visible_design_packs_qs,
     visible_ep2_entries_qs,
 )
+from .census_service import (
+    compute_census_stats,
+    create_census,
+    export_census_html,
+    export_census_json,
+    export_census_markdown,
+    save_census_answer,
+)
 from .dossier_service import (
     complete_discord_link,
     compute_dossier_stats,
@@ -33,7 +41,13 @@ from .meshnet_adapter_service import export_meshnet_pack_payload, get_meshnet_pa
 __all__ = [
     "can_edit_design_pack",
     "complete_discord_link",
+    "compute_census_stats",
     "compute_dossier_stats",
+    "create_census",
+    "export_census_html",
+    "export_census_json",
+    "export_census_markdown",
+    "save_census_answer",
     "create_custom_design_pack",
     "create_or_update_custom_entry",
     "ensure_canonical_design_packs",

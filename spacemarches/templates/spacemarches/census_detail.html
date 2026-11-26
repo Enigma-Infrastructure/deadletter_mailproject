@@ -1,0 +1,369 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ census.character_name }} — Eclipse Phase Census | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<p><a href="{% url 'spacemarches:census_list' %}">&larr; All Eclipse Phase Censuses</a></p>
+
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
+  <div>
+    <p class="sm-eyebrow">Eclipse Phase Census &middot; {{ meta.source_credits }}</p>
+    <h1 style="margin-bottom: 0.25rem;">{{ census.character_name }}</h1>
+    <div class="sm-meta-strip" style="margin-bottom: 0.3rem;">
+      <span><span class="sm-meta-key">Voice</span> {{ census.get_narrative_voice_display }}</span>
+      <span><span class="sm-meta-key">Answered</span> <strong id="census-stat-answered">{{ stats.answered_count }}</strong>/<strong id="census-stat-total">{{ stats.total_questions }}</strong> (<span id="census-stat-pct">{{ stats.completion_percent }}</span>%)</span>
+      {% if census.dossier %}
+        <span><span class="sm-meta-key">Dossier</span> <a href="{% url 'spacemarches:dossier_detail' slug=census.dossier.slug %}">{{ census.dossier.character_name }}</a></span>
+      {% endif %}
+      {% if census.character %}
+        <span><span class="sm-meta-key">Point-Buy Sheet</span> <a href="{% url 'spacemarches:character_roster' %}">{{ census.character.character_name }}</a></span>
+      {% endif %}
+      {% if is_admin_override %}<span class="sm-status-flag is-warn">Admin View</span>{% endif %}
+    </div>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md">Export MD</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md&amp;include_unanswered=1">Full Prompt+Answer MD</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=html">Export HTML</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=json">Export JSON</a>
+  </div>
+</div>
+
+<details class="sm-panel" style="margin: 0.85rem 0;" {% if stats.answered_count == 0 %}open{% endif %}>
+  <summary style="cursor: pointer; font-weight: 600;">Introduction &amp; Author Guidance (Read Before Diving In)</summary>
+  <div style="margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.65rem; max-width: 78ch;">
+    {% for para in meta.intro_paragraphs %}
+      <p style="margin: 0; font-size: 0.92rem;">{{ para }}</p>
+    {% endfor %}
+  </div>
+</details>
+
+<details class="sm-panel" style="margin: 0.85rem 0;">
+  <summary style="cursor: pointer; font-weight: 600;">Census Links, Voice &amp; Optional Section Preferences</summary>
+  <form method="post" action="{% url 'spacemarches:census_settings' pk=census.pk %}" style="margin-top: 0.75rem;">
+    {% csrf_token %}
+    <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 0.75rem;">
+      <div class="form-group">
+        <label for="id_edit_name">Character Name</label>
+        <input id="id_edit_name" type="text" name="character_name" value="{{ census.character_name }}" maxlength="160">
+      </div>
+      <div class="form-group">
+        <label for="id_edit_voice">Default Narrative Voice</label>
+        <select id="id_edit_voice" name="narrative_voice">
+          {% for val, label in voice_choices %}
+            <option value="{{ val }}" {% if census.narrative_voice == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if is_owner_view %}
+        <div class="form-group">
+          <label for="id_edit_dossier">Linked Operational Dossier</label>
+          <select id="id_edit_dossier" name="dossier_id">
+            <option value="">&mdash; None &mdash;</option>
+            {% for d in user_dossiers %}
+              <option value="{{ d.pk }}" {% if census.dossier_id == d.pk %}selected{% endif %}>{{ d.character_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="id_edit_character">Linked Point-Buy Sheet</label>
+          <select id="id_edit_character" name="character_id">
+            <option value="">&mdash; None &mdash;</option>
+            {% for ch in user_characters %}
+              <option value="{{ ch.pk }}" {% if census.character_id == ch.pk %}selected{% endif %}>{{ ch.character_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      {% endif %}
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.3rem 0 0.75rem; font-size: 0.86rem;">
+      <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
+        <input type="hidden" name="show_sexuality_sections" value="0">
+        <input type="checkbox" name="show_sexuality_sections" value="1" {% if census.show_sexuality_sections %}checked{% endif %} style="width: auto;">
+        Show optional sexuality sections (13c, 13e)
+      </label>
+      <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
+        <input type="hidden" name="show_sensitive_appendix" value="0">
+        <input type="checkbox" name="show_sensitive_appendix" value="1" {% if census.show_sensitive_appendix %}checked{% endif %} style="width: auto;">
+        Opt in to Moved Questions Appendix (13d1&ndash;13d6)
+      </label>
+      <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
+        <input type="hidden" name="public_view" value="0">
+        <input type="checkbox" name="public_view" value="1" {% if census.public_view %}checked{% endif %} style="width: auto;">
+        Enable public review link
+      </label>
+    </div>
+    <button type="submit" class="btn btn-secondary btn-sm">Save Preferences</button>
+  </form>
+</details>
+
+{% if is_owner_view %}
+  <details class="sm-panel" style="margin: 0.85rem 0;" {% if census.protection != "none" or census.public_view %}open{% endif %}>
+    <summary style="cursor: pointer; font-weight: 600;">
+      Protection &amp; Public Review
+      <span class="sm-code-tag" style="margin-left: 0.4rem;">{{ census.get_protection_display }}</span>
+      {% if census.public_view %}<span class="sm-status-flag is-ok" style="margin-left: 0.3rem;">Public Review On</span>{% endif %}
+    </summary>
+    <div style="margin-top: 0.75rem;">
+      <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-bottom: 0.65rem;">
+        <form method="post" action="{% url 'spacemarches:census_settings' pk=census.pk %}" style="margin: 0;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="toggle_public">
+          <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
+          <button type="submit" class="btn btn-secondary btn-sm">
+            {% if census.public_view %}Disable Public Review{% else %}Enable Public Review{% endif %}
+          </button>
+        </form>
+        {% if census.public_view %}
+          <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_review' pk=census.pk %}" target="_blank" rel="noopener">Open Public Review</a>
+        {% endif %}
+      </div>
+      <form method="post" action="{% url 'spacemarches:census_protection' pk=census.pk %}" style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
+        {% csrf_token %}
+        <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
+        <select name="protection" aria-label="Protection" style="width: auto; min-width: 130px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+          <option value="none" {% if census.protection == "none" %}selected{% endif %}>None</option>
+          <option value="secret" {% if census.protection == "secret" %}selected{% endif %}>Secret</option>
+          <option value="st_only" {% if census.protection == "st_only" %}selected{% endif %}>ST-Only</option>
+        </select>
+        <input type="text" name="secret_puzzle_prompt" placeholder="Secret puzzle prompt" value="{{ census.secret_puzzle_prompt }}" style="flex: 1; min-width: 190px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+        <input type="password" name="secret_answer" placeholder="Secret answer (leave blank to keep)" autocomplete="new-password" style="flex: 1; min-width: 160px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+        <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+      </form>
+      {% if census.protection == "secret" %}
+        <form method="post" action="{% url 'spacemarches:census_protection' pk=census.pk %}" style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.45rem;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="unlock">
+          <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
+          <input type="password" name="answer" placeholder="Enter the cipher to authenticate" autocomplete="off" required style="flex: 1; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+          <button type="submit" class="btn btn-secondary btn-sm">Authenticate</button>
+        </form>
+      {% endif %}
+    </div>
+  </details>
+{% endif %}
+
+{% if access_log %}
+  <section class="sm-panel" style="margin: 0.85rem 0;" aria-label="Security Log">
+    <h2 style="margin: 0 0 0.4rem; font-size: 1rem;">Security Log</h2>
+    <p class="text-muted" style="margin: 0 0 0.5rem; font-size: 0.82rem;">ST views and secret unlocks recorded for this Census.</p>
+    <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.84rem;">
+      {% for entry in access_log %}
+        <li style="margin-bottom: 0.25rem;">
+          <strong>{{ entry.viewer|default:"Anonymous" }}</strong>
+          &middot; {{ entry.created_at|date:"Y-m-d H:i" }}
+          &middot; <span class="sm-code-tag">{{ entry.protection_type }}</span>
+          {% if entry.note %}<span class="text-muted">&mdash; {{ entry.note }}</span>{% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% endif %}
+
+<nav class="sm-panel" style="margin: 0.9rem 0;" aria-label="Census Chapters">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem;">
+    <span class="sm-eyebrow" style="margin: 0;">Guided Chapters</span>
+    <a class="btn btn-secondary btn-sm" href="?chapter=all" style="{% if view_all %}font-weight: 700; border-color: var(--sm-primary);{% endif %}">
+      View All Chapters
+    </a>
+  </div>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+    {% for ch in chapters %}
+      <a
+        href="?chapter={{ ch.id }}"
+        id="chapter-pill-{{ ch.id }}"
+        class="btn btn-secondary btn-sm"
+        style="{% if active_chapter_id == ch.id %}border-color: var(--sm-primary); font-weight: 700;{% endif %} {% if ch.is_appendix and not census.show_sensitive_appendix %}opacity: 0.72;{% endif %}"
+      >
+        {{ ch.number }}: {{ ch.title|truncatechars:26 }}
+        (<span class="ch-ans">{{ ch.answered_count }}</span>/<span class="ch-tot">{{ ch.total_questions }}</span>)
+      </a>
+    {% endfor %}
+  </div>
+</nav>
+
+{% if view_all %}
+  {% for group in grouped_chapters %}
+    <section style="margin-top: 1.5rem;">
+      <div class="sm-panel" style="margin-bottom: 0.75rem;">
+        <p class="sm-eyebrow" style="margin: 0;">Chapter {{ group.chapter.number }}</p>
+        <h2 style="margin: 0.15rem 0 0.3rem;">{{ group.chapter.title }}</h2>
+        <p class="text-muted" style="margin: 0;">{{ group.chapter.description }}</p>
+      </div>
+      {% if group.chapter.is_appendix %}
+        <div class="sm-panel" style="border-color: var(--sm-tertiary); margin-bottom: 0.75rem;">
+          <p class="sm-eyebrow" style="margin: 0 0 0.4rem;">Appendix Content Warning (GearheadLydia)</p>
+          {% for p in meta.appendix_notice %}
+            <p style="margin: 0 0 0.45rem; font-size: 0.88rem;">{{ p }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+      {% for node in group.nodes %}
+        {% include "spacemarches/_census_question_card.html" with node=node census=census active_chapter_id=active_chapter_id %}
+      {% endfor %}
+    </section>
+  {% endfor %}
+{% else %}
+  {% if active_chapter %}
+    <section class="sm-panel" style="margin-bottom: 0.85rem;">
+      <p class="sm-eyebrow" style="margin: 0;">Chapter {{ active_chapter.number }}</p>
+      <h2 style="margin: 0.15rem 0 0.3rem;">{{ active_chapter.title }}</h2>
+      <p class="text-muted" style="margin: 0;">{{ active_chapter.description }}</p>
+    </section>
+  {% endif %}
+
+  {% if active_chapter_id == "appendix" %}
+    <section class="sm-panel" style="border-color: var(--sm-tertiary); margin-bottom: 0.9rem;">
+      <p class="sm-eyebrow" style="margin: 0 0 0.4rem;">Moved Questions &mdash; Content Warning</p>
+      {% for p in meta.appendix_notice %}
+        <p style="margin: 0 0 0.5rem; font-size: 0.9rem;">{{ p }}</p>
+      {% endfor %}
+      <form method="post" action="{% url 'spacemarches:census_settings' pk=census.pk %}" style="margin-top: 0.65rem;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_appendix">
+        <input type="hidden" name="chapter" value="appendix">
+        {% if census.show_sensitive_appendix %}
+          <button type="submit" class="btn btn-secondary btn-sm">Hide Moved Questions Appendix</button>
+        {% else %}
+          <button type="submit" class="btn btn-sm">Opt In &amp; Show Moved Questions (13d1&ndash;13d6)</button>
+        {% endif %}
+      </form>
+    </section>
+  {% endif %}
+
+  {% if active_chapter_id != "appendix" or census.show_sensitive_appendix %}
+    {% for node in question_nodes %}
+      {% include "spacemarches/_census_question_card.html" with node=node census=census active_chapter_id=active_chapter_id %}
+    {% endfor %}
+  {% endif %}
+
+  <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin: 1.25rem 0; flex-wrap: wrap;">
+    <div>
+      {% if prev_chapter %}
+        <a class="btn btn-secondary btn-sm" href="?chapter={{ prev_chapter.id }}">&larr; {{ prev_chapter.number }}: {{ prev_chapter.title }}</a>
+      {% endif %}
+    </div>
+    <div>
+      {% if next_chapter %}
+        <a class="btn btn-sm" href="?chapter={{ next_chapter.id }}">Next: {{ next_chapter.number }}: {{ next_chapter.title }} &rarr;</a>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+
+<details class="sm-panel" style="margin-top: 1.5rem;">
+  <summary style="cursor: pointer; font-weight: 600;">Tracked Changes &amp; Creative Commons Legalese Notice (CC BY-NC-SA 3.0)</summary>
+  <div style="margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem;">
+    <div>
+      <h3 style="font-size: 0.96rem; margin: 0 0 0.4rem;">Creative Commons Legalese Notice</h3>
+      {% for p in meta.legal_notice %}
+        <p style="margin: 0 0 0.45rem; font-size: 0.84rem;" class="text-muted">{{ p }}</p>
+      {% endfor %}
+    </div>
+    <hr style="margin: 0.25rem 0;">
+    <div>
+      <h3 style="font-size: 0.96rem; margin: 0 0 0.4rem;">Tracked Changes (ShadowDragon8685 &amp; GearheadLydia)</h3>
+      <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.82rem;" class="text-muted">
+        {% for line in meta.tracked_changes %}
+          <li style="margin-bottom: 0.2rem;">{{ line }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</details>
+
+<script>
+  (function () {
+    const forms = document.querySelectorAll(".census-answer-form");
+    if (!forms.length || !window.fetch) return;
+
+    function updateHeaderAndPills(stats) {
+      if (!stats) return;
+      const ans = document.getElementById("census-stat-answered");
+      const tot = document.getElementById("census-stat-total");
+      const pct = document.getElementById("census-stat-pct");
+      if (ans) ans.textContent = String(stats.answered_count);
+      if (tot) tot.textContent = String(stats.total_questions);
+      if (pct) pct.textContent = String(stats.completion_percent);
+      if (Array.isArray(stats.chapters)) {
+        stats.chapters.forEach((ch) => {
+          const pill = document.getElementById("chapter-pill-" + ch.id);
+          if (!pill) return;
+          const ca = pill.querySelector(".ch-ans");
+          const ct = pill.querySelector(".ch-tot");
+          if (ca) ca.textContent = String(ch.answered_count);
+          if (ct) ct.textContent = String(ch.total_questions);
+        });
+      }
+    }
+
+    forms.forEach((form) => {
+      const card = form.closest(".census-card");
+      const statusBadge = card ? card.querySelector(".census-save-status") : null;
+      const submitClearBtn = form.querySelector(".census-clear-btn");
+      let clearRequested = false;
+
+      if (submitClearBtn) {
+        submitClearBtn.addEventListener("click", () => {
+          clearRequested = true;
+        });
+      }
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
+        const qid = form.querySelector('input[name="question_id"]').value;
+        const textarea = form.querySelector('textarea[name="answer_text"]');
+        const voiceSel = form.querySelector('select[name="voice"]');
+        const answerText = clearRequested ? "" : (textarea ? textarea.value : "");
+        const actionType = clearRequested ? "clear" : "save";
+        clearRequested = false;
+
+        if (statusBadge) {
+          statusBadge.textContent = "Saving...";
+          statusBadge.className = "sm-status-flag census-save-status";
+        }
+
+        try {
+          const resp = await fetch(form.action, {
+            method: "POST",
+            credentials: "same-origin",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": csrfInput ? csrfInput.value : "",
+              "X-Requested-With": "XMLHttpRequest"
+            },
+            body: JSON.stringify({
+              question_id: qid,
+              action: actionType,
+              answer_text: answerText,
+              voice: voiceSel ? voiceSel.value : ""
+            })
+          });
+          const data = await resp.json();
+          if (!resp.ok) throw new Error(data.error || "Save failed");
+
+          if (textarea && actionType === "clear") {
+            textarea.value = "";
+          }
+          if (statusBadge) {
+            if (data.answered) {
+              statusBadge.textContent = "Answered";
+              statusBadge.className = "sm-status-flag is-ok census-save-status";
+            } else {
+              statusBadge.textContent = "Unanswered";
+              statusBadge.className = "sm-status-flag census-save-status";
+            }
+          }
+          updateHeaderAndPills(data.stats);
+        } catch (err) {
+          if (statusBadge) {
+            statusBadge.textContent = err.message || "Error saving";
+            statusBadge.className = "sm-status-flag is-warn census-save-status";
+          }
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

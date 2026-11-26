@@ -7,6 +7,7 @@ from .models import (
     DesignPack,
     DiscordIntakeInvite,
     DiscordLink,
+    EclipsePhaseCensus,
     Ep2Entry,
     FieldAgent,
     ForumPost,
@@ -117,3 +118,19 @@ class Ep2EntryAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "reference", "entry_id")
     readonly_fields = ("entry_id", "source", "system")
     date_hierarchy = "updated_at"
+
+
+@admin.register(EclipsePhaseCensus)
+class EclipsePhaseCensusAdmin(admin.ModelAdmin):
+    list_display = (
+        "character_name",
+        "user",
+        "dossier",
+        "character",
+        "narrative_voice",
+        "public_view",
+        "protection",
+        "updated_at",
+    )
+    list_filter = ("narrative_voice", "public_view", "protection", "show_sensitive_appendix")
+    search_fields = ("character_name", "slug", "user__username", "dossier__character_name")

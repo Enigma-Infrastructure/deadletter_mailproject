@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .models import AgentSaveSlot, CharacterDossier, DiscordLink, FieldAgent, GeneratedCharacter
+from .models import AgentSaveSlot, CharacterDossier, DiscordLink, EclipsePhaseCensus, FieldAgent, GeneratedCharacter
 
 
 def get_user_spacemarches_summary(user) -> dict[str, Any]:
@@ -16,6 +16,8 @@ def get_user_spacemarches_summary(user) -> dict[str, Any]:
             "authenticated": False,
             "active_dossiers": [],
             "dossier_count": 0,
+            "active_censuses": [],
+            "census_count": 0,
             "generated_characters": [],
             "generated_character_count": 0,
             "clearance_summary": {},
@@ -78,6 +80,25 @@ def get_user_spacemarches_summary(user) -> dict[str, Any]:
     discord_link = DiscordLink.objects.filter(user=user).first()
     discord_linked = bool(discord_link and discord_link.discord_user_id)
 
+    censuses_qs = EclipsePhaseCensus.objects.filter(user=user).order_by("-updated_at")
+    active_censuses = []
+    for census in censuses_qs[:5]:
+        c_responses = census.responses if isinstance(census.responses, dict) else {}
+        c_answered = sum(
+            1
+            for val in c_responses.values()
+            if isinstance(val, dict) and str(val.get("answer", "")).strip()
+        )
+        active_censuses.append(
+            {
+                "id": census.pk,
+                "character_name": census.character_name,
+                "slug": census.slug,
+                "answered_count": c_answered,
+                "updated_at": census.updated_at,
+            }
+        )
+
     gen_qs = GeneratedCharacter.objects.filter(user=user).select_related("dossier").order_by("-updated_at")
     generated_characters = [
         {
@@ -95,6 +116,8 @@ def get_user_spacemarches_summary(user) -> dict[str, Any]:
         "authenticated": True,
         "active_dossiers": active_dossiers,
         "dossier_count": dossiers_qs.count(),
+        "active_censuses": active_censuses,
+        "census_count": censuses_qs.count(),
         "generated_characters": generated_characters,
         "generated_character_count": gen_qs.count(),
         "clearance_summary": clearance_summary,

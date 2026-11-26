@@ -1,0 +1,67 @@
+<article
+  id="census-q-{{ node.id }}"
+  class="sm-panel census-card"
+  style="margin-bottom: 0.85rem; {% if node.depth == 1 %}margin-left: 1rem; border-left: 3px solid var(--sm-outline);{% elif node.depth == 2 %}margin-left: 2rem; border-left: 3px solid var(--sm-primary);{% endif %}"
+>
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.45rem;">
+    <h3 style="margin: 0; font-size: 1.02rem;">
+      <span class="sm-code-tag" style="margin-right: 0.35rem;">{{ node.display_id }}</span>
+      {{ node.heading }}
+    </h3>
+    {% if node.answerable %}
+      <span class="sm-status-flag {% if node.is_answered %}is-ok{% endif %} census-save-status">
+        {% if node.is_answered %}Answered{% else %}Unanswered{% endif %}
+      </span>
+    {% else %}
+      <span class="sm-code-tag">Section Guide</span>
+    {% endif %}
+  </div>
+
+  {% if node.primer %}
+    <p style="margin: 0 0 0.75rem; font-size: 0.92rem; line-height: 1.58; white-space: pre-line;">{{ node.primer }}</p>
+  {% endif %}
+
+  {% if node.id == "13" %}
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+      <form method="post" action="{% url 'spacemarches:census_settings' pk=census.pk %}" style="margin: 0;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="toggle_sexuality">
+        <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
+        <button type="submit" class="btn btn-secondary btn-sm">
+          {% if census.show_sexuality_sections %}Hide Optional Sexuality Sections (13c, 13e){% else %}Show Optional Sexuality Sections (13c, 13e){% endif %}
+        </button>
+      </form>
+    </div>
+  {% elif node.id == "13d_stub" %}
+    <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
+      <a class="btn btn-secondary btn-sm" href="?chapter=appendix">Go to Moved Questions Appendix (13d1&ndash;13d6)</a>
+    </div>
+  {% elif node.answerable %}
+    <form class="census-answer-form" method="post" action="{% url 'spacemarches:census_answer' pk=census.pk %}">
+      {% csrf_token %}
+      <input type="hidden" name="question_id" value="{{ node.id }}">
+      <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
+      <div class="form-group" style="margin-bottom: 0.5rem;">
+        <textarea
+          name="answer_text"
+          rows="4"
+          placeholder="Answer in first-person or omniscient narrative — or leave blank to skip..."
+          style="width: 100%;"
+        >{{ node.answer }}</textarea>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem;">
+        <div style="display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem;">
+          <label for="voice-{{ node.id }}" style="margin: 0; font-weight: 500;">Voice:</label>
+          <select id="voice-{{ node.id }}" name="voice" style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.82rem;">
+            <option value="first_person" {% if node.voice == "first_person" %}selected{% endif %}>First-person (as character)</option>
+            <option value="omniscient" {% if node.voice == "omniscient" %}selected{% endif %}>Omniscient narrative</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
+          <button type="submit" name="action" value="clear" class="btn btn-secondary btn-sm census-clear-btn">Clear / Skip</button>
+          <button type="submit" name="action" value="save" class="btn btn-sm">Save Response</button>
+        </div>
+      </div>
+    </form>
+  {% endif %}
+</article>

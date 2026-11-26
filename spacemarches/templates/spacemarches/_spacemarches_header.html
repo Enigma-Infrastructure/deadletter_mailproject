@@ -19,6 +19,7 @@
       {% if user.is_authenticated %}
         <a class="sm-nav-link {% if 'character' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:character_roster' %}" rel="external">Characters</a>
         <a class="sm-nav-link {% if 'dossier' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:dossier_list' %}" rel="external">Dossiers</a>
+        <a class="sm-nav-link {% if 'census' in request.resolver_match.url_name %}is-active{% endif %}" href="{% url 'spacemarches:census_list' %}" rel="external">Census</a>
       {% endif %}
     </nav>
 

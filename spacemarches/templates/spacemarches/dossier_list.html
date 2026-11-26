@@ -8,7 +8,10 @@
     <h1>Character Dossiers &amp; Discord Link</h1>
     <p class="text-muted">Manage your Eclipse Phase / Spacemarches narrativization dossiers and sync responses between web and Discord.</p>
   </div>
-  <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_roster' %}">Saved Point-Buy Characters</a>
+  <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_list' %}">Eclipse Phase Census</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_roster' %}">Saved Point-Buy Characters</a>
+  </div>
 </div>
 
 <div class="sm-panel" style="margin: 1rem 0;">
