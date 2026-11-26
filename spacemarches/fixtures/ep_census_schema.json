@@ -1,18 +1,17 @@
 {
   "schema_version": "1.0",
   "title": "Eclipse Phase Census",
-  "subtitle": "Eclipse Phase Character Questionnaire (Original by ShadowDragon8685 / Edited Copy by GearheadLydia)",
+  "subtitle": "Eclipse Phase Character Questionnaire",
   "source_title": "Eclipse Phase Character Questionnaire: [Character Name Here]",
-  "source_credits": "(Original By ShadowDragon8685 / Edited Copy by GearheadLydia)",
+  "source_credits": "(Original By ShadowDragon8685 / Edited Copy by GearheadLydia / Spacemarches integration by MetaWizard)",
   "license": "CC BY-NC-SA 3.0",
-  "attribution_notice": "Eclipse Phase Character Questionnaire — Original by ShadowDragon8685 / Edited Copy by GearheadLydia. Adapted from Eclipse Phase by Posthuman Studios and governed by the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0) license.",
+  "attribution_notice": "Eclipse Phase Character Questionnaire — Original by ShadowDragon8685 / Edited Copy by GearheadLydia / Spacemarches integration by MetaWizard. Adapted from Eclipse Phase by Posthuman Studios and governed by the Creative Commons Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0) license.",
   "intro_paragraphs": [
     "This questionnaire is meant as a tool to aide in roleplaying and character creation: to not see a character as a pile of numbers on a nicely-formatted spreadsheet, but to explain the all-important who they are and why they are who they say they are.",
-    "It is not mandatory. However, it is strongly recommended, as it will give you (and me, the DM) a better grasp on your character, and I will be working off of your character backstory based on the information given. Write me a novella if you feel like - the more information you give, the better. That said, don’t stress over it if you don’t want to fill out everything or if you get stuck. I recommend skipping to the questions you find most interesting.",
-    "You also do not have to answer any questions you’re uncomfortable with, particularly the ones related to sex (question 13). Again, this questionnaire was written in large part by someone else, who may have had a different group dynamic and play-style than we might have.",
-    "As regards how the questionnaire is answered, that is up to you. I’ve followed the original questionnaire author’s advice and answered my character questionnaires in the first person as the character, if they were given that questionnaire -- unless the character wouldn’t know the answer, in which case I answer in the omniscient narrative form, or write down the pertinent information separately.",
-    "That said, let’s dive right in. Please, copy this document and edit your copy as much as you like. Or, alternatively, I can hand you an example of one I filled out for a character not involved in your campaign, if you want to see how I did this.",
-    "This questionnaire was primarily originally written by ShadowDragon8685, and has since seen some edits. Primary credit for all verbiage in this document goes to him. (See also the preserved attribution notice at the end of the document.)"
+    "Iit will give you (and any storyteller) a better grasp on your character, and allow people to build off of your character backstory based on the information given. Write a novella if you feel like - the more information you give, the better. That said, don’t stress over it if you don’t want to fill out everything or if you get stuck. Skip to the questions you find most interesting.",
+    "You also do not have to answer any questions you’re uncomfortable with, particularly the ones related to sex (question 13). This questionnaire was written in large part by someone else who was aiming to get a wholistic picture on Eclipse Phase, and you can engage in as much or as little concepts as you desire.",
+    "As regards how the questionnaire is answered, that is up to you. The original questionnaire author’s advice is to utilize first person as the character, if they were given that this Census -- unless the character wouldn’t know the answer, in which case the recommendation is to answer in the omniscient narrative form, or write down the pertinent information separately.",
+    "The core document has been passed around the Eclipse Phase community multiple times, for more details see the preserved attribution notice at the end of the document."
   ],
   "appendix_notice": [
     "[This is an appendix containing questions that were worth putting a content warning on; however, entirely blotting them out of the original questionnaire author’s work felt inappropriate to the spirit of not concealing or making light of grislier parts of the setting.",
@@ -68,6 +67,7 @@
     "Selectively merged in new question formatting, edits, etc.",
     "[Merged new changes from original sheet -Lydia], February 23rd, 2020",
     "Selectively merged in new question formatting, edits, etc. Also moved some questions back into the main questionnaire."
+	"Revision 13: Spacemarches - integrated into the Spacemarches project. Including passes on integration, verbatage, and narrative structure. by Ari // MetaWizard. 11/26/2026."
   ],
   "legal_notice": [
     "According to Google, the creator of a document retains all legal ownership rights. I, the creator, ShadowDragon8685, consider this work to be an adaptation of Eclipse Phase, published by Posthuman Studios.",
