@@ -184,7 +184,8 @@ class CensusViewsAndProtectionTests(TestCase):
         app_resp = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk}) + "?chapter=appendix")
         self.assertEqual(app_resp.status_code, 200)
         self.assertContains(app_resp, "Opt In &amp; Show Moved Questions")
-        self.assertNotContains(app_resp, "13d1")
+        self.assertNotContains(app_resp, 'id="census-q-13d1"')
+        self.assertNotContains(app_resp, "Rape and sexual assault.")
 
         # Opt in to appendix
         self.client.post(
@@ -192,7 +193,8 @@ class CensusViewsAndProtectionTests(TestCase):
             {"action": "toggle_appendix", "chapter": "appendix"},
         )
         app_resp2 = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk}) + "?chapter=appendix")
-        self.assertContains(app_resp2, "13d1")
+        self.assertContains(app_resp2, 'id="census-q-13d1"')
+        self.assertContains(app_resp2, "Rape and sexual assault.")
 
         # AJAX answer save
         ans_url = reverse("spacemarches:census_answer", kwargs={"pk": self.census.pk})
