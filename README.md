@@ -94,6 +94,26 @@ Then visit the entry points below and confirm each renders.
 - **Courier leaderboard**: http://127.0.0.1:8000/leaderboard/
 - **Print queue** (staff): http://127.0.0.1:8000/letters/print/queue/
 - **Django admin**: http://127.0.0.1:8000/admin/
+- **Spacemarches portal**: http://127.0.0.1:8000/spacemarches/
+- **MeshNet generator**: http://127.0.0.1:8000/spacemarches/generator/
+
+## Eclipse Phase 2e reference data (Ep2Entry)
+
+1042 seeded entries from the Bubz43/ep2e Foundry packs (CC BY 4.0 — see
+`spacemarches/fixtures/ATTRIBUTION.md`). Read it via:
+- `GET http://127.0.0.1:8000/spacemarches/api/ep2/` (filters: `pack`, `category`, `q`, `limit`, `offset`)
+- `GET http://127.0.0.1:8000/spacemarches/api/ep2/<entry_id>/`
+- `spacemarches/fixtures/ep2_entries.json` (raw fixture)
+- `manage.py seed_ep2_data` (idempotent; `--dry-run` to preview)
+
+## Where to read for AI/muse work
+
+**In the repo (GitHub):** `docs/` — engineering handoff (validation/deployment
+notes). Read `docs/` first on a fresh session.
+
+**Local-only (not tracked):** `.obsidian/` — the Obsidian AI-context regime.
+Not visible on GitHub. Contains `SPACEMARCHES.md` (spacemarches handoff),
+`CONTEXT.md` (pirate-mail app context), `DECISIONS.md`, `TODO.md`.
 
 ## Core concepts
 

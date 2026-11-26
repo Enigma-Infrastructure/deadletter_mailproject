@@ -41,6 +41,7 @@
       ><span class="sm-active-swatch-dot" aria-hidden="true"></span><span>Palette &amp; Contrast</span></button>
       {% if user.is_authenticated %}
         {% if is_meshnet_view %}
+          <span id="sm-notify-slot" class="sm-notify-slot" data-kind="success" role="status" aria-live="polite" hidden></span>
           <span id="bridge-status" class="sm-code-tag" style="font-size: 0.72rem;">Synced: {{ user.username }}</span>
           <button type="button" id="bridge-manual-sync" class="btn btn-secondary btn-sm">Sync Save</button>
         {% endif %}

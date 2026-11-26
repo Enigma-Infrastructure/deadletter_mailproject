@@ -253,8 +253,35 @@ def _build_references(entry: Ep2Entry, pack_name: str) -> list[dict[str, Any]]:
     ]
 
 
+
+def _meshnet_native_partial(entry: Ep2Entry, system: dict[str, Any]) -> tuple[str, dict[str, Any]] | None:
+    """Build a MeshNet partial from a meshnet-sourced entry's system payload.
+
+    The system payload stores the full typed design data (lingui ``m_`` message refs preserved
+    verbatim). The bundle's embedded designs use the identical format, so the hydrate path
+    builds and renders this data exactly like the embedded designs. Emit it verbatim.
+    """
+    design_type = (system.get("type") or entry.entry_type or "").strip()
+    if not design_type:
+        return None
+    partial: dict[str, Any] = dict(system)
+    partial["type"] = design_type
+    if "name" not in partial:
+        partial["name"] = _tagged_text(entry.name, "Unnamed Entry")
+    if "description" not in partial:
+        partial["description"] = _tagged_html(str(entry.description or ""))
+    return (design_type, partial)
+
+
 def _make_design_key(entry: Ep2Entry, used_keys: set[str]) -> str:
+    if (entry.source or "").strip().lower() == "meshnet" and entry.entry_id:
+        # MeshNet-native designs preserve the hashed design key so nested design
+        # references resolve exactly as they do in the embedded bundle data.
+        parts = entry.entry_id.split(":", 2)
+        if len(parts) == 3 and parts[2]:
+            return parts[2]
     raw = _SAFE_KEY_RE.sub("-", (entry.entry_id or slugify(entry.name) or "entry").strip()).strip("-")
+
     if not raw:
         raw = f"entry-{entry.pk or 1}"
     base = raw[:48]
@@ -271,6 +298,10 @@ def _make_design_key(entry: Ep2Entry, used_keys: set[str]) -> str:
 def _convert_entry(entry: Ep2Entry, *, pack_name: str) -> tuple[str, dict[str, Any]] | None:
     """Convert one Ep2Entry into (meshnet_design_type, partial_design_dict)."""
     system = entry.system if isinstance(entry.system, dict) else {}
+    if isinstance(system.get("type"), str) and system["type"].strip():
+        native = _meshnet_native_partial(entry, system)
+        if native is not None:
+            return native
     raw_desc = entry.description or system.get("description") or ""
     common: dict[str, Any] = {
         "name": _tagged_text(entry.name, "Unnamed Entry"),
