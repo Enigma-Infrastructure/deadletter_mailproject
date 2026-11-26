@@ -18,7 +18,7 @@
         <span class="sm-status-flag is-warn">ST-Only</span>
       {% endif %}
     </div>
-    <p class="text-muted" style="margin: 0;">{{ attribution_notice }}</p>
+    <p class="text-muted" style="margin: 0;">{{ rendered_attribution|default:attribution_notice }}</p>
   </header>
 
   {% if census_protection.locked and census_protection.protection == "secret" %}
@@ -72,6 +72,6 @@
     {% endif %}
   {% endif %}
 
-  <p class="text-muted" style="margin-top: 1.5rem; font-size: 0.75rem;">{{ attribution_notice }}</p>
+  <p class="text-muted" style="margin-top: 1.5rem; font-size: 0.75rem;">{{ rendered_attribution|default:attribution_notice }}</p>
 </div>
 {% endblock %}

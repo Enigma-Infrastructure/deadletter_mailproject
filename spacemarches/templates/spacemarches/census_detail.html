@@ -6,7 +6,7 @@
 
 <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 0.75rem;">
   <div>
-    <p class="sm-eyebrow">Eclipse Phase Census &middot; {{ meta.source_credits }}</p>
+    <p class="sm-eyebrow">Eclipse Phase Census &middot; {{ rendered_source_credits|default:meta.source_credits }}</p>
     <h1 style="margin-bottom: 0.25rem;">{{ census.character_name }}</h1>
     <div class="sm-meta-strip" style="margin-bottom: 0.3rem;">
       <span><span class="sm-meta-key">Voice</span> {{ census.get_narrative_voice_display }}</span>
@@ -255,6 +255,7 @@
   <summary style="cursor: pointer; font-weight: 600;">Tracked Changes &amp; Creative Commons Legalese Notice (CC BY-NC-SA 3.0)</summary>
   <div style="margin-top: 0.85rem; display: flex; flex-direction: column; gap: 0.75rem;">
     <div>
+      <p class="text-muted" style="font-size: 0.84rem; margin: 0 0 0.6rem;">{{ rendered_attribution|default:attribution_notice }}</p>
       <h3 style="font-size: 0.96rem; margin: 0 0 0.4rem;">Creative Commons Legalese Notice</h3>
       {% for p in meta.legal_notice %}
         <p style="margin: 0 0 0.45rem; font-size: 0.84rem;" class="text-muted">{{ p }}</p>

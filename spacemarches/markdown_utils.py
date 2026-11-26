@@ -44,3 +44,11 @@ def render_markdown_safe(text: str) -> str:
         attributes={"a": {"href", "title"}, "span": {"class"}},
     )
     return _HREF_ATTR.sub(_strip_dangerous_href, html)
+
+
+def render_markdown_inline_safe(text: str) -> str:
+    """Render sanitized Markdown for inline contexts (strips a single outer <p>...</p> wrapper)."""
+    rendered = render_markdown_safe(text).strip()
+    if rendered.startswith("<p>") and rendered.endswith("</p>") and rendered.count("<p>") == 1:
+        return rendered[3:-4]
+    return rendered

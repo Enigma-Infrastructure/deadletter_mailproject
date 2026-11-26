@@ -38,7 +38,8 @@ class CensusSchemaTests(TestCase):
         self.assertEqual(schema["license"], "CC BY-NC-SA 3.0")
         self.assertIn("ShadowDragon8685", meta["attribution_notice"])
         self.assertIn("GearheadLydia", meta["attribution_notice"])
-        self.assertEqual(len(meta["intro_paragraphs"]), 6)
+        self.assertEqual(len(meta["intro_paragraphs"]), 5)
+        self.assertTrue(any("Revision 13" in line for line in meta["tracked_changes"]))
         self.assertTrue(any("Moved Questions" in p or "appendix" in p.lower() for p in meta["appendix_notice"]))
         self.assertGreater(len(meta["tracked_changes"]), 30)
         self.assertGreaterEqual(len(meta["legal_notice"]), 4)
@@ -137,6 +138,9 @@ class CensusServiceTests(TestCase):
         html_out = export_census_html(census)
         self.assertNotIn('<script>alert("xss")</script>', html_out)
         self.assertIn("&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;", html_out)
+        self.assertIn('<a href="https://docs.google.com/document/d/16xufvywcntUv75oW-LBOKab536s1vkZEq_fF8jXMe4g/edit#heading=h.yfxvgs50z90t"', html_out)
+        self.assertIn('<a href="https://docs.google.com/document/d/1XiHbqf5WCdJNzzdggdZcrKyabY_V1-mKFXUMBad1lOw/edit"', html_out)
+        self.assertIn('<a href="https://spacemarches.space"', html_out)
 
         payload = export_census_json(census)
         self.assertEqual(payload["license"], "CC BY-NC-SA 3.0")
@@ -179,6 +183,11 @@ class CensusViewsAndProtectionTests(TestCase):
         self.assertContains(portal_resp, reverse("spacemarches:census_list"))
         dossier_resp = self.client.get(reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug}))
         self.assertContains(dossier_resp, reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk}))
+        self.assertContains(dossier_resp, "https://spacemarches.space")
+        list_resp = self.client.get(reverse("spacemarches:census_list"))
+        self.assertContains(list_resp, "https://docs.google.com/document/d/16xufvywcntUv75oW-LBOKab536s1vkZEq_fF8jXMe4g/edit#heading=h.yfxvgs50z90t")
+        self.assertContains(list_resp, "https://docs.google.com/document/d/1XiHbqf5WCdJNzzdggdZcrKyabY_V1-mKFXUMBad1lOw/edit")
+        self.assertContains(list_resp, "https://spacemarches.space")
 
         # Appendix gated off by default
         app_resp = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk}) + "?chapter=appendix")

@@ -17,7 +17,7 @@ from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
-from .markdown_utils import render_markdown_safe
+from .markdown_utils import render_markdown_inline_safe, render_markdown_safe
 from .models import (
     ArchiveEntry,
     CharacterDossier,
@@ -1035,6 +1035,7 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
             "default_stardate_era": default_stardate_era,
             "default_sol_number": progression["latest_sol_number"],
             "attribution_notice": get_attribution_notice(),
+            "rendered_attribution": mark_safe(render_markdown_inline_safe(get_attribution_notice())),
             "dossier_answer_url": dossier_answer_url,
             "dossier_export_url": dossier_export_url,
             "dossier_toggle_url": dossier_toggle_url,
@@ -1145,6 +1146,7 @@ def _handle_dossier_review(request, dossier: CharacterDossier, *, review_url: st
             "review_url": review_url,
             "is_anonymous": not request.user.is_authenticated,
             "attribution_notice": get_attribution_notice(),
+            "rendered_attribution": mark_safe(render_markdown_inline_safe(get_attribution_notice())),
         },
     )
 
@@ -1852,6 +1854,8 @@ def census_list(request):
             "characters": user_characters,
             "voice_choices": EclipsePhaseCensus.NARRATIVE_VOICE_CHOICES,
             "meta": meta,
+            "rendered_attribution": mark_safe(render_markdown_inline_safe(meta.get("attribution_notice") or "")),
+            "rendered_source_credits": mark_safe(render_markdown_inline_safe(meta.get("source_credits") or "")),
             "prefill_dossier_id": (request.GET.get("dossier_id") or "").strip(),
             "prefill_character_id": (request.GET.get("character_id") or "").strip(),
         },
@@ -1956,6 +1960,8 @@ def census_detail(request, pk: int):
             "protection": protection,
             "access_log": access_log,
             "attribution_notice": get_census_attribution(),
+            "rendered_attribution": mark_safe(render_markdown_inline_safe(get_census_attribution())),
+            "rendered_source_credits": mark_safe(render_markdown_inline_safe(meta.get("source_credits") or "")),
         },
     )
 
@@ -2201,6 +2207,7 @@ def census_review(request, pk: int):
             if ch_nodes:
                 grouped_chapters.append({"chapter": ch, "nodes": ch_nodes})
 
+    meta = get_census_meta()
     return render(
         request,
         "spacemarches/census_review.html",
@@ -2209,9 +2216,11 @@ def census_review(request, pk: int):
             "census_protection": census_protection_state,
             "stats": stats,
             "grouped_chapters": grouped_chapters,
-            "meta": get_census_meta(),
+            "meta": meta,
             "review_url": review_url,
             "attribution_notice": get_census_attribution(),
+            "rendered_attribution": mark_safe(render_markdown_inline_safe(get_census_attribution())),
+            "rendered_source_credits": mark_safe(render_markdown_inline_safe(meta.get("source_credits") or "")),
         },
     )
 

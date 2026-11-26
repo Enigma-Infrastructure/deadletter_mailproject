@@ -8,7 +8,7 @@
     <h1>Eclipse Phase Census</h1>
     <p class="text-muted" style="max-width: 68ch;">
       A companion document to your operational Character Dossier &mdash; preserving the original guided step through the Eclipse Phase universe, factions, social fault lines, and character prompts
-      (<em>{{ meta.source_credits }}</em>).
+      (<em>{{ rendered_source_credits|default:meta.source_credits }}</em>).
     </p>
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
@@ -119,5 +119,5 @@
   <p class="text-muted">You have not started an Eclipse Phase Census yet. Initialize one above to begin the guided setting walkthrough.</p>
 {% endif %}
 
-<p class="text-muted" style="margin-top: 2rem; font-size: 0.78rem;">{{ meta.attribution_notice }}</p>
+<p class="text-muted" style="margin-top: 2rem; font-size: 0.78rem;">{{ rendered_attribution|default:meta.attribution_notice }}</p>
 {% endblock %}

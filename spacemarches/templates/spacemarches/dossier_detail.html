@@ -326,7 +326,7 @@
 </section>
 
 <hr>
-<p class="text-muted" style="font-size: 0.8rem;">{{ attribution_notice }}</p>
+<p class="text-muted" style="font-size: 0.8rem;">{{ rendered_attribution|default:attribution_notice }}</p>
 
 <script>
   (function () {

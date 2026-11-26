@@ -7,6 +7,7 @@ from typing import Any
 
 from django.utils import timezone
 
+from spacemarches.markdown_utils import render_markdown_inline_safe
 from spacemarches.census import (
     get_all_census_questions,
     get_census_attribution,
@@ -310,7 +311,7 @@ def export_census_html(census: EclipsePhaseCensus, *, include_unanswered: bool =
         "<body>",
         "<header>",
         f"<h1>Eclipse Phase Character Questionnaire: {html.escape(census.character_name)}</h1>",
-        f'<p class="meta">{html.escape(meta.get("source_credits") or "")}</p>',
+        f'<p class="meta">{render_markdown_inline_safe(meta.get("source_credits") or "")}</p>',
         (
             f'<p class="meta">Voice: <strong>{html.escape(census.get_narrative_voice_display())}</strong> '
             f"&middot; Progress: <strong>{stats['answered_count']}/{stats['total_questions']} "
@@ -358,7 +359,7 @@ def export_census_html(census: EclipsePhaseCensus, *, include_unanswered: bool =
             parts.append("</article>")
 
     parts.append("<footer>")
-    parts.append(f"<p><strong>Attribution:</strong> {html.escape(get_census_attribution())}</p>")
+    parts.append(f"<p><strong>Attribution:</strong> {render_markdown_inline_safe(get_census_attribution())}</p>")
     for p in meta.get("legal_notice", []):
         parts.append(f"<p>{html.escape(p)}</p>")
     parts.extend(["</footer>", "</body>", "</html>"])
