@@ -310,7 +310,7 @@ class CensusUxAndCrossSyncTests(TestCase):
         self.assertEqual(appendix_ch["number"], "Appendix")
         self.assertEqual(appendix_ch["title"], "Sensitive Topics")
         self.assertEqual(appendix_ch["description"], "")
-        for qid in ("1", "5", "6.1j", "6.2o", "13", "13d_stub", "15f"):
+        for qid in ("5", "6", "6.1j", "6.2o", "13a", "15f"):
             q = get_census_question(qid)
             self.assertIn("\n\n", q["primer"], f"Expected paragraph breaks in primer for {qid}")
 
@@ -328,8 +328,8 @@ class CensusUxAndCrossSyncTests(TestCase):
         self.assertIn('id="census-q-6"', html)
         # Full chapter titles are never truncated
         self.assertIn("Fall, Origin, Morph, Home &amp; Livelihood", html)
-        self.assertIn("Politics, Factions, Reputations &amp; Beliefs", html)
-        self.assertIn("Sex, Relationships &amp; Intimacy", html)
+        self.assertIn("Politics &amp; Polarizing Entities", html)
+        self.assertIn("Gender, Sex &amp; Relationships", html)
         self.assertIn("Appendix: Sensitive Topics", html)
         # Awkward legacy appendix copy is gone
         self.assertNotIn("Chapter Appendix", html)

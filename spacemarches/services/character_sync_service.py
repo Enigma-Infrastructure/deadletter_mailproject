@@ -46,7 +46,7 @@ def _lookup_design_name_by_key(design_key: str) -> str:
     row = _load_meshnet_design_lookup().get(design_key)
     if row and row.get("name"):
         return _unwrap_tagged_text(row.get("name"))
-    entry = Ep2Entry.objects.filter(raw_data__key=design_key).only("name").first()
+    entry = Ep2Entry.objects.filter(entry_id__endswith=f":{design_key}").only("name").first()
     if entry and entry.name:
         return entry.name
     return ""
@@ -63,15 +63,13 @@ def get_sheet_skill_pack_choices() -> dict[str, list[dict[str, str]]]:
     seen: dict[str, set[str]] = {k: set() for k in grouped}
 
     # Prefer seeded Ep2Entry rows if available
-    db_rows = Ep2Entry.objects.filter(category=Ep2Entry.CATEGORY_SKILL_PACK).only(
-        "name", "system", "raw_data", "design_pack_id"
-    ).select_related("design_pack")
+    db_rows = Ep2Entry.objects.filter(category=Ep2Entry.CATEGORY_SKILL_PACK).select_related("design_pack")
     for entry in db_rows:
         sys_data = entry.system if isinstance(entry.system, dict) else {}
-        raw_data = entry.raw_data if isinstance(entry.raw_data, dict) else {}
         slot = str(sys_data.get("skillPackType") or "").strip().lower()
-        key = str(raw_data.get("key") or "").strip()
-        pack_slug = entry.design_pack.slug if entry.design_pack_id and entry.design_pack else "ep-crb"
+        eid = str(entry.entry_id or "").strip()
+        key = eid.rsplit(":", 1)[-1].strip() if ":" in eid else eid
+        pack_slug = entry.design_pack.slug if entry.design_pack_id and entry.design_pack else (entry.pack or "ep-crb")
         if slot in grouped and key and entry.name not in seen[slot]:
             seen[slot].add(entry.name)
             grouped[slot].append(

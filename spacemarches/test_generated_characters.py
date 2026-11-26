@@ -443,6 +443,12 @@ class CrossModelSheetSyncTests(TestCase):
         self.assertIn('form.getAttribute("action")', dossier_html)
         self.assertNotIn("fetch(form.action", dossier_html)
 
+        # Backdate sheet baseline cleanly so rapid Windows test ticks reliably register newer Census edits
+        from datetime import timedelta
+        from django.utils import timezone
+        GeneratedCharacter.objects.filter(pk=self.sheet.pk).update(updated_at=timezone.now() - timedelta(seconds=5))
+        self.sheet.refresh_from_db()
+
         # Updating a sheet-tracked Census answer and character name surfaces Pending Sync
         save_census_answer(census, "6", "Left the Brinker commune to join Anarchists.")
         census.character_name = "Nyx Anarch"
