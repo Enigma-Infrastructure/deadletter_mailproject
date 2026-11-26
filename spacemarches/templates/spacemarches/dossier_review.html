@@ -1,0 +1,117 @@
+{% extends "spacemarches/base_spacemarches.html" %}
+{% block title %}{{ dossier.character_name }} — Review | Spacemarches{% endblock %}
+
+{% block spacemarches_content %}
+<div style="max-width: 880px; margin: 0 auto;">
+  <p style="margin: 0 0 0.6rem;"><a href="{% url 'spacemarches:portal' %}">&larr; Back to Portal</a></p>
+
+  <header style="margin-bottom: 1.25rem;">
+    <p class="sm-eyebrow">Public Review — Completed Sheets</p>
+    <h1 style="margin: 0.15rem 0 0.35rem;">{{ dossier.character_name }}</h1>
+    <div class="sm-meta-strip" style="margin-bottom: 0.4rem;">
+      <span>Owner: <strong>{{ dossier.user|default:"Unclaimed" }}</strong></span>
+      {% if dossier_protection.locked and dossier_protection.protection == "secret" %}
+        <span class="sm-status-flag is-warn">Sealed — Secret</span>
+      {% elif dossier_protection.locked and dossier_protection.protection == "st_only" %}
+        <span class="sm-status-flag is-warn">ST-Only</span>
+      {% endif %}
+    </div>
+    <p class="text-muted" style="margin: 0;">{{ attribution_notice }}</p>
+  </header>
+
+  {% if dossier_protection.locked and dossier_protection.protection == "secret" %}
+    <section class="sm-panel" aria-label="Secret lock" style="border-color: var(--sm-tertiary);">
+      <p class="sm-eyebrow">Secret Locked</p>
+      <h2 style="margin: 0.3rem 0 0.6rem; font-size: 1.05rem;">This review is sealed.</h2>
+      {% if dossier_protection.secret_puzzle_prompt %}
+        <p style="font-size: 0.92rem; font-style: italic;">{{ dossier_protection.secret_puzzle_prompt }}</p>
+      {% else %}
+        <p class="text-muted">The content is locked behind a secret cipher.</p>
+      {% endif %}
+      <form method="post" action="{% url 'spacemarches:dossier_review' slug=dossier.slug %}" style="display: flex; gap: 0.5rem; margin-top: 0.85rem; align-items: center; flex-wrap: wrap;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="unlock_dossier">
+        <input type="text" name="answer" placeholder="Enter the cipher" autocomplete="off"
+               style="flex: 1; min-width: 180px;" required>
+        <button type="submit" class="btn">Unlock</button>
+      </form>
+      <p class="text-muted" style="font-size: 0.78rem; margin-top: 0.7rem;">
+        The owner must use the same cipher to bypass the lock. This is a secret lock on the whole section.
+      </p>
+    </section>
+  {% elif dossier_protection.locked and dossier_protection.protection == "st_only" %}
+    <section class="sm-panel" aria-label="ST-only lock" style="border-color: var(--sm-tertiary);">
+      <p class="sm-eyebrow">ST-Only</p>
+      <h2 style="margin: 0.3rem 0 0.5rem; font-size: 1.05rem;">Storyteller Access Required</h2>
+      <p class="text-muted" style="margin: 0;">This review is restricted to Storyteller accounts. Storyteller views are logged in the eclipse-phase security log for the owner.</p>
+    </section>
+  {% else %}
+    <section class="sm-panel">
+      <p class="sm-eyebrow">Sheets in this review ({{ sheets|length }})</p>
+      {% if sheets %}
+        <div class="sm-card-grid">
+          {% for item in sheets %}
+            <article class="sm-card" style="padding: 0.9rem 1rem;">
+              {% if item.protection.locked %}
+                <h3 style="margin: 0 0 0.4rem;">Sealed Sheet</h3>
+              {% else %}
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.4rem;">
+                  <h3 style="margin: 0;">{{ item.sheet.character_name }}</h3>
+                  <span class="sm-code-tag">Completed</span>
+                </div>
+              {% endif %}
+
+              {% if item.protection.locked and item.protection.protection == "secret" %}
+                <p class="sm-status-flag is-warn" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">Sealed — Secret</p>
+                {% if item.protection.secret_puzzle_prompt %}
+                  <p style="font-style: italic; margin: 0.4rem 0 0.55rem;">{{ item.protection.secret_puzzle_prompt }}</p>
+                {% else %}
+                  <p class="text-muted" style="margin: 0.4rem 0 0.55rem;">A secret.</p>
+                {% endif %}
+                <form method="post" action="{% url 'spacemarches:dossier_review' slug=dossier.slug %}" style="display: flex; gap: 0.4rem; align-items: center;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="unlock_sheet">
+                  <input type="hidden" name="sheet_pk" value="{{ item.sheet.pk }}">
+                  <input type="text" name="answer" placeholder="Enter the cipher" autocomplete="off" required>
+                  <button type="submit" class="btn btn-sm">Unlock</button>
+                </form>
+              {% elif item.protection.locked and item.protection.protection == "st_only" %}
+                <p class="sm-status-flag is-warn" style="display: inline-block; padding: 0.2rem 0.5rem; border-radius: 6px; font-size: 0.8rem; font-weight: 600;">ST-Only</p>
+                <p class="text-muted" style="margin: 0.5rem 0 0; font-size: 0.84rem;">Storyteller accounts only. Storyteller views are logged.</p>
+              {% else %}
+                {% if item.sheet.summary.concept %}
+                  <p class="text-muted" style="margin: 0 0 0.5rem;">{{ item.sheet.summary.concept }}</p>
+                {% endif %}
+                <div class="sm-meta-strip" style="font-size: 0.8rem; margin-bottom: 0.6rem;">
+                  {% if item.sheet.summary.morphs %}<span>Morph: <strong>{{ item.sheet.summary.morphs|join:", " }}</strong></span>{% endif %}
+                  {% if item.sheet.summary.skill_count %}<span>Skills: <strong>{{ item.sheet.summary.skill_count }}</strong></span>{% endif %}
+                  {% if item.sheet.summary.aptitudes %}
+                    <span>COG {{ item.sheet.summary.aptitudes.cog|default:"-" }} · INT {{ item.sheet.summary.aptitudes.int|default:"-" }} · REF {{ item.sheet.summary.aptitudes.ref|default:"-" }} · SAV {{ item.sheet.summary.aptitudes.sav|default:"-" }} · SOM {{ item.sheet.summary.aptitudes.som|default:"-" }} · WIL {{ item.sheet.summary.aptitudes.wil|default:"-" }}</span>
+                  {% endif %}
+                </div>
+                {% if user.is_authenticated and user == dossier.user %}
+                  <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:character_export' pk=item.sheet.pk %}?format=html">Open Sheet</a>
+                {% endif %}
+              {% endif %}
+            </article>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted" style="margin-bottom: 0;">No completed public sheets are linked to this dossier yet.</p>
+      {% endif %}
+    </section>
+
+    <section class="sm-panel">
+      <p class="sm-eyebrow">Dossier Summary</p>
+      <p style="margin: 0.35rem 0 0;">
+        Voice: <strong>{{ dossier.get_narrative_voice_display }}</strong>
+      </p>
+      <p class="text-muted" style="margin: 0.45rem 0 0; font-size: 0.84rem;">
+        This is a read-only public review. The questionnaire stays private to its owner.
+      </p>
+    </section>
+  {% endif %}
+
+  <p class="text-muted" style="margin-top: 1.5rem; font-size: 0.75rem;">{{ attribution_notice }}</p>
+</div>
+{% endblock %}

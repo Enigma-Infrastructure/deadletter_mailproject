@@ -57,6 +57,58 @@
   </details>
 {% endif %}
 
+{% if dossier.user_id == user.pk %}
+<section class="sm-panel" style="margin: 0.85rem 0;" aria-label="Protection & Review">
+  <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+    <h2 style="margin: 0; font-size: 1rem;">Protection &amp; Review</h2>
+    {% if linked_completed_sheets %}
+      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:dossier_review' slug=dossier.slug %}" target="_blank" rel="noopener">Open Public Review</a>
+    {% endif %}
+  </div>
+  <p class="text-muted" style="margin: 0 0 0.55rem; font-size: 0.82rem;">
+    Current: {% if dossier.protection == "none" %}<strong>None</strong>{% elif dossier.protection == "secret" %}<strong>Secret</strong>{% else %}<strong>ST-Only</strong>{% endif %}
+    {% if dossier.protection == "secret" %} — sealed for everyone until the cipher is entered{% endif %}
+    {% if dossier.protection == "st_only" %} — storyteller accounts only; views are logged{% endif %}
+  </p>
+  <form method="post" action="{% url 'spacemarches:dossier_protection' slug=dossier.slug %}" style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
+    {% csrf_token %}
+    <select name="protection" aria-label="Protection" style="width: auto; min-width: 130px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+      <option value="none" {% if dossier.protection == "none" %}selected{% endif %}>None</option>
+      <option value="secret" {% if dossier.protection == "secret" %}selected{% endif %}>Secret</option>
+      <option value="st_only" {% if dossier.protection == "st_only" %}selected{% endif %}>ST-Only</option>
+    </select>
+    <input type="text" name="secret_puzzle_prompt" placeholder="Secret puzzle prompt (e.g. 'What does the muse recall?')" value="{{ dossier.secret_puzzle_prompt }}" style="flex: 1; min-width: 200px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+    <input type="password" name="secret_answer" placeholder="Secret answer (leave blank to keep)" autocomplete="new-password" style="flex: 1; min-width: 160px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+    <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+  </form>
+  {% if dossier.protection == "secret" %}
+    <form method="post" action="{% url 'spacemarches:dossier_protection' slug=dossier.slug %}" style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.45rem;">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="unlock">
+      <input type="password" name="answer" placeholder="Enter the cipher to authenticate" autocomplete="off" required style="flex: 1; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+      <button type="submit" class="btn btn-secondary btn-sm">Authenticate</button>
+    </form>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if access_log %}
+<section class="sm-panel" style="margin: 0.85rem 0;" aria-label="Security Log">
+  <h2 style="margin: 0 0 0.5rem; font-size: 1rem;">Security Log</h2>
+  <p class="text-muted" style="margin: 0 0 0.5rem; font-size: 0.82rem;">ST views of this section — an Eclipse Phase-themed observation log.</p>
+  <ul style="margin: 0; padding-left: 1.2rem; font-size: 0.84rem;">
+    {% for entry in access_log %}
+      <li style="margin-bottom: 0.3rem;">
+        <strong>{{ entry.viewer|default:"Anonymous" }}</strong>
+        &middot; {{ entry.created_at|date:"Y-m-d H:i" }}
+        &middot; <span class="sm-code-tag">{{ entry.protection_type }}</span>
+        {% if entry.note %}<span class="text-muted">— {{ entry.note }}</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section class="sm-panel" style="margin: 0.85rem 0;" aria-label="Linked Point-Buy Characters">
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
     <h2 style="margin: 0; font-size: 1rem;">Linked Point-Buy Character Sheets ({{ linked_characters|length }})</h2>
@@ -67,8 +119,22 @@
   </div>
   {% if linked_characters %}
     <div class="sm-card-grid">
-      {% for ch in linked_characters %}
+      {% for item in sheet_states %}
+        {% with ch=item.sheet %}
         <article class="sm-card" style="padding: 0.75rem 0.9rem;">
+          {% if not item.visible %}
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem;">
+              <strong>Sealed Sheet</strong>
+              <span class="sm-code-tag">{{ item.protection.protection }}</span>
+            </div>
+            <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 0.3rem;">
+              {% if item.protection.protection == "secret" %}
+                <span class="sm-code-tag">Secret</span> Locked — the cipher is required to reveal.
+              {% elif item.protection.protection == "st_only" %}
+                <span class="sm-code-tag">ST-Only</span> Storyteller privilege required to view.
+              {% endif %}
+            </p>
+          {% else %}
           <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.3rem;">
             <strong>{{ ch.character_name }}</strong>
             <span class="sm-code-tag">{{ ch.source_system }}</span>
@@ -104,7 +170,9 @@
               </form>
             {% endif %}
           </div>
+          {% endif %}
         </article>
+        {% endwith %}
       {% endfor %}
     </div>
   {% else %}

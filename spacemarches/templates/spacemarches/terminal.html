@@ -60,6 +60,27 @@
 <div class="sm-generator-viewport">
   {% include "spacemarches/_spacemarches_header.html" with is_meshnet_view=True %}
 
+  {% if not user.is_authenticated %}
+    <div id="sm-anon-banner" style="display:flex; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap; padding:0.55rem 1rem; border-bottom:1px solid var(--sm-border, rgba(255,255,255,0.12)); background: color-mix(in srgb, var(--sm-accent, #5ee0a0) 14%, transparent); font-size:0.86rem;">
+      <span>
+        <strong>These characters are not saved.</strong>
+        Anonymous sheets stay in this browser only. Export them, or
+        <a href="{% url 'login' %}?next={{ request.get_full_path|urlencode }}" rel="external" style="font-weight:600;">log in to save them</a>.
+      </span>
+      <span id="sm-anon-draft-count" class="text-muted"></span>
+    </div>
+  {% endif %}
+
+  {% if user.is_authenticated %}
+    <div id="sm-save-prompt" style="display:none; align-items:center; justify-content:space-between; gap:0.6rem; flex-wrap:wrap; padding:0.55rem 1rem; border-bottom:1px solid var(--sm-border, rgba(255,255,255,0.12)); background: color-mix(in srgb, var(--sm-accent, #5ee0a0) 14%, transparent); font-size:0.86rem;">
+      <span id="sm-save-prompt-text">You have unsaved sheets in this browser.</span>
+      <span style="display:flex; gap:0.45rem;">
+        <button type="button" id="sm-save-prompt-confirm" class="btn btn-sm">Save to My Account</button>
+        <button type="button" id="sm-save-prompt-dismiss" class="btn btn-secondary btn-sm">Dismiss</button>
+      </span>
+    </div>
+  {% endif %}
+
   <main class="sm-generator-mount">
     <div id="root" data-spacemarches-terminal="true" data-slot="{{ slot_name }}">
       {% if not meshnet_bundle.ready %}
@@ -130,6 +151,97 @@
     const bootScript = document.getElementById("spacemarches-generator-boot");
     const bootData = bootScript ? JSON.parse(bootScript.textContent || "{}") : {};
     window.__SPACEMARCHES_BOOT__ = bootData;
+
+    // ---- Anonymous draft visibility + authenticated auto-save prompt ----
+    // Reads the Dexie database created by the bundle (meshnet-db -> pointBuy).
+    // Does not modify the bundle; never touches protected content.
+    function openPointBuyDb() {
+      return new Promise((resolve, reject) => {
+        if (!("indexedDB" in window)) return resolve(null);
+        try {
+          const req = indexedDB.open("meshnet-db");
+          req.onsuccess = () => resolve(req.result);
+          req.onerror = () => reject(req.error);
+          req.onupgradeneeded = () => reject(new Error("open failed"));
+        } catch (err) { reject(err); }
+      });
+    }
+
+    function listPointBuyDrafts(db) {
+      return new Promise((resolve) => {
+        try {
+          const tx = db.transaction("pointBuy", "readonly");
+          const store = tx.objectStore("pointBuy");
+          const req = store.getAll();
+          req.onsuccess = () => resolve(req.result || []);
+          req.onerror = () => resolve([]);
+        } catch (err) { resolve([]); }
+      });
+    }
+
+    const isAnonDraft = Boolean(bootData && !bootData.authenticated);
+    if (isAnonDraft) {
+      openPointBuyDb().then((db) => {
+        if (!db) return;
+        listPointBuyDrafts(db).then((rows) => {
+          const countEl = document.getElementById("sm-anon-draft-count");
+          if (!countEl) return;
+          if (rows.length > 0) {
+            countEl.textContent = rows.length + " unsaved sheet" + (rows.length === 1 ? "" : "s") + " in this browser.";
+          } else {
+            countEl.textContent = "No unsaved sheets yet.";
+          }
+        });
+      }).catch(() => {});
+    } else if (bootData && bootData.authenticated) {
+      openPointBuyDb().then((db) => {
+        if (!db) return;
+        listPointBuyDrafts(db).then((rows) => {
+          if (!rows.length) return;
+          const prompt = document.getElementById("sm-save-prompt");
+          const promptText = document.getElementById("sm-save-prompt-text");
+          const confirm = document.getElementById("sm-save-prompt-confirm");
+          const dismiss = document.getElementById("sm-save-prompt-dismiss");
+          if (!prompt || !promptText) return;
+          promptText.textContent = "You have " + rows.length + " unsaved sheet" + (rows.length === 1 ? "" : "s") + " in this browser.";
+          prompt.style.display = "flex";
+          if (dismiss) dismiss.addEventListener("click", () => { prompt.style.display = "none"; });
+          if (confirm) confirm.addEventListener("click", () => {
+            const drafts = rows.map((row) => {
+              const pb = row.pointBuy || {};
+              let name = "";
+              if (pb.name && typeof pb.name === "object") {
+                name = pb.name.custom || pb.name.msgId || "";
+              } else if (typeof pb.name === "string") {
+                name = pb.name;
+              }
+              return {
+                external_id: row.id || "",
+                character_name: name,
+                source_system: "point-buy-v2",
+                raw_data: pb,
+              };
+            });
+            fetch(bootData.characters_api_url || "/spacemarches/api/characters/", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+              body: JSON.stringify({ characters: drafts }),
+            }).then((resp) => resp.json().then((data) => ({ ok: resp.ok, data: data }))).then(({ ok, data }) => {
+              if (ok && data && data.status === "ok") {
+                const count = Array.isArray(data.characters) ? data.characters.length : 0;
+                if (promptText) promptText.textContent = "Saved " + count + " sheet" + (count === 1 ? "" : "s") + " to your account.";
+                setTimeout(() => { prompt.style.display = "none"; }, 4000);
+              } else {
+                if (promptText) promptText.textContent = (data && data.error) || "Save failed.";
+              }
+            }).catch(() => {
+              if (promptText) promptText.textContent = "Save failed — check your connection.";
+            });
+          });
+        });
+      }).catch(() => {});
+    }
 
     const isAuthenticated = Boolean(bootData.authenticated);
     const syncUrl = "{% url 'spacemarches:api_sync' %}";

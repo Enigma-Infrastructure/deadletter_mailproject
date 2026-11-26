@@ -35,6 +35,7 @@ class User(EmailStateMixin, AbstractUser):
     Email verification is separate from approval, identity, and ownership.
     """
     is_collaborator = models.BooleanField(default=False)
+    is_st = models.BooleanField(default=False, help_text="Storyteller privilege: required to view ST-only Sections.")
     participant_status = models.CharField(
         max_length=16, choices=PARTICIPANT_STATUS_CHOICES, default="pending",
     )

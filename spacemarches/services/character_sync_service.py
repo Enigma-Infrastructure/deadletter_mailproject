@@ -5,6 +5,7 @@ import json
 from typing import Any
 
 from django.db import transaction
+from django.utils import timezone
 from django.urls import reverse
 from django.utils.html import escape
 from django.utils.text import slugify
@@ -288,6 +289,10 @@ def save_generated_character(
             source_system=norm_source,
             raw_data=payload,
             summary=summary,
+            # A saved sheet is finalized: Finalize pushes it to be completed.
+            # A sheet that is later re-saved stays at its current status.
+            status=GeneratedCharacter.STATUS_COMPLETED,
+            completed_at=timezone.now(),
         )
         return created_obj, True
 

@@ -7,10 +7,10 @@ from .services import can_review_participants, review_participant
 
 @admin.register(User)
 class ParticipantAdmin(UserAdmin):
-    list_display = UserAdmin.list_display + ('participant_status', 'registration_source', 'participant_reviewed_at', 'email_verified')
-    list_filter = UserAdmin.list_filter + ('participant_status', 'registration_source', 'email_verified')
+    list_display = UserAdmin.list_display + ('participant_status', 'is_st', 'registration_source', 'participant_reviewed_at', 'email_verified')
+    list_filter = UserAdmin.list_filter + ('participant_status', 'is_st', 'registration_source', 'email_verified')
     readonly_fields = ('participant_status', 'registration_source', 'participant_reviewed_by', 'participant_reviewed_at', 'email_verified')
-    fieldsets = UserAdmin.fieldsets + (('Participation', {'fields': ('participant_status', 'registration_source', 'participant_reviewed_by', 'participant_reviewed_at', 'default_request_visibility', 'default_body_visibility', 'email_verified')}),)
+    fieldsets = UserAdmin.fieldsets + (('Participation', {'fields': ('participant_status', 'registration_source', 'participant_reviewed_by', 'participant_reviewed_at', 'default_request_visibility', 'default_body_visibility', 'email_verified')}), ('Storyteller', {'fields': ('is_st',)}))
     actions = ('approve_participants', 'reject_participants', 'suspend_participants')
 
     def get_readonly_fields(self, request, obj=None):

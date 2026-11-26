@@ -47,7 +47,22 @@
       <article class="sm-card" style="display: flex; flex-direction: column; gap: 0.65rem;">
         <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
           <h2 style="margin: 0;">{{ ch.character_name }}</h2>
-          <span class="sm-code-tag">{{ ch.source_system }}</span>
+          <div style="display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap;">
+            {% if ch.status == "completed" %}
+              <span class="sm-status-flag is-ok">Completed</span>
+            {% else %}
+              <span class="sm-status-flag">Draft</span>
+            {% endif %}
+            {% if ch.public_view %}
+              <span class="sm-status-flag is-ok">Public Review</span>
+            {% endif %}
+            {% if ch.protection == "secret" %}
+              <span class="sm-status-flag is-warn">Secret</span>
+            {% elif ch.protection == "st_only" %}
+              <span class="sm-status-flag is-warn">ST-Only</span>
+            {% endif %}
+            <span class="sm-code-tag">{{ ch.source_system }}</span>
+          </div>
         </div>
 
         {% if ch.summary.concept %}
@@ -62,6 +77,9 @@
             <span><span class="sm-meta-key">Skills</span> <span class="sm-meta-val">{{ ch.summary.skill_count }}</span></span>
           {% endif %}
           <span><span class="sm-meta-key">Updated</span> {{ ch.updated_at|date:"Y-m-d H:i" }}</span>
+          {% if ch.completed_at %}
+            <span><span class="sm-meta-key">Completed</span> <span class="sm-meta-val">{{ ch.completed_at|date:"Y-m-d H:i" }}</span></span>
+          {% endif %}
         </div>
 
         {% if ch.summary.aptitudes %}
@@ -97,6 +115,49 @@
               {% csrf_token %}
               <input type="hidden" name="create_dossier" value="1">
               <button type="submit" class="btn btn-auth btn-sm">Create &amp; Link New Dossier</button>
+            </form>
+          {% endif %}
+        </div>
+
+        <div class="sm-panel" style="padding: 0.7rem 0.85rem;">
+          <p class="sm-eyebrow" style="margin: 0 0 0.35rem;">Protection &amp; Review</p>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.45rem; align-items: center; margin-bottom: 0.45rem;">
+            <form method="post" action="{% url 'spacemarches:character_complete' pk=ch.pk %}" style="margin: 0;">
+              {% csrf_token %}
+              {% if ch.status == "completed" %}
+                <input type="hidden" name="status" value="draft">
+                <button type="submit" class="btn btn-secondary btn-sm">Mark as Draft</button>
+              {% else %}
+                <input type="hidden" name="status" value="completed">
+                <button type="submit" class="btn btn-sm">Mark as Completed</button>
+              {% endif %}
+            </form>
+            <form method="post" action="{% url 'spacemarches:character_public_toggle' pk=ch.pk %}" style="margin: 0;">
+              {% csrf_token %}
+              <input type="hidden" name="public_view" value="{% if ch.public_view %}{% else %}1{% endif %}">
+              <button type="submit" class="btn btn-secondary btn-sm">{% if ch.public_view %}Disable Public Review{% else %}Enable Public Review{% endif %}</button>
+            </form>
+            {% if ch.public_view and ch.dossier %}
+              <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:dossier_review' slug=ch.dossier.slug %}">Review</a>
+            {% endif %}
+          </div>
+          <form method="post" action="{% url 'spacemarches:character_protection' pk=ch.pk %}" style="display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center;">
+            {% csrf_token %}
+            <select name="protection" aria-label="Protection" style="width: auto; min-width: 130px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+              <option value="none" {% if ch.protection == "none" %}selected{% endif %}>None</option>
+              <option value="secret" {% if ch.protection == "secret" %}selected{% endif %}>Secret</option>
+              <option value="st_only" {% if ch.protection == "st_only" %}selected{% endif %}>ST-Only</option>
+            </select>
+            <input type="text" name="secret_puzzle_prompt" placeholder="Secret puzzle prompt (e.g. 'What does the muse recall?')" value="{{ ch.secret_puzzle_prompt }}" style="flex: 1; min-width: 180px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+            <input type="password" name="secret_answer" placeholder="Secret answer (leave blank to keep)" autocomplete="new-password" style="flex: 1; min-width: 150px; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+            <button type="submit" class="btn btn-secondary btn-sm">Apply</button>
+          </form>
+          {% if ch.protection == "secret" %}
+            <form method="post" action="{% url 'spacemarches:character_protection' pk=ch.pk %}" style="display: flex; gap: 0.4rem; align-items: center; margin-top: 0.4rem;">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="unlock">
+              <input type="password" name="answer" placeholder="Enter the cipher to authenticate" autocomplete="off" required style="flex: 1; padding: 0.3rem 0.5rem; font-size: 0.82rem;">
+              <button type="submit" class="btn btn-secondary btn-sm">Authenticate</button>
             </form>
           {% endif %}
         </div>

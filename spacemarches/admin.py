@@ -13,6 +13,7 @@ from .models import (
     ForumThread,
     GeneratedCharacter,
     OperationSession,
+    ProtectionAccessLog,
 )
 
 
@@ -24,9 +25,17 @@ class AgentSaveSlotAdmin(admin.ModelAdmin):
 
 @admin.register(GeneratedCharacter)
 class GeneratedCharacterAdmin(admin.ModelAdmin):
-    list_display = ("character_name", "user", "dossier", "source_system", "external_id", "updated_at")
-    list_filter = ("source_system",)
+    list_display = ("character_name", "user", "dossier", "status", "public_view", "protection", "source_system", "updated_at")
+    list_filter = ("source_system", "status", "protection")
     search_fields = ("character_name", "external_id", "user__username", "dossier__character_name")
+
+
+@admin.register(ProtectionAccessLog)
+class ProtectionAccessLogAdmin(admin.ModelAdmin):
+    list_display = ("created_at", "target_kind", "target_pk", "owner", "viewer", "protection_type", "note")
+    list_filter = ("target_kind", "protection_type")
+    search_fields = ("owner__username", "viewer__username", "note")
+    readonly_fields = ("created_at",)
 
 
 @admin.register(OperationSession)

@@ -12,12 +12,13 @@ from django.db.models import Q
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.safestring import mark_safe
 from django.utils.text import slugify
 from django.views.decorators.http import require_http_methods, require_POST
 
 from .markdown_utils import render_markdown_safe
-from .models import ArchiveEntry, CharacterDossier, DesignPack, DiscordLink, Ep2Entry, ForumPost, ForumThread, GeneratedCharacter
+from .models import ArchiveEntry, CharacterDossier, DesignPack, DiscordLink, Ep2Entry, ForumPost, ForumThread, GeneratedCharacter, ProtectionAccessLog
 from .questionnaire import (
     get_all_questions,
     get_attribution_notice,
@@ -74,6 +75,16 @@ from .services.ep2_service import (
 )
 from .services.game_sync_service import load_agent_save, sync_agent_save
 from .services.meshnet_adapter_service import get_meshnet_packs_payload
+from .services.protection_service import (
+    clear_secret,
+    is_secret_unlockable,
+    is_unlocked,
+    log_protection_access,
+    mark_unlocked,
+    protection_state,
+    set_secret,
+    verify_secret,
+)
 
 User = get_user_model()
 
@@ -407,7 +418,7 @@ def character_roster(request):
 def character_export(request, pk: int):
     """Download a saved GeneratedCharacter as HTML, JSON, or Markdown."""
     qs = GeneratedCharacter.objects.select_related("dossier")
-    if _is_gm_or_admin(request.user):
+    if _is_admin(request.user):
         character = get_object_or_404(qs, pk=pk)
     else:
         character = get_object_or_404(qs, pk=pk, user=request.user)
@@ -469,6 +480,119 @@ def character_delete(request, pk: int):
     character.delete()
     messages.success(request, f"Removed {name} from cloud saves.")
     return redirect("spacemarches:character_roster")
+
+
+# --- Protection / finalize / public review ---
+
+@login_required
+@require_POST
+def character_complete(request, pk: int):
+    """Toggle a sheet between Draft and Completed. Completion is a soft, reviewable state."""
+    character = get_object_or_404(GeneratedCharacter, pk=pk, user=request.user)
+    new_status = (request.POST.get("status") or "").strip()
+    if new_status not in {GeneratedCharacter.STATUS_DRAFT, GeneratedCharacter.STATUS_COMPLETED}:
+        messages.error(request, "Unknown status.")
+        return redirect("spacemarches:character_roster")
+    if character.status != new_status:
+        character.status = new_status
+        character.completed_at = timezone.now() if new_status == GeneratedCharacter.STATUS_COMPLETED else None
+        character.save(update_fields=["status", "completed_at", "updated_at"])
+        messages.success(request, f"{character.character_name} is now {new_status}.")
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url.startswith("/spacemarches/"):
+        return redirect(next_url)
+    return redirect("spacemarches:character_roster")
+
+
+@login_required
+@require_POST
+def character_public_toggle(request, pk: int):
+    """Toggle the public-review flag on a completed sheet."""
+    character = get_object_or_404(GeneratedCharacter, pk=pk, user=request.user)
+    new_value = request.POST.get("public_view") in {"1", "true", "on", "yes"}
+    character.public_view = new_value
+    character.save(update_fields=["public_view", "updated_at"])
+    messages.success(request, f"Public review is now {'on' if new_value else 'off'}.")
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url.startswith("/spacemarches/"):
+        return redirect(next_url)
+    return redirect("spacemarches:character_roster")
+
+
+@login_required
+@require_POST
+def character_protection(request, pk: int):
+    """Set the protection lock on a sheet, or unlock it with the cipher."""
+    character = get_object_or_404(GeneratedCharacter, pk=pk, user=request.user)
+    action = (request.POST.get("action") or "save").strip()
+
+    if action == "unlock":
+        answer = (request.POST.get("answer") or "").strip()
+        if not verify_secret(character, answer):
+            messages.error(request, "Incorrect answer — the lock held.")
+            return redirect("spacemarches:character_roster")
+        mark_unlocked(request, "character", character.pk)
+        messages.success(request, f"Authenticated — {character.character_name} is unlocked.")
+        next_url = (request.POST.get("next") or "").strip()
+        if next_url.startswith("/spacemarches/"):
+            return redirect(next_url)
+        return redirect("spacemarches:character_roster")
+
+    protection = (request.POST.get("protection") or "none").strip()
+    if protection not in {choice[0] for choice in GeneratedCharacter.PROTECTION_CHOICES}:
+        protection = GeneratedCharacter.PROTECTION_NONE
+
+    puzzle_prompt = (request.POST.get("secret_puzzle_prompt") or "").strip()
+    answer = (request.POST.get("secret_answer") or "").strip()
+
+    character.protection = protection
+    character.save(update_fields=["protection", "updated_at"])
+
+    if protection == GeneratedCharacter.PROTECTION_SECRET:
+        set_secret(character, puzzle_prompt, answer)
+        messages.success(request, f"Secret lock armed for {character.character_name}.")
+    else:
+        clear_secret(character)
+        messages.success(request, f"Protection set to {protection} for {character.character_name}.")
+    next_url = (request.POST.get("next") or "").strip()
+    if next_url.startswith("/spacemarches/"):
+        return redirect(next_url)
+    return redirect("spacemarches:character_roster")
+
+
+@login_required
+@require_POST
+def dossier_protection(request, slug: str):
+    """Set the protection lock on a dossier, or unlock it with the cipher."""
+    dossier = get_object_or_404(CharacterDossier, slug=slug, user=request.user)
+    action = (request.POST.get("action") or "save").strip()
+
+    if action == "unlock":
+        answer = (request.POST.get("answer") or "").strip()
+        if not verify_secret(dossier, answer):
+            messages.error(request, "Incorrect answer — the lock held.")
+            return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+        mark_unlocked(request, "dossier", dossier.pk)
+        messages.success(request, f"Authenticated — dossier unlocked.")
+        return redirect("spacemarches:dossier_detail", slug=dossier.slug)
+
+    protection = (request.POST.get("protection") or "none").strip()
+    if protection not in {choice[0] for choice in GeneratedCharacter.PROTECTION_CHOICES}:
+        protection = GeneratedCharacter.PROTECTION_NONE
+
+    puzzle_prompt = (request.POST.get("secret_puzzle_prompt") or "").strip()
+    answer = (request.POST.get("secret_answer") or "").strip()
+
+    dossier.protection = protection
+    dossier.save(update_fields=["protection", "updated_at"])
+
+    if protection == GeneratedCharacter.PROTECTION_SECRET:
+        set_secret(dossier, puzzle_prompt, answer)
+        messages.success(request, f"Secret lock armed for {dossier.character_name}.")
+    else:
+        clear_secret(dossier)
+        messages.success(request, f"Protection set to {protection}.")
+    return redirect("spacemarches:dossier_detail", slug=dossier.slug)
 
 
 @login_required
@@ -596,12 +720,18 @@ def api_character_link_dossier(request, pk: int):
 # --------------------------------------------------
 
 
-def _is_gm_or_admin(user) -> bool:
+def _is_admin(user) -> bool:
+    """Site-wide admin privilege (staff or superuser). Distinct from is_st (Storyteller)."""
     return bool(user and getattr(user, "is_authenticated", False) and (user.is_staff or user.is_superuser))
 
 
+def _is_st(user) -> bool:
+    """Storyteller privilege - required to view ST-only sections."""
+    return bool(user and getattr(user, "is_authenticated", False) and getattr(user, "is_st", False))
+
+
 def _get_accessible_dossier(user, *, slug: str = "", pk: int | None = None) -> CharacterDossier:
-    is_admin = _is_gm_or_admin(user)
+    is_admin = _is_admin(user)
     if pk is not None:
         if is_admin:
             return get_object_or_404(CharacterDossier.objects.select_related("user", "invited_by"), pk=pk)
@@ -657,7 +787,7 @@ def dossier_list(request):
         for d in dossiers
     ]
     gm_dossier_cards = []
-    if _is_gm_or_admin(request.user):
+    if _is_admin(request.user):
         other_dossiers = list(
             CharacterDossier.objects.filter(Q(user__isnull=True) | ~Q(user=request.user))
             .select_related("user", "invited_by")
@@ -674,7 +804,7 @@ def dossier_list(request):
         {
             "dossier_cards": dossier_cards,
             "gm_dossier_cards": gm_dossier_cards,
-            "is_gm_or_admin": _is_gm_or_admin(request.user),
+            "is_admin": _is_admin(request.user),
             "discord_link": discord_link,
             "voice_choices": CharacterDossier.NARRATIVE_VOICE_CHOICES,
         },
@@ -741,7 +871,24 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
     }
 
 
+def _log_st_only_access(request, dossier: CharacterDossier) -> None:
+    """Log ST-only access when the viewer is a Storyteller."""
+    if (dossier.protection or "none") != GeneratedCharacter.PROTECTION_ST_ONLY:
+        return
+    if not _is_st(request.user):
+        return
+    log_protection_access(
+        target_kind="dossier",
+        target_pk=dossier.pk,
+        owner=dossier.user,
+        viewer=request.user,
+        protection_type=GeneratedCharacter.PROTECTION_ST_ONLY,
+        note="Section view",
+    )
+
+
 def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = False):
+    _log_st_only_access(request, dossier)
     responses = dossier.responses if isinstance(dossier.responses, dict) else {}
     private_keys = set(dossier.private_keys or [])
     include_sensitive = bool(dossier.show_sensitive_appendix)
@@ -776,7 +923,7 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
         dossier_export_url = reverse("spacemarches:dossier_export", kwargs={"slug": dossier.slug})
         dossier_toggle_url = reverse("spacemarches:dossier_toggle_sensitive", kwargs={"slug": dossier.slug})
 
-    can_admin_reassign = _is_gm_or_admin(request.user)
+    can_admin_reassign = _is_admin(request.user)
     reassign_users = list(User.objects.order_by("username")) if can_admin_reassign else []
     dossier_reassign_url = (
         reverse("spacemarches:dossier_reassign_by_id", kwargs={"pk": dossier.pk})
@@ -784,9 +931,43 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
         else ""
     )
 
+    protection = protection_state(dossier, request, viewer=request.user)
+    protected_sheets = [
+        ch for ch in dossier.generated_characters.order_by("-updated_at")
+        if ch.protection != GeneratedCharacter.PROTECTION_NONE
+    ]
+
     linked_characters = list(
         dossier.generated_characters.order_by("-updated_at")
     )
+
+    # Per-sheet protection states: owner always sees their own sheets; non-owners
+    # (admin override) see protected sheets as locked cards. ST-only access is
+    # logged when a Storyteller views a non-owner's sheet.
+    is_owner_view = dossier.user_id == request.user.pk
+    sheet_states = []
+    for ch in linked_characters:
+        state = protection_state(ch, request, viewer=request.user)
+        visible = True
+        if not is_owner_view:
+            visible = (
+                state["protection"] == GeneratedCharacter.PROTECTION_NONE
+                or (state["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY and _is_st(request.user))
+            )
+            if state["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY and _is_st(request.user):
+                log_protection_access(
+                    target_kind="character", target_pk=ch.pk, owner=ch.user,
+                    viewer=request.user,
+                    protection_type=GeneratedCharacter.PROTECTION_ST_ONLY, note="Section view",
+                )
+        sheet_states.append({"sheet": ch, "visible": visible, "protection": state})
+
+    access_log = list(
+        ProtectionAccessLog.objects.filter(target_kind="dossier", target_pk=dossier.pk)
+        .select_related("viewer")
+        .order_by("-created_at")[:20]
+    ) if (dossier.protection or "none") != GeneratedCharacter.PROTECTION_NONE else []
+
     available_characters = (
         list(
             GeneratedCharacter.objects.filter(user=request.user)
@@ -823,6 +1004,12 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
             "can_admin_reassign": can_admin_reassign,
             "reassign_users": reassign_users,
             "dossier_reassign_url": dossier_reassign_url,
+            "protection": protection,
+            "protected_sheets": protected_sheets,
+            "linked_completed_sheets": [ch for ch in linked_characters if ch.status == GeneratedCharacter.STATUS_COMPLETED and ch.public_view],
+            "sheet_states": sheet_states,
+            "is_owner_view": is_owner_view,
+            "access_log": access_log,
         },
     )
 
@@ -839,6 +1026,101 @@ def dossier_detail_by_id(request, pk: int):
     """Primary-key dossier view supporting admin access to unclaimed or player-owned dossiers."""
     dossier = _get_accessible_dossier(request.user, pk=pk)
     return _render_dossier_detail(request, dossier, by_id=True)
+
+
+@require_http_methods(["GET", "POST"])
+def dossier_review(request, slug: str):
+    """Public read-only review surface for a dossier + its completed public sheets.
+
+    - Secret locks: content hidden for everyone (including the owner) until the
+      viewer authenticates with the cipher (POST action=unlock).
+    - ST-only locks: content shown only to Storyteller accounts; every view is
+      logged to ProtectionAccessLog (the Eclipse Phase-themed security log).
+    - Public view: only completed + public_view sheets render; protected sheets
+      render a locked card for viewers who do not clear the lock.
+    """
+    dossier = get_object_or_404(
+        CharacterDossier.objects.select_related("user"),
+        slug=slug,
+    )
+    review_sheets = [
+        ch for ch in dossier.generated_characters.order_by("-updated_at")
+        if ch.status == GeneratedCharacter.STATUS_COMPLETED and ch.public_view
+    ]
+
+    # POST: secret unlock attempt
+    if request.method == "POST":
+        action = (request.POST.get("action") or "").strip()
+        if action == "unlock_dossier":
+            answer = (request.POST.get("answer") or "").strip()
+            if verify_secret(dossier, answer):
+                mark_unlocked(request, "dossier", dossier.pk)
+                log_protection_access(target_kind="dossier", target_pk=dossier.pk, owner=dossier.user,
+                                      viewer=request.user if request.user.is_authenticated else None,
+                                      protection_type=GeneratedCharacter.PROTECTION_SECRET, note="Secret unlocked")
+                return redirect("spacemarches:dossier_review", slug=dossier.slug)
+            messages.error(request, "Incorrect answer — the lock held.")
+            return redirect("spacemarches:dossier_review", slug=dossier.slug)
+        if action == "unlock_sheet":
+            sheet_pk = request.POST.get("sheet_pk")
+            try:
+                sheet = get_object_or_404(GeneratedCharacter, pk=sheet_pk, dossier=dossier)
+            except Http404:
+                return redirect("spacemarches:dossier_review", slug=dossier.slug)
+            answer = (request.POST.get("answer") or "").strip()
+            if verify_secret(sheet, answer):
+                mark_unlocked(request, "character", sheet.pk)
+                log_protection_access(target_kind="character", target_pk=sheet.pk, owner=sheet.user,
+                                      viewer=request.user if request.user.is_authenticated else None,
+                                      protection_type=GeneratedCharacter.PROTECTION_SECRET, note="Secret unlocked")
+                return redirect("spacemarches:dossier_review", slug=dossier.slug)
+            messages.error(request, "Incorrect answer — the lock held.")
+            return redirect("spacemarches:dossier_review", slug=dossier.slug)
+        return redirect("spacemarches:dossier_review", slug=dossier.slug)
+
+    # Resolve per-object protection state
+    dossier_protection = protection_state(dossier, request, viewer=request.user if request.user.is_authenticated else None)
+
+    viewer = request.user if request.user.is_authenticated else None
+    dossier_viewer_is_owner = viewer == dossier.user
+
+    if (
+        dossier_protection["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY
+        and dossier_protection["unlocked"]
+        and not dossier_viewer_is_owner
+    ):
+        log_protection_access(
+            target_kind="dossier", target_pk=dossier.pk, owner=dossier.user,
+            viewer=viewer,
+            protection_type=GeneratedCharacter.PROTECTION_ST_ONLY, note="Section view",
+        )
+
+    sheet_states = []
+    for ch in review_sheets:
+        ch_protection = protection_state(ch, request, viewer=viewer)
+        if (
+            ch_protection["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY
+            and ch_protection["unlocked"]
+            and viewer != ch.user
+        ):
+            log_protection_access(
+                target_kind="character", target_pk=ch.pk, owner=ch.user,
+                viewer=viewer,
+                protection_type=GeneratedCharacter.PROTECTION_ST_ONLY, note="Section view",
+            )
+        sheet_states.append({"sheet": ch, "protection": ch_protection})
+
+    return render(
+        request,
+        "spacemarches/dossier_review.html",
+        {
+            "dossier": dossier,
+            "dossier_protection": dossier_protection,
+            "sheets": sheet_states,
+            "is_anonymous": not request.user.is_authenticated,
+            "attribution_notice": get_attribution_notice(),
+        },
+    )
 
 
 def _handle_toggle_sensitive(request, dossier: CharacterDossier, *, by_id: bool = False):
@@ -994,7 +1276,7 @@ def dossier_export_by_id(request, pk: int):
 @require_POST
 def dossier_reassign_by_id(request, pk: int):
     """Staff/Admin endpoint to reassign control of a dossier to a website user or unclaimed Discord ID."""
-    if not _is_gm_or_admin(request.user):
+    if not _is_admin(request.user):
         raise Http404("Character dossier not found.")
 
     dossier = get_object_or_404(CharacterDossier.objects.select_related("user"), pk=pk)

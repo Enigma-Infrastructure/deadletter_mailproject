@@ -28,6 +28,9 @@ urlpatterns = [
     path("characters/<int:pk>/export/", views.character_export, name="character_export"),
     path("characters/<int:pk>/link/", views.character_link_dossier, name="character_link_dossier"),
     path("characters/<int:pk>/delete/", views.character_delete, name="character_delete"),
+    path("characters/<int:pk>/complete/", views.character_complete, name="character_complete"),
+    path("characters/<int:pk>/public/", views.character_public_toggle, name="character_public_toggle"),
+    path("characters/<int:pk>/protection/", views.character_protection, name="character_protection"),
     path("api/ep2/", views.api_ep2_entries, name="api_ep2_data"),
     path("api/ep2/meta/", views.api_ep2_meta, name="api_ep2_meta"),
     path("api/ep2/<str:entry_id>/", views.api_ep2_entries, name="api_ep2_entry"),
@@ -53,4 +56,6 @@ urlpatterns = [
     path("dossier/<slug:slug>/answer/", views.dossier_answer, name="dossier_answer"),
     path("dossier/<slug:slug>/export/", views.dossier_export, name="dossier_export"),
     path("dossier/<slug:slug>/toggle-sensitive/", views.dossier_toggle_sensitive, name="dossier_toggle_sensitive"),
+    path("dossier/<slug:slug>/protection/", views.dossier_protection, name="dossier_protection"),
+    path("dossier/<slug:slug>/review/", views.dossier_review, name="dossier_review"),
 ]

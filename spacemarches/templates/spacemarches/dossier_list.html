@@ -78,7 +78,7 @@
   <p class="text-muted">You do not have any character dossiers yet. Create one above to begin.</p>
 {% endif %}
 
-{% if is_gm_or_admin %}
+{% if is_admin %}
   <h2 style="margin-top: 2rem;">GM / Admin Roster ({{ gm_dossier_cards|length }})</h2>
   <p class="text-muted" style="margin-bottom: 0.75rem;">View and update any unclaimed Discord onboarding dossier or player-controlled character sheet.</p>
   {% if gm_dossier_cards %}

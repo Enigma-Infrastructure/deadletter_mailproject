@@ -142,6 +142,20 @@ python manage.py test accounts.test_oauth_idp
 
 ### Checkpoints
 
+- **Completion & protection framework (2026-11-25):** Built the completed-character
+  framework end-to-end. `GeneratedCharacter` is now a first-class Django entity: status
+  (`draft`/`completed` + `completed_at`), `public_view`, protection (`none`/`secret`/`st_only`)
+  with server-hashed secrets (`protection_service.py`), plus `accounts.User.is_st` (Storyteller
+  privilege, admin-controlled, distinct from site admin) and `ProtectionAccessLog` (Eclipse Phase
+  security log for non-owner ST views). Public read-only review surface at
+  `/spacemarches/dossier/<slug>/review/` renders completed + public sheets only; secret sheets
+  render locked cards (puzzle prompt visible, answer never shown; session unlock via cipher);
+  ST-only sheets render only to Storyteller accounts. Anonymous banner + authenticated
+  auto-import prompt (IndexedDB drafts → `/api/characters/` batch import) in `terminal.html`.
+  Admin registration for GeneratedCharacter (status/protection filters) + ProtectionAccessLog.
+  `save_generated_character` now creates sheets as completed. Tests: `test_protection.py` (25);
+  89 total green. Docs updated. Not started: Stage 2 bundle rebuild, forks/setting-timeline
+  flow, Bubz premade character rows, Life-Path sub-system.
 - **Chunk 3 (2026-11-25):** Built Django→MeshNet Compendium adapter (`spacemarches/services/meshnet_adapter_service.py`, `GET /spacemarches/api/meshnet/packs/`), updated `character_sync_service.py` to resolve `packs.*.designs` + `i_`/`m_`/`h_` strings, and rebuilt & deployed the `mesh-net` Point-Buy v2 bundle (`spacemarches/static/spacemarches/assets/`). MeshNet now hydrates `ep-crb`, `ep-crb-storyteller`, `ep-copt`, `spacemarches`, and user custom packs live from Django, preserves Spacemarches Cloud Roster / Dossier Sync / HTML+MD+JSON export / Theme sync / HashRouter (`sw.js` disabled), and routes Browse Designs to `/spacemarches/compendium/`. Verified 962/962 fixture conversions against MeshNet TypeBox models (`vite-node`), `tsc --noEmit`, `vite build`, and `node --check` on emitted JS. Next: **Chunk 4** (`ep2e-virtual` Character Options import into `ep-copt` + binary PDF/DOCX cleanup).
 - **Latest (2026-11-25):** Wired `Ep2Entry` end-to-end into Spacemarches (`/spacemarches/compendium/`, `/spacemarches/api/ep2/meta/`, Portal card, Admin Hub links, `ep2_service.py` sanitization/stat extraction, `seed_ep2_data` `CommandError` fix, and the live **EP2E Lookup** drawer inside `/spacemarches/meshnet/`).
 - **`822b5b6` (2026-11-25):** Local agentic work — added `Ep2Entry` (`0006_ep2entry`), 1,042-entry `ep2_entries.json` fixture (`Bubz43/ep2e`), `seed_ep2_data`, `/spacemarches/api/ep2/`, `test_ep2_data.py`, and source PDF/DOCX attachments (needs local review & test run).

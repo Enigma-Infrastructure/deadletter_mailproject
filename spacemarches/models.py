@@ -33,6 +33,20 @@ class GeneratedCharacter(models.Model):
         (SOURCE_POINT_BUY_V2, "Point-Buy (v2)"),
         (SOURCE_LIFE_PATH, "Life-Path"),
     ]
+    STATUS_DRAFT = "draft"
+    STATUS_COMPLETED = "completed"
+    STATUS_CHOICES = [
+        (STATUS_DRAFT, "Draft"),
+        (STATUS_COMPLETED, "Completed"),
+    ]
+    PROTECTION_NONE = "none"
+    PROTECTION_SECRET = "secret"
+    PROTECTION_ST_ONLY = "st_only"
+    PROTECTION_CHOICES = [
+        (PROTECTION_NONE, "None"),
+        (PROTECTION_SECRET, "Secret"),
+        (PROTECTION_ST_ONLY, "ST-Only"),
+    ]
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -55,6 +69,30 @@ class GeneratedCharacter(models.Model):
     )
     raw_data = models.JSONField(default=dict, blank=True)
     summary = models.JSONField(default=dict, blank=True)
+    status = models.CharField(
+        max_length=16,
+        choices=STATUS_CHOICES,
+        default=STATUS_DRAFT,
+        help_text="Draft until the sheet is Finalized; completion is a soft, reviewable state.",
+    )
+    completed_at = models.DateTimeField(null=True, blank=True)
+    public_view = models.BooleanField(
+        default=False,
+        help_text="Allow the completed sheet to be publicly Reviewed (with protected sections locked).",
+    )
+    protection = models.CharField(
+        max_length=16,
+        choices=PROTECTION_CHOICES,
+        default=PROTECTION_NONE,
+    )
+    secret_puzzle_prompt = models.TextField(
+        blank=True,
+        help_text="Secret lock: the puzzle/prompt shown to viewers.",
+    )
+    secret_answer_hash = models.CharField(
+        max_length=256, blank=True,
+        help_text="Secret lock: hashed answer. Never exposed to clients.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -292,6 +330,20 @@ class CharacterDossier(models.Model):
     responses = models.JSONField(default=dict, blank=True)
     show_sensitive_appendix = models.BooleanField(default=False)
     private_keys = models.JSONField(default=list, blank=True)
+    protection = models.CharField(
+        max_length=16,
+        choices=GeneratedCharacter.PROTECTION_CHOICES,
+        default=GeneratedCharacter.PROTECTION_NONE,
+        help_text="Whole-section protection: none / secret / ST-only.",
+    )
+    secret_puzzle_prompt = models.TextField(
+        blank=True,
+        help_text="Secret lock: the puzzle/prompt shown to viewers.",
+    )
+    secret_answer_hash = models.CharField(
+        max_length=256, blank=True,
+        help_text="Secret lock: hashed answer. Never exposed to clients.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -333,6 +385,45 @@ class CharacterDossier(models.Model):
 
     def __str__(self) -> str:
         return f"{self.character_name} ({self.owner_display})"
+
+
+class ProtectionAccessLog(models.Model):
+    """Append-only log of ST-only / secret view access (an Eclipse Phase-themed security log).
+
+    Entries are created when an ST-only protected section is viewed and when a secret
+    section is unlocked. The content owner can review the log when they come back.
+    """
+
+    TARGET_CHARACTER = "character"
+    TARGET_DOSSIER = "dossier"
+    TARGET_CHOICES = [
+        (TARGET_CHARACTER, "Character Sheet"),
+        (TARGET_DOSSIER, "Character Dossier"),
+    ]
+
+    target_kind = models.CharField(max_length=16, choices=TARGET_CHOICES)
+    target_pk = models.IntegerField()
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="protection_access_log_entries",
+    )
+    viewer = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="protection_accesses_by_viewer",
+    )
+    protection_type = models.CharField(max_length=16)
+    note = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.get_target_kind_display()} #{self.target_pk} by {self.viewer} ({self.protection_type})"
 
 
 class DiscordIntakeInvite(models.Model):
@@ -423,6 +514,16 @@ class Ep2Entry(models.Model):
     CATEGORY_CHARACTER = "character"
     CATEGORY_SPECIAL = "special"
     CATEGORY_MISC = "misc"
+    CATEGORY_SKILL = "skill"
+    CATEGORY_KNOW_SKILL = "know_skill"
+    CATEGORY_EGO = "ego"
+    CATEGORY_SKILL_PACK = "skill_pack"
+    CATEGORY_REP = "rep"
+    CATEGORY_MOVEMENT = "movement"
+    CATEGORY_ENVIRONMENT = "environment"
+    CATEGORY_MODIFIER = "modifier"
+    CATEGORY_WEAPON_ACCESSORY = "weapon_accessory"
+    CATEGORY_ABILITY = "ability"
 
     CATEGORY_CHOICES = [
         (CATEGORY_MORPH, "Morph"),
@@ -433,6 +534,16 @@ class Ep2Entry(models.Model):
         (CATEGORY_CHARACTER, "Character / Creature"),
         (CATEGORY_SPECIAL, "Special"),
         (CATEGORY_MISC, "Other"),
+        (CATEGORY_SKILL, "Active Skill"),
+        (CATEGORY_KNOW_SKILL, "Know Skill"),
+        (CATEGORY_EGO, "Ego"),
+        (CATEGORY_SKILL_PACK, "Skill Pack"),
+        (CATEGORY_REP, "Rep"),
+        (CATEGORY_MOVEMENT, "Movement"),
+        (CATEGORY_ENVIRONMENT, "Environment"),
+        (CATEGORY_MODIFIER, "Success-Test Modifier"),
+        (CATEGORY_WEAPON_ACCESSORY, "Weapon Accessory"),
+        (CATEGORY_ABILITY, "Ability"),
     ]
 
     design_pack = models.ForeignKey(
