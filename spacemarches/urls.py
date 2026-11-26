@@ -58,4 +58,5 @@ urlpatterns = [
     path("dossier/<slug:slug>/toggle-sensitive/", views.dossier_toggle_sensitive, name="dossier_toggle_sensitive"),
     path("dossier/<slug:slug>/protection/", views.dossier_protection, name="dossier_protection"),
     path("dossier/<slug:slug>/review/", views.dossier_review, name="dossier_review"),
+    path("dossier/id/<int:pk>/review/", views.dossier_review_by_id, name="dossier_review_by_id"),
 ]

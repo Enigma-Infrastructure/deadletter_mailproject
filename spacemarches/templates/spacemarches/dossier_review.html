@@ -28,7 +28,7 @@
       {% else %}
         <p class="text-muted">The content is locked behind a secret cipher.</p>
       {% endif %}
-      <form method="post" action="{% url 'spacemarches:dossier_review' slug=dossier.slug %}" style="display: flex; gap: 0.5rem; margin-top: 0.85rem; align-items: center; flex-wrap: wrap;">
+      <form method="post" action="{{ review_url|default:request.path }}" style="display: flex; gap: 0.5rem; margin-top: 0.85rem; align-items: center; flex-wrap: wrap;">
         {% csrf_token %}
         <input type="hidden" name="action" value="unlock_dossier">
         <input type="text" name="answer" placeholder="Enter the cipher" autocomplete="off"
@@ -68,7 +68,7 @@
                 {% else %}
                   <p class="text-muted" style="margin: 0.4rem 0 0.55rem;">A secret.</p>
                 {% endif %}
-                <form method="post" action="{% url 'spacemarches:dossier_review' slug=dossier.slug %}" style="display: flex; gap: 0.4rem; align-items: center;">
+                <form method="post" action="{{ review_url|default:request.path }}" style="display: flex; gap: 0.4rem; align-items: center;">
                   {% csrf_token %}
                   <input type="hidden" name="action" value="unlock_sheet">
                   <input type="hidden" name="sheet_pk" value="{{ item.sheet.pk }}">

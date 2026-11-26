@@ -99,12 +99,12 @@ Then visit the entry points below and confirm each renders.
 
 ## Eclipse Phase 2e reference data (Ep2Entry)
 
-1042 seeded entries from the Bubz43/ep2e Foundry packs (CC BY 4.0 — see
-`spacemarches/fixtures/ATTRIBUTION.md`). Read it via:
+1,791 total seeded entries (`1,042` from Bubz43/ep2e Foundry packs + `749` MeshNet-native `ep-crb` / `ep-crb-storyteller` entries; `91` `ep-copt` entries intentionally skipped — CC BY 4.0, see `spacemarches/fixtures/ATTRIBUTION.md`). Read it via:
 - `GET http://127.0.0.1:8000/spacemarches/api/ep2/` (filters: `pack`, `category`, `q`, `limit`, `offset`)
 - `GET http://127.0.0.1:8000/spacemarches/api/ep2/<entry_id>/`
-- `spacemarches/fixtures/ep2_entries.json` (raw fixture)
-- `manage.py seed_ep2_data` (idempotent; `--dry-run` to preview)
+- `GET http://127.0.0.1:8000/spacemarches/api/meshnet/packs/` (MeshNet `DesignPackPartial` hydration payload)
+- `spacemarches/fixtures/ep2_entries.json` & `spacemarches/fixtures/meshnet-pack-designs.json`
+- `python manage.py seed_ep2_data` and `python manage.py seed_meshnet_data` (both idempotent; support `--dry-run`)
 
 ## Where to read for AI/muse work
 

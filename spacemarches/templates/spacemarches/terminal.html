@@ -96,10 +96,10 @@
       {% if not meshnet_bundle.ready %}
         <div style="padding: 2rem; max-width: 780px; margin: 2rem auto;">
           <section class="sm-surface-frame">
-            <p class="sm-eyebrow">MeshNet // Point-Buy v2</p>
+            <p class="sm-eyebrow">MeshNet // Point-Buy</p>
             <h1>Mesh-Net Bundle Pending</h1>
             <p class="text-muted">
-              Build the Mesh-Net frontend assets into <code>spacemarches/static/spacemarches/assets/</code> so the interactive Point-Buy v2 character generator mounts here.
+              Build the Mesh-Net frontend assets into <code>spacemarches/static/spacemarches/assets/</code> so the interactive Point-Buy character generator mounts here.
             </p>
             {% if not user.is_authenticated %}
               <p style="margin-top: 1rem;">
@@ -195,12 +195,46 @@
       if (!el) return;
       if (notifySlotTimer) window.clearTimeout(notifySlotTimer);
       el.textContent = text;
+      el.removeAttribute("hidden");
       el.setAttribute("data-kind", kind || "success");
       el.classList.add("sm-notify-show");
       notifySlotTimer = window.setTimeout(() => {
         el.classList.remove("sm-notify-show");
         el.removeAttribute("data-kind");
+        el.setAttribute("hidden", "");
       }, 5200);
+    }
+
+    function hashDraftPayload(value) {
+      const str = JSON.stringify(value || {});
+      let h = 2166136261;
+      for (let i = 0; i < str.length; i += 1) {
+        h ^= str.charCodeAt(i);
+        h = Math.imul(h, 16777619);
+      }
+      return (h >>> 0).toString(16);
+    }
+
+    function getAutoSaveCacheKey() {
+      return "sm_autosave_hashes_v1:" + ((bootData && bootData.username) || "");
+    }
+
+    function loadAutoSaveHashes() {
+      try {
+        const raw = window.localStorage.getItem(getAutoSaveCacheKey());
+        const parsed = raw ? JSON.parse(raw) : {};
+        return parsed && typeof parsed === "object" ? parsed : {};
+      } catch (_err) {
+        return {};
+      }
+    }
+
+    function saveAutoSaveHashes(map) {
+      try {
+        window.localStorage.setItem(getAutoSaveCacheKey(), JSON.stringify(map));
+      } catch (_err) {
+        // Ignore storage quota errors
+      }
     }
 
     const isAnonDraft = Boolean(bootData && !bootData.authenticated);
@@ -218,12 +252,15 @@
         });
       }).catch(() => {});
     } else if (bootData && bootData.authenticated) {
-      // Auto-save local drafts to the user's account on load (no prompt).
+      // Auto-save only new or modified local drafts to the user's account on load.
       openPointBuyDb().then((db) => {
         if (!db) return;
         listPointBuyDrafts(db).then((rows) => {
           if (!rows.length) return;
-          const drafts = rows.map((row) => {
+          const syncedHashes = loadAutoSaveHashes();
+          const pendingHashes = {};
+          const drafts = [];
+          rows.forEach((row) => {
             const pb = row.pointBuy || {};
             let name = "";
             if (pb.name && typeof pb.name === "object") {
@@ -231,13 +268,20 @@
             } else if (typeof pb.name === "string") {
               name = pb.name;
             }
-            return {
-              external_id: row.id || "",
+            const extId = String(row.id || "");
+            const draftPayload = {
+              external_id: extId,
               character_name: name,
-              source_system: "point-buy-v2",
+              source_system: "point_buy_v2",
               raw_data: pb,
             };
+            const fp = hashDraftPayload({ character_name: name, raw_data: pb });
+            if (!extId || syncedHashes[extId] !== fp) {
+              drafts.push(draftPayload);
+              if (extId) pendingHashes[extId] = fp;
+            }
           });
+          if (!drafts.length) return;
           fetch(bootData.characters_api_url || "/spacemarches/api/characters/", {
             method: "POST",
             credentials: "same-origin",
@@ -245,7 +289,8 @@
             body: JSON.stringify({ characters: drafts }),
           }).then((resp) => resp.json().then((data) => ({ ok: resp.ok, data: data }))).then(({ ok, data }) => {
             if (ok && data && data.status === "ok") {
-              const count = Array.isArray(data.characters) ? data.characters.length : 0;
+              saveAutoSaveHashes(Object.assign({}, syncedHashes, pendingHashes));
+              const count = Array.isArray(data.characters) ? data.characters.length : drafts.length;
               showNotify("Saved " + count + " sheet" + (count === 1 ? "" : "s") + " to your account.", "success");
             } else {
               showNotify((data && data.error) || "Save failed — check your connection.", "warn");

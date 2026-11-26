@@ -115,6 +115,8 @@ python manage.py migrate --plan
 python manage.py migrate
 python manage.py seed_ep2_data --dry-run
 python manage.py seed_ep2_data
+python manage.py seed_meshnet_data --dry-run
+python manage.py seed_meshnet_data
 python manage.py test spacemarches
 python manage.py test
 python manage.py runserver
@@ -141,6 +143,10 @@ python manage.py test accounts.test_oauth_idp
 4. **Update Section 1 & add a checkpoint entry below** whenever a MeshNet bundle drop-in, EP2E content pack, or Django schema change lands.
 
 ### Checkpoints
+
+- **MeshNet-native fixture, `01e94e7` review fixes & polish (2026-11-26):**
+  - Landed `spacemarches/fixtures/meshnet-pack-designs.json` (`840` entries: `738 ep-crb` + `11 ep-crb-storyteller` seeded via `seed_meshnet_data`, `91 ep-copt` skipped → `1,791` total `Ep2Entry` rows), migration `0008_ep2entry_new_categories`, `0009_characterdossier_protection_and_more`, `_meshnet_native_partial` / hashed-key adapter, `home`/locale label scrub, and `test_meshnet_native.py`.
+  - Fixed `dossier_review` duplicate-slug `MultipleObjectsReturned` risk (`dossier_review_by_id` + safe slug lookup), surfaced sheet-level `ProtectionAccessLog` entries to dossier owners on `dossier_detail`, fixed `terminal.html` auto-save (`source_system: "point_buy_v2"` + `sm_autosave_hashes_v1` fingerprint dedup so unchanged sheets do not re-POST/re-toast on reload), and scrubbed remaining Django template `"Point-Buy v2"` UI copy.
 
 - **Completion & protection framework (2026-11-25):** Built the completed-character
   framework end-to-end. `GeneratedCharacter` is now a first-class Django entity: status

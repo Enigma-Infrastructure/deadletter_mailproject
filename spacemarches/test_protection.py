@@ -366,3 +366,47 @@ class DossierDetailProtectionTests(TestCase):
         # review surface below is secret-locked — the owner must not be locked out of
         # their own dossier management
         self.assertEqual(resp.status_code, 200)
+
+    def test_owner_sees_sheet_level_security_log_even_when_dossier_unprotected(self):
+        self.sheet.protection = GeneratedCharacter.PROTECTION_ST_ONLY
+        self.sheet.save()
+        ProtectionAccessLog.objects.create(
+            target_kind=ProtectionAccessLog.TARGET_CHARACTER,
+            target_pk=self.sheet.pk,
+            owner=self.owner,
+            viewer=self.st,
+            protection_type=GeneratedCharacter.PROTECTION_ST_ONLY,
+            note="Section view",
+        )
+        self.client.login(username="owner2", password="pw12345!")
+        resp = self.client.get(reverse("spacemarches:dossier_detail", kwargs={"slug": "logged-dossier"}))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "Security Log")
+        self.assertContains(resp, "Character Sheet")
+
+    def test_duplicate_dossier_slug_review_does_not_500_and_pk_route_disambiguates(self):
+        other = User.objects.create_user(username="other_dupe", password="pw12345!")
+        other_dossier = CharacterDossier.objects.create(
+            user=other, character_name="Logged Dossier", slug="logged-dossier",
+        )
+        other_sheet = GeneratedCharacter.objects.create(
+            user=other, dossier=other_dossier, character_name="Other Dupe Sheet",
+            source_system=GeneratedCharacter.SOURCE_POINT_BUY_V2,
+            raw_data={}, summary={}, status=GeneratedCharacter.STATUS_COMPLETED,
+            public_view=True,
+        )
+        slug_resp = self.client.get(reverse("spacemarches:dossier_review", kwargs={"slug": "logged-dossier"}))
+        self.assertEqual(slug_resp.status_code, 200)
+
+        pk_resp = self.client.get(reverse("spacemarches:dossier_review_by_id", kwargs={"pk": other_dossier.pk}))
+        self.assertEqual(pk_resp.status_code, 200)
+        self.assertContains(pk_resp, other_sheet.character_name)
+        self.assertNotContains(pk_resp, self.sheet.character_name)
+
+    def test_terminal_autosave_uses_canonical_source_system_and_dedup_cache(self):
+        self.client.login(username="owner2", password="pw12345!")
+        resp = self.client.get(reverse("spacemarches:meshnet"))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, "source_system: \"point_buy_v2\"")
+        self.assertNotContains(resp, "source_system: \"point-buy-v2\"")
+        self.assertContains(resp, "sm_autosave_hashes_v1")

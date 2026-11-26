@@ -62,7 +62,7 @@
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
     <h2 style="margin: 0; font-size: 1rem;">Protection &amp; Review</h2>
     {% if linked_completed_sheets %}
-      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:dossier_review' slug=dossier.slug %}" target="_blank" rel="noopener">Open Public Review</a>
+      <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:dossier_review_by_id' pk=dossier.pk %}" target="_blank" rel="noopener">Open Public Review</a>
     {% endif %}
   </div>
   <p class="text-muted" style="margin: 0 0 0.55rem; font-size: 0.82rem;">
@@ -101,7 +101,7 @@
       <li style="margin-bottom: 0.3rem;">
         <strong>{{ entry.viewer|default:"Anonymous" }}</strong>
         &middot; {{ entry.created_at|date:"Y-m-d H:i" }}
-        &middot; <span class="sm-code-tag">{{ entry.protection_type }}</span>
+        &middot; <span class="sm-code-tag">{{ entry.get_target_kind_display }}</span> <span class="sm-code-tag">{{ entry.protection_type }}</span>
         {% if entry.note %}<span class="text-muted">— {{ entry.note }}</span>{% endif %}
       </li>
     {% endfor %}

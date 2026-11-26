@@ -962,11 +962,19 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
                 )
         sheet_states.append({"sheet": ch, "visible": visible, "protection": state})
 
-    access_log = list(
-        ProtectionAccessLog.objects.filter(target_kind="dossier", target_pk=dossier.pk)
-        .select_related("viewer")
-        .order_by("-created_at")[:20]
-    ) if (dossier.protection or "none") != GeneratedCharacter.PROTECTION_NONE else []
+    linked_sheet_pks = [ch.pk for ch in linked_characters]
+    log_q = Q(target_kind=ProtectionAccessLog.TARGET_DOSSIER, target_pk=dossier.pk)
+    if linked_sheet_pks:
+        log_q |= Q(target_kind=ProtectionAccessLog.TARGET_CHARACTER, target_pk__in=linked_sheet_pks)
+    access_log = (
+        list(
+            ProtectionAccessLog.objects.filter(log_q)
+            .select_related("viewer")
+            .order_by("-created_at")[:20]
+        )
+        if is_owner_view
+        else []
+    )
 
     available_characters = (
         list(
@@ -1028,21 +1036,8 @@ def dossier_detail_by_id(request, pk: int):
     return _render_dossier_detail(request, dossier, by_id=True)
 
 
-@require_http_methods(["GET", "POST"])
-def dossier_review(request, slug: str):
-    """Public read-only review surface for a dossier + its completed public sheets.
-
-    - Secret locks: content hidden for everyone (including the owner) until the
-      viewer authenticates with the cipher (POST action=unlock).
-    - ST-only locks: content shown only to Storyteller accounts; every view is
-      logged to ProtectionAccessLog (the Eclipse Phase-themed security log).
-    - Public view: only completed + public_view sheets render; protected sheets
-      render a locked card for viewers who do not clear the lock.
-    """
-    dossier = get_object_or_404(
-        CharacterDossier.objects.select_related("user"),
-        slug=slug,
-    )
+def _handle_dossier_review(request, dossier: CharacterDossier, *, review_url: str):
+    """Shared public read-only review handler for slug and PK dossier review routes."""
     review_sheets = [
         ch for ch in dossier.generated_characters.order_by("-updated_at")
         if ch.status == GeneratedCharacter.STATUS_COMPLETED and ch.public_view
@@ -1058,25 +1053,25 @@ def dossier_review(request, slug: str):
                 log_protection_access(target_kind="dossier", target_pk=dossier.pk, owner=dossier.user,
                                       viewer=request.user if request.user.is_authenticated else None,
                                       protection_type=GeneratedCharacter.PROTECTION_SECRET, note="Secret unlocked")
-                return redirect("spacemarches:dossier_review", slug=dossier.slug)
+                return redirect(review_url)
             messages.error(request, "Incorrect answer — the lock held.")
-            return redirect("spacemarches:dossier_review", slug=dossier.slug)
+            return redirect(review_url)
         if action == "unlock_sheet":
             sheet_pk = request.POST.get("sheet_pk")
             try:
                 sheet = get_object_or_404(GeneratedCharacter, pk=sheet_pk, dossier=dossier)
             except Http404:
-                return redirect("spacemarches:dossier_review", slug=dossier.slug)
+                return redirect(review_url)
             answer = (request.POST.get("answer") or "").strip()
             if verify_secret(sheet, answer):
                 mark_unlocked(request, "character", sheet.pk)
                 log_protection_access(target_kind="character", target_pk=sheet.pk, owner=sheet.user,
                                       viewer=request.user if request.user.is_authenticated else None,
                                       protection_type=GeneratedCharacter.PROTECTION_SECRET, note="Secret unlocked")
-                return redirect("spacemarches:dossier_review", slug=dossier.slug)
+                return redirect(review_url)
             messages.error(request, "Incorrect answer — the lock held.")
-            return redirect("spacemarches:dossier_review", slug=dossier.slug)
-        return redirect("spacemarches:dossier_review", slug=dossier.slug)
+            return redirect(review_url)
+        return redirect(review_url)
 
     # Resolve per-object protection state
     dossier_protection = protection_state(dossier, request, viewer=request.user if request.user.is_authenticated else None)
@@ -1117,10 +1112,37 @@ def dossier_review(request, slug: str):
             "dossier": dossier,
             "dossier_protection": dossier_protection,
             "sheets": sheet_states,
+            "review_url": review_url,
             "is_anonymous": not request.user.is_authenticated,
             "attribution_notice": get_attribution_notice(),
         },
     )
+
+
+@require_http_methods(["GET", "POST"])
+def dossier_review(request, slug: str):
+    """Public read-only review surface for a dossier + its completed public sheets (slug route)."""
+    matches = CharacterDossier.objects.select_related("user").filter(slug=slug)
+    dossier = None
+    if request.user.is_authenticated:
+        dossier = matches.filter(user=request.user).first()
+    if dossier is None:
+        dossier = matches.order_by("-updated_at").first()
+    if dossier is None:
+        raise Http404("Character dossier not found.")
+    review_url = reverse("spacemarches:dossier_review", kwargs={"slug": dossier.slug})
+    return _handle_dossier_review(request, dossier, review_url=review_url)
+
+
+@require_http_methods(["GET", "POST"])
+def dossier_review_by_id(request, pk: int):
+    """Unambiguous PK-based public read-only review surface for a dossier + its completed public sheets."""
+    dossier = get_object_or_404(
+        CharacterDossier.objects.select_related("user"),
+        pk=pk,
+    )
+    review_url = reverse("spacemarches:dossier_review_by_id", kwargs={"pk": dossier.pk})
+    return _handle_dossier_review(request, dossier, review_url=review_url)
 
 
 def _handle_toggle_sensitive(request, dossier: CharacterDossier, *, by_id: bool = False):
