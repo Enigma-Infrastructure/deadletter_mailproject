@@ -280,8 +280,8 @@
     {
       "id": "appendix",
       "number": "Appendix",
-      "title": "Moved Questions (Opt-In Content Warning)",
-      "description": "Content-warned topics (13d1–13d6) preserved verbatim in an explicit opt-in appendix.",
+      "title": "Sensitive Topics (Optional)",
+      "description": "Optional content-warned questions addressing consent, sexual assault, exploitation, and habitat norms in transhuman society. Hidden by default unless you choose to view them.",
       "is_appendix": true,
       "question_ids": [
         "13d",

@@ -22,14 +22,14 @@
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md">Export MD</a>
-    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md&amp;include_unanswered=1">Full Prompt+Answer MD</a>
+    <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md&amp;include_unanswered=1">Export All Prompts (MD)</a>
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=html">Export HTML</a>
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=json">Export JSON</a>
   </div>
 </div>
 
 <details class="sm-panel" style="margin: 0.85rem 0;" {% if stats.answered_count == 0 %}open{% endif %}>
-  <summary style="cursor: pointer; font-weight: 600;">Introduction &amp; Author Guidance (Read Before Diving In)</summary>
+  <summary style="cursor: pointer; font-weight: 600;">How This Census Works (Optional Guidance)</summary>
   <div style="margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.65rem; max-width: 78ch;">
     {% for para in meta.intro_paragraphs %}
       <p style="margin: 0; font-size: 0.92rem;">{{ para }}</p>
@@ -38,7 +38,7 @@
 </details>
 
 <details class="sm-panel" style="margin: 0.85rem 0;">
-  <summary style="cursor: pointer; font-weight: 600;">Census Links, Voice &amp; Optional Section Preferences</summary>
+  <summary style="cursor: pointer; font-weight: 600;">Settings, Links &amp; Optional Sections</summary>
   <form method="post" action="{% url 'spacemarches:census_settings' pk=census.pk %}" style="margin-top: 0.75rem;">
     {% csrf_token %}
     <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
@@ -80,12 +80,12 @@
       <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
         <input type="hidden" name="show_sexuality_sections" value="0">
         <input type="checkbox" name="show_sexuality_sections" value="1" {% if census.show_sexuality_sections %}checked{% endif %} style="width: auto;">
-        Show optional sexuality sections (13c, 13e)
+        Include optional sexuality &amp; relationship questions (Section 13)
       </label>
       <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
         <input type="hidden" name="show_sensitive_appendix" value="0">
         <input type="checkbox" name="show_sensitive_appendix" value="1" {% if census.show_sensitive_appendix %}checked{% endif %} style="width: auto;">
-        Opt in to Moved Questions Appendix (13d1&ndash;13d6)
+        Include optional sensitive topics appendix (content warning)
       </label>
       <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
         <input type="hidden" name="public_view" value="0">
@@ -162,7 +162,7 @@
 
 <nav class="sm-panel" style="margin: 0.9rem 0;" aria-label="Census Chapters">
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem;">
-    <span class="sm-eyebrow" style="margin: 0;">Guided Chapters</span>
+    <span class="sm-eyebrow" style="margin: 0;">Chapters</span>
     <a class="btn btn-secondary btn-sm" href="?chapter=all" style="{% if view_all %}font-weight: 700; border-color: var(--sm-primary);{% endif %}">
       View All Chapters
     </a>
@@ -192,7 +192,7 @@
       </div>
       {% if group.chapter.is_appendix %}
         <div class="sm-panel" style="border-color: var(--sm-tertiary); margin-bottom: 0.75rem;">
-          <p class="sm-eyebrow" style="margin: 0 0 0.4rem;">Appendix Content Warning (GearheadLydia)</p>
+          <p class="sm-eyebrow" style="margin: 0 0 0.4rem;">Content Warning &mdash; Sensitive Topics</p>
           {% for p in meta.appendix_notice %}
             <p style="margin: 0 0 0.45rem; font-size: 0.88rem;">{{ p }}</p>
           {% endfor %}
@@ -214,7 +214,7 @@
 
   {% if active_chapter_id == "appendix" %}
     <section class="sm-panel" style="border-color: var(--sm-tertiary); margin-bottom: 0.9rem;">
-      <p class="sm-eyebrow" style="margin: 0 0 0.4rem;">Moved Questions &mdash; Content Warning</p>
+      <p class="sm-eyebrow" style="margin: 0 0 0.4rem;">Content Warning &mdash; Sensitive Topics</p>
       {% for p in meta.appendix_notice %}
         <p style="margin: 0 0 0.5rem; font-size: 0.9rem;">{{ p }}</p>
       {% endfor %}
@@ -223,9 +223,9 @@
         <input type="hidden" name="action" value="toggle_appendix">
         <input type="hidden" name="chapter" value="appendix">
         {% if census.show_sensitive_appendix %}
-          <button type="submit" class="btn btn-secondary btn-sm">Hide Moved Questions Appendix</button>
+          <button type="submit" class="btn btn-secondary btn-sm">Hide Sensitive Topics Section</button>
         {% else %}
-          <button type="submit" class="btn btn-sm">Opt In &amp; Show Moved Questions (13d1&ndash;13d6)</button>
+          <button type="submit" class="btn btn-sm">Show Sensitive Topics Section</button>
         {% endif %}
       </form>
     </section>

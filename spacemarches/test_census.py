@@ -192,7 +192,7 @@ class CensusViewsAndProtectionTests(TestCase):
         # Appendix gated off by default
         app_resp = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk}) + "?chapter=appendix")
         self.assertEqual(app_resp.status_code, 200)
-        self.assertContains(app_resp, "Opt In &amp; Show Moved Questions")
+        self.assertContains(app_resp, "Show Sensitive Topics Section")
         self.assertNotContains(app_resp, 'id="census-q-13d1"')
         self.assertNotContains(app_resp, "Rape and sexual assault.")
 

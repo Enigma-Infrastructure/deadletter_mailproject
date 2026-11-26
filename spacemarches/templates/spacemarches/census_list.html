@@ -17,7 +17,7 @@
 </div>
 
 <details class="sm-panel" style="margin: 1rem 0;">
-  <summary style="cursor: pointer; font-weight: 600;">About the Questionnaire &amp; Author Guidance (ShadowDragon8685 / GearheadLydia)</summary>
+  <summary style="cursor: pointer; font-weight: 600;">How This Census Works</summary>
   <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.65rem; max-width: 78ch;">
     {% for para in meta.intro_paragraphs %}
       <p style="margin: 0; font-size: 0.92rem;">{{ para }}</p>
@@ -26,13 +26,13 @@
 </details>
 
 <details class="sm-panel" style="margin: 1rem 0;" {% if not census_cards or prefill_dossier_id or prefill_character_id %}open{% endif %}>
-  <summary style="cursor: pointer; font-weight: 600;">+ Initialize New Eclipse Phase Census</summary>
+  <summary style="cursor: pointer; font-weight: 600;">+ Start a New Census</summary>
   <form method="post" action="{% url 'spacemarches:census_list' %}" style="margin-top: 0.85rem;">
     {% csrf_token %}
     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.85rem;">
       <div class="form-group">
-        <label for="id_census_character_name">Character Name / Ego Designation</label>
-        <input id="id_census_character_name" type="text" name="character_name" maxlength="160" placeholder="Required unless linking a Dossier or Sheet below">
+        <label for="id_census_character_name">Character Name</label>
+        <input id="id_census_character_name" type="text" name="character_name" maxlength="160" placeholder="e.g. Vesper Vance (auto-fills if linked)">
       </div>
       <div class="form-group">
         <label for="id_census_voice">Default Narrative Voice</label>
@@ -44,9 +44,9 @@
       </div>
       {% if dossiers %}
         <div class="form-group">
-          <label for="id_census_dossier">Link Operational Dossier (optional)</label>
+          <label for="id_census_dossier">Link Character Dossier (optional)</label>
           <select id="id_census_dossier" name="dossier_id">
-            <option value="">&mdash; Standalone Census &mdash;</option>
+            <option value="">&mdash; Standalone &mdash;</option>
             {% for d in dossiers %}
               <option value="{{ d.pk }}" {% if prefill_dossier_id == d.pk|stringformat:"s" %}selected{% endif %}>{{ d.character_name }}</option>
             {% endfor %}
@@ -55,7 +55,7 @@
       {% endif %}
       {% if characters %}
         <div class="form-group">
-          <label for="id_census_character">Link Point-Buy Character Sheet (optional)</label>
+          <label for="id_census_character">Link Point-Buy Sheet (optional)</label>
           <select id="id_census_character" name="character_id">
             <option value="">&mdash; None &mdash;</option>
             {% for ch in characters %}
@@ -65,18 +65,10 @@
         </div>
       {% endif %}
     </div>
-    <div style="display: flex; flex-wrap: wrap; gap: 1rem; margin: 0.35rem 0 0.9rem; font-size: 0.88rem;">
-      <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
-        <input type="hidden" name="show_sexuality_sections" value="0">
-        <input type="checkbox" name="show_sexuality_sections" value="1" checked style="width: auto;">
-        Include optional sexuality &amp; experience sections (13c, 13e)
-      </label>
-      <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
-        <input type="checkbox" name="show_sensitive_appendix" value="1" style="width: auto;">
-        Opt in to Moved Questions Appendix (13d1&ndash;13d6, content-warned)
-      </label>
-    </div>
-    <button type="submit" class="btn">Begin Guided Census</button>
+    <p class="text-muted" style="font-size: 0.84rem; margin: 0 0 0.75rem;">
+      You can skip any question or hide optional sections at any time once inside.
+    </p>
+    <button type="submit" class="btn">Start Census</button>
   </form>
 </details>
 
@@ -102,7 +94,7 @@
           {% if c.character %}<span><span class="sm-meta-key">Sheet</span> {{ c.character.character_name }}</span>{% endif %}
         </div>
         <div style="display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: auto;">
-          <a class="btn btn-sm" href="{% url 'spacemarches:census_detail' pk=c.pk %}">Open Walkthrough</a>
+          <a class="btn btn-sm" href="{% url 'spacemarches:census_detail' pk=c.pk %}">Continue Census</a>
           <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=c.pk %}?format=md">Export MD</a>
           <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=c.pk %}?format=html">Export HTML</a>
           <form method="post" action="{% url 'spacemarches:census_delete' pk=c.pk %}" style="margin: 0; margin-left: auto;">

@@ -28,13 +28,13 @@
         <input type="hidden" name="action" value="toggle_sexuality">
         <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
         <button type="submit" class="btn btn-secondary btn-sm">
-          {% if census.show_sexuality_sections %}Hide Optional Sexuality Sections (13c, 13e){% else %}Show Optional Sexuality Sections (13c, 13e){% endif %}
+          {% if census.show_sexuality_sections %}Hide Optional Sexuality Questions{% else %}Show Optional Sexuality Questions{% endif %}
         </button>
       </form>
     </div>
   {% elif node.id == "13d_stub" %}
     <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-      <a class="btn btn-secondary btn-sm" href="?chapter=appendix">Go to Moved Questions Appendix (13d1&ndash;13d6)</a>
+      <a class="btn btn-secondary btn-sm" href="?chapter=appendix">Open Optional Sensitive Topics Section</a>
     </div>
   {% elif node.answerable %}
     <form class="census-answer-form" method="post" action="{% url 'spacemarches:census_answer' pk=census.pk %}">
