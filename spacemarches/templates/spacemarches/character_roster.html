@@ -42,9 +42,10 @@
   </form>
 </details>
 
-{% if characters %}
+{% if character_rows %}
   <div class="sm-card-grid">
-    {% for ch in characters %}
+    {% for row in character_rows %}
+      {% with ch=row.sheet pending=row.pending sheet_context=row.sheet_context %}
       <article class="sm-card" style="display: flex; flex-direction: column; gap: 0.65rem;">
         <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
           <h2 style="margin: 0;">{{ ch.character_name }}</h2>
@@ -53,6 +54,9 @@
               <span class="sm-status-flag is-ok">Completed</span>
             {% else %}
               <span class="sm-status-flag">Draft</span>
+            {% endif %}
+            {% if pending.has_pending %}
+              <span class="sm-status-flag is-warn">Pending Sync ({{ pending.count }})</span>
             {% endif %}
             {% if ch.public_view %}
               <span class="sm-status-flag is-ok">Public Review</span>
@@ -71,6 +75,18 @@
         {% endif %}
 
         <div class="sm-meta-strip">
+          {% if sheet_context.faction %}
+            <span><span class="sm-meta-key">Faction</span> <span class="sm-meta-val">{{ sheet_context.faction }}</span></span>
+          {% endif %}
+          {% if sheet_context.background %}
+            <span><span class="sm-meta-key">Background</span> <span class="sm-meta-val">{{ sheet_context.background }}</span></span>
+          {% endif %}
+          {% if sheet_context.career %}
+            <span><span class="sm-meta-key">Career</span> <span class="sm-meta-val">{{ sheet_context.career }}</span></span>
+          {% endif %}
+          {% if sheet_context.interest %}
+            <span><span class="sm-meta-key">Interest</span> <span class="sm-meta-val">{{ sheet_context.interest }}</span></span>
+          {% endif %}
           {% if ch.summary.morphs %}
             <span><span class="sm-meta-key">Morph</span> <span class="sm-meta-val">{{ ch.summary.morphs|join:", " }}</span></span>
           {% endif %}
@@ -93,6 +109,108 @@
             <span>WIL {{ ch.summary.aptitudes.wil|default:"-" }}</span>
           </div>
         {% endif %}
+
+        <details class="sm-panel" style="padding: 0.7rem 0.85rem;" {% if pending.has_pending %}open{% endif %}>
+          <summary style="cursor: pointer; font-weight: 600; font-size: 0.86rem;">
+            Profile Sync &amp; Quick-Edit
+            {% if pending.has_pending %}
+              <span class="sm-status-flag is-warn" style="margin-left: 0.35rem;">{{ pending.count }} pending</span>
+            {% endif %}
+          </summary>
+          <div style="margin-top: 0.6rem; display: flex; flex-direction: column; gap: 0.55rem;">
+            {% if pending.has_pending %}
+              <div style="padding: 0.5rem 0.65rem; border-radius: 6px; border: 1px solid var(--sm-tertiary); font-size: 0.8rem;">
+                <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.4rem; margin-bottom: 0.3rem;">
+                  <strong>Pending Census / Dossier Updates</strong>
+                  <form method="post" action="{% url 'spacemarches:character_sync_profile' pk=ch.pk %}" style="margin: 0;">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="acknowledge">
+                    <input type="hidden" name="source" value="roster">
+                    <input type="hidden" name="next" value="{% url 'spacemarches:character_roster' %}">
+                    <button type="submit" class="btn btn-secondary btn-sm">Mark Up-to-Date</button>
+                  </form>
+                </div>
+                <ul style="margin: 0; padding-left: 1.1rem;">
+                  {% for item in pending.items %}
+                    <li><strong>{{ item.source }} {{ item.question_id }}</strong> ({{ item.label }}): {{ item.detail }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+
+            <form method="post" action="{% url 'spacemarches:character_sync_profile' pk=ch.pk %}" style="margin: 0;">
+              {% csrf_token %}
+              <input type="hidden" name="source" value="roster">
+              <input type="hidden" name="next" value="{% url 'spacemarches:character_roster' %}">
+              <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0.45rem;">
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-name-{{ ch.pk }}" style="font-size: 0.74rem;">Name</label>
+                  <input id="roster-name-{{ ch.pk }}" type="text" name="character_name" value="{{ sheet_context.character_name }}" maxlength="160" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-fullname-{{ ch.pk }}" style="font-size: 0.74rem;">Full Name</label>
+                  <input id="roster-fullname-{{ ch.pk }}" type="text" name="full_name" value="{{ sheet_context.full_name }}" maxlength="160" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-concept-{{ ch.pk }}" style="font-size: 0.74rem;">Concept</label>
+                  <input id="roster-concept-{{ ch.pk }}" type="text" name="concept" value="{{ sheet_context.concept }}" maxlength="240" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-faction-{{ ch.pk }}" style="font-size: 0.74rem;">Faction</label>
+                  <select id="roster-faction-{{ ch.pk }}" name="skill_pack_faction" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                    <option value="">&mdash; None &mdash;</option>
+                    {% for opt in skill_pack_choices.faction %}
+                      <option value="{{ opt.key }}" {% if sheet_context.faction|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-bg-{{ ch.pk }}" style="font-size: 0.74rem;">Background</label>
+                  <select id="roster-bg-{{ ch.pk }}" name="skill_pack_background" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                    <option value="">&mdash; None &mdash;</option>
+                    {% for opt in skill_pack_choices.background %}
+                      <option value="{{ opt.key }}" {% if sheet_context.background|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-career-{{ ch.pk }}" style="font-size: 0.74rem;">Career</label>
+                  <select id="roster-career-{{ ch.pk }}" name="skill_pack_career" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                    <option value="">&mdash; None &mdash;</option>
+                    {% for opt in skill_pack_choices.career %}
+                      <option value="{{ opt.key }}" {% if sheet_context.career|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-interest-{{ ch.pk }}" style="font-size: 0.74rem;">Interest</label>
+                  <select id="roster-interest-{{ ch.pk }}" name="skill_pack_interest" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                    <option value="">&mdash; None &mdash;</option>
+                    {% for opt in skill_pack_choices.interest %}
+                      <option value="{{ opt.key }}" {% if sheet_context.interest|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-gender-{{ ch.pk }}" style="font-size: 0.74rem;">Gender</label>
+                  <input id="roster-gender-{{ ch.pk }}" type="text" name="gender" value="{{ sheet_context.gender }}" maxlength="80" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-muse-{{ ch.pk }}" style="font-size: 0.74rem;">Muse Name</label>
+                  <input id="roster-muse-{{ ch.pk }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                </div>
+              </div>
+              <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; margin-top: 0.5rem;">
+                <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.78rem; cursor: pointer;">
+                  <input type="hidden" name="sync_linked_names" value="0">
+                  <input type="checkbox" name="sync_linked_names" value="1" checked style="width: auto;">
+                  Sync name to linked Dossier &amp; Census
+                </label>
+                <button type="submit" class="btn btn-sm">Save Sheet Changes</button>
+              </div>
+            </form>
+          </div>
+        </details>
 
         <div class="sm-panel" style="padding: 0.7rem 0.85rem;">
           {% if ch.dossier %}
@@ -174,6 +292,7 @@
           </form>
         </div>
       </article>
+      {% endwith %}
     {% endfor %}
   </div>
 {% else %}

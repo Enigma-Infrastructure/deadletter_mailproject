@@ -14,8 +14,8 @@
       {% if census.dossier %}
         <span><span class="sm-meta-key">Dossier</span> <a href="{% url 'spacemarches:dossier_detail' slug=census.dossier.slug %}">{{ census.dossier.character_name }}</a></span>
       {% endif %}
-      {% if census.character %}
-        <span><span class="sm-meta-key">Point-Buy Sheet</span> <a href="{% url 'spacemarches:character_roster' %}">{{ census.character.character_name }}</a></span>
+      {% if primary_sheet %}
+        <span><span class="sm-meta-key">Sheet</span> <a href="{% url 'spacemarches:character_roster' %}">{{ primary_sheet.character_name }}</a></span>
       {% endif %}
       {% if is_admin_override %}<span class="sm-status-flag is-warn">Admin View</span>{% endif %}
     </div>
@@ -27,6 +27,8 @@
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=json">Export JSON</a>
   </div>
 </div>
+
+{% include "spacemarches/_sheet_sync_panel.html" with sync_source="census" next_sync_url=request.get_full_path %}
 
 <details class="sm-panel" style="margin: 0.85rem 0;" {% if stats.answered_count == 0 %}open{% endif %}>
   <summary style="cursor: pointer; font-weight: 600;">How This Census Works (Optional Guidance)</summary>
@@ -162,33 +164,59 @@
 
 <nav class="sm-panel" style="margin: 0.9rem 0;" aria-label="Census Chapters">
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.55rem;">
-    <span class="sm-eyebrow" style="margin: 0;">Chapters</span>
-    <a class="btn btn-secondary btn-sm" href="?chapter=all" style="{% if view_all %}font-weight: 700; border-color: var(--sm-primary);{% endif %}">
-      View All Chapters
+    <span class="sm-eyebrow" style="margin: 0;">Chapters &amp; Focus</span>
+    <a class="btn {% if not view_all %}btn-secondary{% endif %} btn-sm" href="?chapter=all">
+      All Chapters
     </a>
   </div>
-  <div style="display: flex; flex-wrap: wrap; gap: 0.4rem;">
+  <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
     {% for ch in chapters %}
       <a
         href="?chapter={{ ch.id }}"
         id="chapter-pill-{{ ch.id }}"
-        class="btn btn-secondary btn-sm"
-        style="{% if active_chapter_id == ch.id %}border-color: var(--sm-primary); font-weight: 700;{% endif %} {% if ch.is_appendix and not census.show_sensitive_appendix %}opacity: 0.72;{% endif %}"
+        class="btn {% if active_chapter_id != ch.id %}btn-secondary{% endif %} btn-sm"
+        style="{% if ch.is_appendix and not census.show_sensitive_appendix %}opacity: 0.78;{% endif %}"
       >
-        {{ ch.number }}: {{ ch.title|truncatechars:26 }}
+        {% if ch.is_appendix %}
+          Appendix: {{ ch.title }}
+        {% else %}
+          {{ ch.number }}: {{ ch.title }}
+        {% endif %}
         (<span class="ch-ans">{{ ch.answered_count }}</span>/<span class="ch-tot">{{ ch.total_questions }}</span>)
       </a>
     {% endfor %}
   </div>
+  {% if view_all and grouped_chapters %}
+    <div style="display: flex; flex-wrap: wrap; gap: 0.4rem 0.75rem; align-items: center; margin-top: 0.65rem; padding-top: 0.55rem; border-top: 1px dashed var(--sm-outline-variant); font-size: 0.82rem;">
+      <span class="sm-meta-key">Jump to section</span>
+      {% for group in grouped_chapters %}
+        <a href="#chapter-{{ group.chapter.id }}">
+          {% if group.chapter.is_appendix %}Appendix: {{ group.chapter.title }}{% else %}{{ group.chapter.number }}. {{ group.chapter.title }}{% endif %}
+        </a>
+      {% endfor %}
+    </div>
+  {% endif %}
 </nav>
 
 {% if view_all %}
   {% for group in grouped_chapters %}
-    <section style="margin-top: 1.5rem;">
+    <section id="chapter-{{ group.chapter.id }}" style="margin-top: 1.5rem;">
       <div class="sm-panel" style="margin-bottom: 0.75rem;">
-        <p class="sm-eyebrow" style="margin: 0;">Chapter {{ group.chapter.number }}</p>
-        <h2 style="margin: 0.15rem 0 0.3rem;">{{ group.chapter.title }}</h2>
-        <p class="text-muted" style="margin: 0;">{{ group.chapter.description }}</p>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
+          <div>
+            {% if group.chapter.is_appendix %}
+              <p class="sm-eyebrow" style="margin: 0;">Appendix</p>
+              <h2 style="margin: 0.15rem 0 0.3rem;">Appendix: {{ group.chapter.title }}</h2>
+            {% else %}
+              <p class="sm-eyebrow" style="margin: 0;">Chapter {{ group.chapter.number }}</p>
+              <h2 style="margin: 0.15rem 0 0.3rem;">{{ group.chapter.title }}</h2>
+            {% endif %}
+          </div>
+          <a class="btn btn-secondary btn-sm" href="?chapter={{ group.chapter.id }}">Focus Chapter</a>
+        </div>
+        {% if group.chapter.description %}
+          <p class="text-muted" style="margin: 0;">{{ group.chapter.description }}</p>
+        {% endif %}
       </div>
       {% if group.chapter.is_appendix %}
         <div class="sm-panel" style="border-color: var(--sm-tertiary); margin-bottom: 0.75rem;">
@@ -203,12 +231,34 @@
       {% endfor %}
     </section>
   {% endfor %}
+
+  {% if not census.show_sensitive_appendix %}
+    <div class="sm-panel" style="margin-top: 1.5rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.65rem;">
+      <div>
+        <p class="sm-eyebrow" style="margin: 0;">Appendix</p>
+        <p style="margin: 0.15rem 0 0; font-size: 0.88rem;"><strong>Appendix: Sensitive Topics</strong> is hidden unless you opt in.</p>
+      </div>
+      <a class="btn btn-secondary btn-sm" href="?chapter=appendix">Review Content Warning &amp; Opt In</a>
+    </div>
+  {% endif %}
 {% else %}
   {% if active_chapter %}
     <section class="sm-panel" style="margin-bottom: 0.85rem;">
-      <p class="sm-eyebrow" style="margin: 0;">Chapter {{ active_chapter.number }}</p>
-      <h2 style="margin: 0.15rem 0 0.3rem;">{{ active_chapter.title }}</h2>
-      <p class="text-muted" style="margin: 0;">{{ active_chapter.description }}</p>
+      <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem;">
+        <div>
+          {% if active_chapter.is_appendix %}
+            <p class="sm-eyebrow" style="margin: 0;">Appendix</p>
+            <h2 style="margin: 0.15rem 0 0.3rem;">Appendix: {{ active_chapter.title }}</h2>
+          {% else %}
+            <p class="sm-eyebrow" style="margin: 0;">Chapter {{ active_chapter.number }}</p>
+            <h2 style="margin: 0.15rem 0 0.3rem;">{{ active_chapter.title }}</h2>
+          {% endif %}
+        </div>
+        <a class="btn btn-secondary btn-sm" href="?chapter=all">Back to All Chapters</a>
+      </div>
+      {% if active_chapter.description %}
+        <p class="text-muted" style="margin: 0;">{{ active_chapter.description }}</p>
+      {% endif %}
     </section>
   {% endif %}
 
@@ -240,12 +290,12 @@
   <div style="display: flex; justify-content: space-between; align-items: center; gap: 0.75rem; margin: 1.25rem 0; flex-wrap: wrap;">
     <div>
       {% if prev_chapter %}
-        <a class="btn btn-secondary btn-sm" href="?chapter={{ prev_chapter.id }}">&larr; {{ prev_chapter.number }}: {{ prev_chapter.title }}</a>
+        <a class="btn btn-secondary btn-sm" href="?chapter={{ prev_chapter.id }}">&larr; {% if prev_chapter.is_appendix %}Appendix: {{ prev_chapter.title }}{% else %}{{ prev_chapter.number }}: {{ prev_chapter.title }}{% endif %}</a>
       {% endif %}
     </div>
     <div>
       {% if next_chapter %}
-        <a class="btn btn-sm" href="?chapter={{ next_chapter.id }}">Next: {{ next_chapter.number }}: {{ next_chapter.title }} &rarr;</a>
+        <a class="btn btn-sm" href="?chapter={{ next_chapter.id }}">Next: {% if next_chapter.is_appendix %}Appendix: {{ next_chapter.title }}{% else %}{{ next_chapter.number }}: {{ next_chapter.title }}{% endif %} &rarr;</a>
       {% endif %}
     </div>
   </div>
@@ -316,17 +366,22 @@
         const qid = form.querySelector('input[name="question_id"]').value;
         const textarea = form.querySelector('textarea[name="answer_text"]');
         const voiceSel = form.querySelector('select[name="voice"]');
-        const answerText = clearRequested ? "" : (textarea ? textarea.value : "");
-        const actionType = clearRequested ? "clear" : "save";
+        const submitter = event.submitter || null;
+        const isClear = (submitter && submitter.dataset && submitter.dataset.action === "clear") || clearRequested;
         clearRequested = false;
 
+        const actionType = isClear ? "clear" : "save";
+        const answerText = isClear ? "" : (textarea ? textarea.value : "");
+        const actionUrl = form.getAttribute("action");
+        if (!actionUrl) return;
+
         if (statusBadge) {
-          statusBadge.textContent = "Saving...";
+          statusBadge.textContent = isClear ? "Clearing..." : "Saving...";
           statusBadge.className = "sm-status-flag census-save-status";
         }
 
         try {
-          const resp = await fetch(form.action, {
+          const resp = await fetch(actionUrl, {
             method: "POST",
             credentials: "same-origin",
             headers: {
@@ -341,6 +396,10 @@
               voice: voiceSel ? voiceSel.value : ""
             })
           });
+          const contentType = resp.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            throw new Error("Server returned HTTP " + resp.status + " instead of JSON.");
+          }
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || "Save failed");
 
@@ -349,7 +408,9 @@
           }
           if (statusBadge) {
             if (data.answered) {
-              statusBadge.textContent = "Answered";
+              statusBadge.textContent = data.synced_dossier_qid
+                ? ("Answered \u00b7 Synced [" + data.synced_dossier_qid + "]")
+                : "Answered";
               statusBadge.className = "sm-status-flag is-ok census-save-status";
             } else {
               statusBadge.textContent = "Unanswered";

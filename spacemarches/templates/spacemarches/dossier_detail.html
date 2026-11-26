@@ -207,6 +207,8 @@
   {% endif %}
 </section>
 
+{% include "spacemarches/_sheet_sync_panel.html" with sync_source="dossier" next_sync_url=request.get_full_path %}
+
 <div class="sm-panel" style="margin: 0.85rem 0 1rem;">
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem; margin-bottom: 0.65rem;">
     <div style="display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: flex-end;">
@@ -524,7 +526,9 @@
 
       const statusBadge = card.querySelector(":scope > div .card-save-status");
       if (statusBadge) {
-        statusBadge.textContent = answered ? ("Saved (" + data.version_label + ")") : "Unanswered";
+        statusBadge.textContent = answered
+          ? ("Saved (" + data.version_label + ")" + (data.synced_census_qid ? " · Synced Census [" + data.synced_census_qid + "]" : ""))
+          : "Unanswered";
       }
 
       if (Array.isArray(data.revisions)) {
@@ -625,8 +629,10 @@
           const csrfInput = form.querySelector('input[name="csrfmiddlewaretoken"]');
           const qid = form.querySelector('input[name="question_id"]').value;
           const statusBadge = card.querySelector(":scope > div .card-save-status");
+          const actionUrl = form.getAttribute("action");
+          if (!actionUrl) return;
           try {
-            const resp = await fetch(form.action, {
+            const resp = await fetch(actionUrl, {
               method: "POST",
               credentials: "same-origin",
               headers: {
@@ -640,6 +646,10 @@
                 is_gm_only: gmCheckbox.checked
               })
             });
+            const contentType = resp.headers.get("content-type") || "";
+            if (!contentType.includes("application/json")) {
+              throw new Error("Server returned HTTP " + resp.status + " instead of JSON.");
+            }
             const data = await resp.json();
             if (!resp.ok) throw new Error(data.error || "Privacy update failed");
             updateCardAfterSave(card, data);
@@ -662,9 +672,11 @@
           ? (solInput ? solInput.value : form.querySelector('input[name="sol_date"]').value)
           : "";
 
+        const actionUrl = form.getAttribute("action");
+        if (!actionUrl) return;
         if (statusBadge) statusBadge.textContent = "Saving...";
         try {
-          const resp = await fetch(form.action, {
+          const resp = await fetch(actionUrl, {
             method: "POST",
             credentials: "same-origin",
             headers: {
@@ -681,6 +693,10 @@
               is_gm_only: gmCheckbox ? gmCheckbox.checked : false
             })
           });
+          const contentType = resp.headers.get("content-type") || "";
+          if (!contentType.includes("application/json")) {
+            throw new Error("Server returned HTTP " + resp.status + " instead of JSON.");
+          }
           const data = await resp.json();
           if (!resp.ok) throw new Error(data.error || "Save failed");
 

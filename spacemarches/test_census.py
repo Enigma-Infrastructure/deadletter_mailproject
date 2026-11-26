@@ -284,3 +284,114 @@ class CensusViewsAndProtectionTests(TestCase):
         owner_detail = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk}))
         self.assertContains(owner_detail, "Security Log")
         self.assertContains(owner_detail, "storyteller")
+
+
+class CensusUxAndCrossSyncTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="ux_alice", password="pw12345!")
+        self.dossier = CharacterDossier.objects.create(
+            user=self.user,
+            character_name="Lyra Orbit",
+            slug="lyra-orbit",
+        )
+        self.census = EclipsePhaseCensus.objects.create(
+            user=self.user,
+            dossier=self.dossier,
+            character_name="Lyra Orbit",
+            slug="lyra-orbit",
+        )
+
+    def test_schema_primers_have_paragraph_breaks_and_clean_appendix_meta(self):
+        meta = get_census_meta()
+        self.assertTrue(any("It will give you" in p for p in meta["intro_paragraphs"]))
+        self.assertFalse(any("Iit will give you" in p for p in meta["intro_paragraphs"]))
+        chapters = get_census_chapters(include_appendix=True)
+        appendix_ch = next(c for c in chapters if c["id"] == "appendix")
+        self.assertEqual(appendix_ch["number"], "Appendix")
+        self.assertEqual(appendix_ch["title"], "Sensitive Topics")
+        self.assertEqual(appendix_ch["description"], "")
+        for qid in ("1", "5", "6.1j", "6.2o", "13", "13d_stub", "15f"):
+            q = get_census_question(qid)
+            self.assertIn("\n\n", q["primer"], f"Expected paragraph breaks in primer for {qid}")
+
+    def test_view_all_default_untruncated_chapters_appendix_copy_and_clear_ajax(self):
+        self.client.force_login(self.user)
+        url = reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk})
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode("utf-8")
+        # Default View All mode shows sections from multiple chapters immediately
+        self.assertIn('id="chapter-origins"', html)
+        self.assertIn('id="chapter-politics"', html)
+        self.assertIn('id="chapter-exosolar"', html)
+        self.assertIn('id="census-q-1"', html)
+        self.assertIn('id="census-q-6"', html)
+        # Full chapter titles are never truncated
+        self.assertIn("Fall, Origin, Morph, Home &amp; Livelihood", html)
+        self.assertIn("Politics, Factions, Reputations &amp; Beliefs", html)
+        self.assertIn("Sex, Relationships &amp; Intimacy", html)
+        self.assertIn("Appendix: Sensitive Topics", html)
+        # Awkward legacy appendix copy is gone
+        self.assertNotIn("Chapter Appendix", html)
+        self.assertNotIn("Moved Questions (Opt-In Content Warning)", html)
+        self.assertNotIn("Content-warned topics (13d1", html)
+        # Clear/Skip AJAX bug fix: JS uses form.getAttribute("action"), never form.action
+        self.assertIn('form.getAttribute("action")', html)
+        self.assertNotIn("fetch(form.action", html)
+        # Primers render structured <p> paragraphs via |linebreaks
+        self.assertIn('<div class="sm-primer"><p>', html)
+
+        # Save then Clear via AJAX JSON
+        ans_url = reverse("spacemarches:census_answer", kwargs={"pk": self.census.pk})
+        save_resp = self.client.post(
+            ans_url,
+            data=json.dumps({"question_id": "1", "action": "save", "answer_text": "Born on Ceres."}),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(save_resp.status_code, 200)
+        self.assertTrue(save_resp.json()["answered"])
+        clear_resp = self.client.post(
+            ans_url,
+            data=json.dumps({"question_id": "1", "action": "clear", "answer_text": ""}),
+            content_type="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+        )
+        self.assertEqual(clear_resp.status_code, 200)
+        self.assertFalse(clear_resp.json()["answered"])
+        self.assertEqual(clear_resp.json()["stats"]["answered_count"], 0)
+
+    def test_census_dossier_bidirectional_sync_and_backfill(self):
+        from spacemarches.services.dossier_service import save_dossier_answer
+
+        self.client.force_login(self.user)
+        # Saving Census [11j] (character name) propagates to Dossier [1]
+        save_res = save_census_answer(self.census, "11j", "Lyra K. Orbit (callsign: Spar)")
+        self.assertEqual(save_res.get("synced_dossier_qid"), "1")
+        self.dossier.refresh_from_db()
+        self.assertEqual(self.dossier.responses["1"]["answer"], "Lyra K. Orbit (callsign: Spar)")
+        self.assertEqual(self.dossier.responses["1"]["source"], "census_sync")
+
+        # Clearing Census [11j] succeeds cleanly without crashing Dossier immutability
+        clear_res = save_census_answer(self.census, "11j", "")
+        self.assertFalse(clear_res["answered"])
+        self.dossier.refresh_from_db()
+        self.assertEqual(self.dossier.responses["1"]["answer"], "Lyra K. Orbit (callsign: Spar)")
+
+        # Saving Dossier [6.2f] (Muse) propagates to Census [12]
+        d_res = save_dossier_answer(self.dossier, "6.2f", "Helios (custom AI muse)", source="web")
+        self.assertEqual(d_res.get("synced_census_qid"), "12")
+        self.census.refresh_from_db()
+        self.assertEqual(self.census.responses["12"]["answer"], "Helios (custom AI muse)")
+
+        # Backfill when linking a new Census to an existing Dossier with answered questions
+        save_dossier_answer(self.dossier, "6.1g", "Survived the Fall aboard an orbital tug.", source="web")
+        second_census = create_census(self.user, character_name="Lyra Second", dossier=self.dossier)
+        self.assertEqual(second_census.responses["1"]["answer"], "Survived the Fall aboard an orbital tug.")
+        self.assertEqual(second_census.responses["12"]["answer"], "Helios (custom AI muse)")
+
+        # Detail templates display sync pills
+        census_html = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk})).content.decode("utf-8")
+        dossier_html = self.client.get(reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug})).content.decode("utf-8")
+        self.assertIn("Synced with Dossier [6.1g]", census_html)
+        self.assertIn("Synced with Census [1]", dossier_html)

@@ -85,7 +85,7 @@ def create_census(
     if character is not None and dossier is None and character.dossier_id:
         dossier = character.dossier
 
-    return EclipsePhaseCensus.objects.create(
+    census = EclipsePhaseCensus.objects.create(
         user=user,
         dossier=dossier,
         character=character,
@@ -95,6 +95,11 @@ def create_census(
         show_sexuality_sections=bool(show_sexuality_sections),
         show_sensitive_appendix=bool(show_sensitive_appendix),
     )
+    if dossier is not None:
+        from spacemarches.services.character_cross_sync import backfill_linked_census_and_dossier
+
+        backfill_linked_census_and_dossier(census, dossier)
+    return census
 
 
 def save_census_answer(
@@ -103,6 +108,7 @@ def save_census_answer(
     answer: str,
     *,
     voice: str = "",
+    propagate: bool = True,
 ) -> dict[str, Any]:
     q = get_census_question(question_id)
     if q is None:
@@ -135,9 +141,15 @@ def save_census_answer(
     responses[q["id"]] = record
     census.responses = responses
     census.save(update_fields=["responses", "updated_at"])
+    synced_dossier_qid = None
+    if propagate and census.dossier_id:
+        from spacemarches.services.character_cross_sync import sync_census_answer_to_dossier
+
+        synced_dossier_qid = sync_census_answer_to_dossier(census, q["id"], cleaned_answer)
     return {
         "question_id": q["id"],
         "answered": True,
+        "synced_dossier_qid": synced_dossier_qid,
         **record,
     }
 
@@ -245,7 +257,8 @@ def export_census_markdown(census: EclipsePhaseCensus, *, include_unanswered: bo
             continue
 
         any_written = True
-        lines.extend([f"## {ch['number']} — {ch['title']}", ""])
+        heading_line = f"## Appendix: {ch['title']}" if ch.get("is_appendix") else f"## {ch['number']} — {ch['title']}"
+        lines.extend([heading_line, ""])
         if ch.get("is_appendix") and meta.get("appendix_notice"):
             for p in meta["appendix_notice"]:
                 lines.extend([f"> {p}", ""])
@@ -340,7 +353,8 @@ def export_census_html(census: EclipsePhaseCensus, *, include_unanswered: bool =
                 items.append((q, None))
         if not items:
             continue
-        parts.append(f"<h2>{html.escape(ch['number'])} &mdash; {html.escape(ch['title'])}</h2>")
+        h2_text = f"Appendix: {html.escape(ch['title'])}" if ch.get("is_appendix") else f"{html.escape(ch['number'])} &mdash; {html.escape(ch['title'])}"
+        parts.append(f"<h2>{h2_text}</h2>")
         for q, norm in items:
             disp_id = html.escape(str(q.get("display_id") or q["id"]))
             heading = html.escape(str(q["heading"]))

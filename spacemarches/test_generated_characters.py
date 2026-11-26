@@ -368,3 +368,122 @@ class GeneratedCharacterTests(TestCase):
         self.assertEqual(summary["morphs"], ["Ghost"])
         self.assertEqual(summary["traits"], ["Situational Awareness"])
         self.assertEqual(summary["sleights"], ["Neural Shunt"])
+
+
+class CrossModelSheetSyncTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(username="sheet_pilot", password="pw12345!")
+        self.dossier = CharacterDossier.objects.create(
+            user=self.user,
+            character_name="Nyx Vesper",
+            slug="nyx-vesper",
+        )
+        self.payload = {
+            "type": "point-buy-exported",
+            "createdAt": "2026-11-25T12:00:00Z",
+            "packs": {
+                "ep-crb": {
+                    "name": "i_EP2e Core Rulebook",
+                    "designs": {
+                        "skillPack": {
+                            "E9GLwW0z0fKLJSyd": {"name": "m_aUDYLT", "skillPackType": "faction"},
+                        },
+                        "biologicalBody": {
+                            "k001": {"name": "i_Splicer"},
+                        },
+                    },
+                }
+            },
+            "pointBuy": {
+                "name": "i_Nyx Vesper",
+                "fullName": "i_Nyx Vesper-4",
+                "concept": "m_Orbital scavenger",
+                "egoType": "i_Transhuman",
+                "gender": "i_Nonbinary",
+                "museName": "i_Iris",
+                "aptitudes": {"cog": 15, "int": 20, "ref": 15, "sav": 10, "som": 15, "wil": 15},
+                "skillPacks": {
+                    "faction": {"design": {"uid": "skillPack:ep-crb:E9GLwW0z0fKLJSyd"}, "skills": {}},
+                },
+                "morphs": {"m1": {"design": {"uid": "ep-crb:biologicalBody:k001"}}},
+            },
+        }
+        self.sheet = GeneratedCharacter.objects.create(
+            user=self.user,
+            dossier=self.dossier,
+            character_name="Nyx Vesper",
+            source_system=GeneratedCharacter.SOURCE_POINT_BUY_V2,
+            raw_data=self.payload,
+            summary=extract_point_buy_summary(self.payload),
+        )
+
+    def test_hashed_skill_pack_name_resolves_cleanly(self):
+        self.assertEqual(self.sheet.summary["skill_packs"]["faction"], "Brinker")
+
+    def test_sheet_reminders_pending_sync_and_profile_update_across_models(self):
+        from spacemarches.models import EclipsePhaseCensus
+        from spacemarches.services.census_service import create_census, save_census_answer
+
+        census = create_census(
+            self.user,
+            character_name="Nyx Vesper",
+            dossier=self.dossier,
+            character=self.sheet,
+        )
+        self.client.force_login(self.user)
+
+        # Inline reminders appear on both Census and Dossier
+        census_html = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": census.pk})).content.decode("utf-8")
+        dossier_html = self.client.get(reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug})).content.decode("utf-8")
+        self.assertIn("Sheet Reminder", census_html)
+        self.assertIn("Brinker", census_html)
+        self.assertIn("Change Sheet Option", census_html)
+        self.assertIn("Sheet Reminder", dossier_html)
+        self.assertIn("Iris", dossier_html)
+        self.assertIn('form.getAttribute("action")', dossier_html)
+        self.assertNotIn("fetch(form.action", dossier_html)
+
+        # Updating a sheet-tracked Census answer and character name surfaces Pending Sync
+        save_census_answer(census, "6", "Left the Brinker commune to join Anarchists.")
+        census.character_name = "Nyx Anarch"
+        census.save()
+
+        roster_html = self.client.get(reverse("spacemarches:character_roster")).content.decode("utf-8")
+        self.assertIn("Pending Sync", roster_html)
+        self.assertIn("Pending Census/Dossier Updates", roster_html)
+
+        census_html_pending = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": census.pk})).content.decode("utf-8")
+        self.assertIn("Pending Census / Dossier Changes Since Last Sheet Sync", census_html_pending)
+
+        # Switch Faction from Brinker -> Anarchist and update name across Sheet, Dossier & Census
+        sync_url = reverse("spacemarches:character_sync_profile", kwargs={"pk": self.sheet.pk})
+        post_resp = self.client.post(
+            sync_url,
+            {
+                "character_name": "Nyx Anarch",
+                "skill_pack_faction": "o5uyqu81YM17HO7G",
+                "muse_name": "Iris-2",
+                "sync_linked_names": "1",
+                "source": "census",
+                "next": reverse("spacemarches:census_detail", kwargs={"pk": census.pk}),
+            },
+        )
+        self.assertEqual(post_resp.status_code, 302)
+
+        self.sheet.refresh_from_db()
+        self.dossier.refresh_from_db()
+        census.refresh_from_db()
+
+        self.assertEqual(self.sheet.character_name, "Nyx Anarch")
+        self.assertEqual(self.sheet.summary["skill_packs"]["faction"], "Anarchist")
+        self.assertEqual(self.sheet.summary["muse_name"], "Iris-2")
+        self.assertEqual(
+            self.sheet.raw_data["pointBuy"]["skillPacks"]["faction"]["design"]["uid"],
+            "skillPack:ep-crb:o5uyqu81YM17HO7G",
+        )
+        self.assertEqual(self.dossier.character_name, "Nyx Anarch")
+        self.assertEqual(census.character_name, "Nyx Anarch")
+
+        # Pending notice cleared after sync checkpoint
+        census_html_after = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": census.pk})).content.decode("utf-8")
+        self.assertNotIn("Pending Census / Dossier Changes Since Last Sheet Sync", census_html_after)

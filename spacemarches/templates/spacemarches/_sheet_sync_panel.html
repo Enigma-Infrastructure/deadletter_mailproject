@@ -1,0 +1,124 @@
+{% if primary_sheet and sheet_context %}
+<details class="sm-panel" style="margin: 0.85rem 0;" {% if pending_sheet_changes.has_pending %}open{% endif %}>
+  <summary style="cursor: pointer; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; gap: 0.45rem;">
+    <span>Linked Sheet Snapshot &amp; Sync: {{ primary_sheet.character_name }}</span>
+    {% if sheet_context.faction %}<span class="sm-code-tag">Faction: {{ sheet_context.faction }}</span>{% endif %}
+    {% if sheet_context.background %}<span class="sm-code-tag">Background: {{ sheet_context.background }}</span>{% endif %}
+    {% if sheet_context.career %}<span class="sm-code-tag">Career: {{ sheet_context.career }}</span>{% endif %}
+    {% if pending_sheet_changes.has_pending %}
+      <span class="sm-status-flag is-warn">Pending Sheet Sync ({{ pending_sheet_changes.count }})</span>
+    {% endif %}
+  </summary>
+
+  <div style="margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.65rem;">
+    <div class="sm-meta-strip" style="font-size: 0.82rem;">
+      {% if sheet_context.full_name %}<span><span class="sm-meta-key">Full Name</span> {{ sheet_context.full_name }}</span>{% endif %}
+      {% if sheet_context.concept %}<span><span class="sm-meta-key">Concept</span> {{ sheet_context.concept }}</span>{% endif %}
+      {% if sheet_context.ego_type %}<span><span class="sm-meta-key">Ego Type</span> {{ sheet_context.ego_type }}</span>{% endif %}
+      {% if sheet_context.gender %}<span><span class="sm-meta-key">Gender</span> {{ sheet_context.gender }}</span>{% endif %}
+      {% if sheet_context.interest %}<span><span class="sm-meta-key">Interest</span> {{ sheet_context.interest }}</span>{% endif %}
+      {% if sheet_context.morphs_display %}<span><span class="sm-meta-key">Morph</span> {{ sheet_context.morphs_display }}</span>{% endif %}
+      {% if sheet_context.muse_name %}<span><span class="sm-meta-key">Muse</span> {{ sheet_context.muse_name }}</span>{% endif %}
+      {% if sheet_context.reputations_display %}<span><span class="sm-meta-key">Rep</span> {{ sheet_context.reputations_display }}</span>{% endif %}
+      {% if sheet_context.motivations_display %}<span><span class="sm-meta-key">Motivations</span> {{ sheet_context.motivations_display }}</span>{% endif %}
+    </div>
+
+    {% if pending_sheet_changes.has_pending %}
+      <div class="sm-panel" style="padding: 0.6rem 0.75rem; border-color: var(--sm-tertiary); margin: 0;">
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem;">
+          <strong style="font-size: 0.85rem;">Pending Census / Dossier Changes Since Last Sheet Sync</strong>
+          <form method="post" action="{% url 'spacemarches:character_sync_profile' pk=primary_sheet.pk %}" style="margin: 0;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="acknowledge">
+            <input type="hidden" name="source" value="{{ sync_source|default:'census' }}">
+            <input type="hidden" name="next" value="{{ next_sync_url }}">
+            <button type="submit" class="btn btn-secondary btn-sm">Mark Sheet Up-to-Date</button>
+          </form>
+        </div>
+        <ul style="margin: 0; padding-left: 1.15rem; font-size: 0.8rem;">
+          {% for item in pending_sheet_changes.items %}
+            <li><strong>{{ item.source }} {{ item.question_id }}</strong> ({{ item.label }}): {{ item.detail }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {% if is_owner_view %}
+      <form method="post" action="{% url 'spacemarches:character_sync_profile' pk=primary_sheet.pk %}" style="margin: 0;">
+        {% csrf_token %}
+        <input type="hidden" name="source" value="{{ sync_source|default:'census' }}">
+        <input type="hidden" name="next" value="{{ next_sync_url }}">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(175px, 1fr)); gap: 0.55rem;">
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-name-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Character Name</label>
+            <input id="sync-sheet-name-{{ primary_sheet.pk }}" type="text" name="character_name" value="{{ sheet_context.character_name }}" maxlength="160" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-fullname-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Full Name</label>
+            <input id="sync-sheet-fullname-{{ primary_sheet.pk }}" type="text" name="full_name" value="{{ sheet_context.full_name }}" maxlength="160" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-concept-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Concept</label>
+            <input id="sync-sheet-concept-{{ primary_sheet.pk }}" type="text" name="concept" value="{{ sheet_context.concept }}" maxlength="240" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-faction-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Faction</label>
+            <select id="sync-sheet-faction-{{ primary_sheet.pk }}" name="skill_pack_faction" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+              <option value="">&mdash; None &mdash;</option>
+              {% for opt in skill_pack_choices.faction %}
+                <option value="{{ opt.key }}" {% if sheet_context.faction|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-bg-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Background</label>
+            <select id="sync-sheet-bg-{{ primary_sheet.pk }}" name="skill_pack_background" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+              <option value="">&mdash; None &mdash;</option>
+              {% for opt in skill_pack_choices.background %}
+                <option value="{{ opt.key }}" {% if sheet_context.background|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-career-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Career</label>
+            <select id="sync-sheet-career-{{ primary_sheet.pk }}" name="skill_pack_career" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+              <option value="">&mdash; None &mdash;</option>
+              {% for opt in skill_pack_choices.career %}
+                <option value="{{ opt.key }}" {% if sheet_context.career|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-interest-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Interest</label>
+            <select id="sync-sheet-interest-{{ primary_sheet.pk }}" name="skill_pack_interest" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+              <option value="">&mdash; None &mdash;</option>
+              {% for opt in skill_pack_choices.interest %}
+                <option value="{{ opt.key }}" {% if sheet_context.interest|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-gender-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Gender</label>
+            <input id="sync-sheet-gender-{{ primary_sheet.pk }}" type="text" name="gender" value="{{ sheet_context.gender }}" maxlength="80" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+          </div>
+          <div class="form-group" style="margin: 0;">
+            <label for="sync-sheet-muse-{{ primary_sheet.pk }}" style="font-size: 0.78rem;">Muse Name</label>
+            <input id="sync-sheet-muse-{{ primary_sheet.pk }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.3rem 0.5rem; font-size: 0.84rem;">
+          </div>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.5rem; margin-top: 0.65rem;">
+          <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
+            <input type="hidden" name="sync_linked_names" value="0">
+            <input type="checkbox" name="sync_linked_names" value="1" checked style="width: auto;">
+            Sync Character Name across Sheet, Dossier &amp; Census
+          </label>
+          <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+            <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:meshnet' %}?load={{ primary_sheet.pk }}">Open Sheet in MeshNet</a>
+            <button type="submit" class="btn btn-sm">Update Character Sheet</button>
+          </div>
+        </div>
+      </form>
+    {% endif %}
+  </div>
+</details>
+{% endif %}

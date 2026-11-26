@@ -16,6 +16,9 @@
       <span class="text-muted" style="font-size: 0.8rem; margin-left: 0.35rem;">{{ node.category }}</span>
     </div>
     <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
+      {% if node.synced_census_qid %}
+        <span class="sm-code-tag" title="Automatically synced with linked Eclipse Phase Census">Synced with Census [{{ node.synced_census_qid }}]</span>
+      {% endif %}
       <span class="sm-status-flag {% if node.tier == 'sensitive_appendix' %}is-danger{% endif %}">
         {% if node.tier == 'sensitive_appendix' %}Sensitive Appendix{% elif node.tier == 'deep' %}Dive Deeper{% else %}Core{% endif %}
       </span>
@@ -40,6 +43,109 @@
   <p style="font-weight: 600; margin-bottom: 0.3rem;">{{ node.prompt }}</p>
   {% if node.lore_text %}
     <p class="text-muted" style="font-size: 0.84rem; margin-bottom: 0.65rem;">{{ node.lore_text }}</p>
+  {% endif %}
+
+  {% if node.sheet_hint %}
+    <div class="sm-sheet-reminder">
+      <div style="display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center;">
+        <span class="sm-meta-key">Sheet Reminder</span>
+        {% for label, value in node.sheet_hint.reminders %}
+          <span><strong>{{ label }}:</strong> {{ value }}</span>
+        {% endfor %}
+      </div>
+      {% if primary_sheet and is_owner_view and node.sheet_hint.editable_fields %}
+        <details style="margin-top: 0.4rem;">
+          <summary style="cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--sm-primary);">Change Sheet Option</summary>
+          <form method="post" action="{% url 'spacemarches:character_sync_profile' pk=primary_sheet.pk %}" style="margin-top: 0.45rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end;">
+            {% csrf_token %}
+            <input type="hidden" name="source" value="dossier">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="sync_linked_names" value="1">
+            {% if "character_name" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-name-{{ node.id }}" style="font-size: 0.74rem; display: block;">Character Name</label>
+                <input id="d-hint-name-{{ node.id }}" type="text" name="character_name" value="{{ sheet_context.character_name }}" maxlength="160" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "full_name" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-fullname-{{ node.id }}" style="font-size: 0.74rem; display: block;">Full Name</label>
+                <input id="d-hint-fullname-{{ node.id }}" type="text" name="full_name" value="{{ sheet_context.full_name }}" maxlength="160" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "concept" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-concept-{{ node.id }}" style="font-size: 0.74rem; display: block;">Concept</label>
+                <input id="d-hint-concept-{{ node.id }}" type="text" name="concept" value="{{ sheet_context.concept }}" maxlength="240" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "ego_type" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-egotype-{{ node.id }}" style="font-size: 0.74rem; display: block;">Ego Type</label>
+                <input id="d-hint-egotype-{{ node.id }}" type="text" name="ego_type" value="{{ sheet_context.ego_type }}" maxlength="80" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "faction" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-faction-{{ node.id }}" style="font-size: 0.74rem; display: block;">Faction</label>
+                <select id="d-hint-faction-{{ node.id }}" name="skill_pack_faction" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.faction %}
+                    <option value="{{ opt.key }}" {% if sheet_context.faction|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "background" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-bg-{{ node.id }}" style="font-size: 0.74rem; display: block;">Background</label>
+                <select id="d-hint-bg-{{ node.id }}" name="skill_pack_background" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.background %}
+                    <option value="{{ opt.key }}" {% if sheet_context.background|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "career" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-career-{{ node.id }}" style="font-size: 0.74rem; display: block;">Career</label>
+                <select id="d-hint-career-{{ node.id }}" name="skill_pack_career" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.career %}
+                    <option value="{{ opt.key }}" {% if sheet_context.career|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "interest" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-interest-{{ node.id }}" style="font-size: 0.74rem; display: block;">Interest</label>
+                <select id="d-hint-interest-{{ node.id }}" name="skill_pack_interest" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.interest %}
+                    <option value="{{ opt.key }}" {% if sheet_context.interest|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "gender" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-gender-{{ node.id }}" style="font-size: 0.74rem; display: block;">Gender</label>
+                <input id="d-hint-gender-{{ node.id }}" type="text" name="gender" value="{{ sheet_context.gender }}" maxlength="80" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "muse_name" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-muse-{{ node.id }}" style="font-size: 0.74rem; display: block;">Muse Name</label>
+                <input id="d-hint-muse-{{ node.id }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            <button type="submit" class="btn btn-sm">Update Sheet</button>
+          </form>
+        </details>
+      {% endif %}
+    </div>
   {% endif %}
 
   <div class="card-redacted-notice sm-alert" style="display: none; border-style: dashed; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.84rem; margin-bottom: 0.5rem;">

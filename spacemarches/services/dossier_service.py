@@ -747,6 +747,7 @@ def save_dossier_answer(
     stardate_era: str = "",
     sol_date: str = "",
     privacy_only: bool = False,
+    propagate: bool = True,
 ) -> dict[str, Any]:
     """
     Append-only progression saver for a CharacterDossier prompt.
@@ -764,8 +765,8 @@ def save_dossier_answer(
         raise ValueError(f"Unknown questionnaire question ID: {qid}")
 
     normalized_source = (source or "web").strip().lower()
-    if normalized_source not in {"web", "discord"}:
-        raise ValueError(f"Invalid answer source '{source}'; expected 'web' or 'discord'.")
+    if normalized_source not in {"web", "discord", "census_sync"}:
+        raise ValueError(f"Invalid answer source '{source}'; expected 'web', 'discord', or 'census_sync'.")
 
     new_answer = "" if answer_text is None else str(answer_text)
     normalized_kind = normalize_entry_kind(entry_kind, session_tag=session_tag)
@@ -935,6 +936,22 @@ def save_dossier_answer(
         dossier.private_keys = locked.private_keys
         dossier.updated_at = locked.updated_at
 
+        synced_census_qid = None
+        if propagate and new_answer.strip():
+            from spacemarches.services.character_cross_sync import (
+                DOSSIER_TO_CENSUS_MAP,
+                sync_dossier_answer_to_censuses,
+            )
+
+            synced_ids = sync_dossier_answer_to_censuses(
+                locked,
+                qid,
+                new_answer,
+                is_gm_only=(qid in private_keys),
+            )
+            if synced_ids:
+                synced_census_qid = DOSSIER_TO_CENSUS_MAP.get(qid)
+
         stats = compute_dossier_stats(locked)
         stats.update(
             {
@@ -952,6 +969,7 @@ def save_dossier_answer(
                 "version_label": version_label,
                 "session_tag": version_label,
                 "source": normalized_source,
+                "synced_census_qid": synced_census_qid,
                 "revisions": list(reversed(revisions)),
             }
         )

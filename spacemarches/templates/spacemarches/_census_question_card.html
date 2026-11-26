@@ -8,17 +8,125 @@
       <span class="sm-code-tag" style="margin-right: 0.35rem;">{{ node.display_id }}</span>
       {{ node.heading }}
     </h3>
-    {% if node.answerable %}
-      <span class="sm-status-flag {% if node.is_answered %}is-ok{% endif %} census-save-status">
-        {% if node.is_answered %}Answered{% else %}Unanswered{% endif %}
-      </span>
-    {% else %}
-      <span class="sm-code-tag">Section Guide</span>
-    {% endif %}
+    <div style="display: flex; flex-wrap: wrap; gap: 0.35rem; align-items: center;">
+      {% if node.synced_dossier_qid %}
+        <span class="sm-code-tag" title="Automatically synced with linked Operational Dossier">Synced with Dossier [{{ node.synced_dossier_qid }}]</span>
+      {% endif %}
+      {% if node.answerable %}
+        <span class="sm-status-flag {% if node.is_answered %}is-ok{% endif %} census-save-status">
+          {% if node.is_answered %}Answered{% else %}Unanswered{% endif %}
+        </span>
+      {% else %}
+        <span class="sm-code-tag">Section Guide</span>
+      {% endif %}
+    </div>
   </div>
 
   {% if node.primer %}
-    <p style="margin: 0 0 0.75rem; font-size: 0.92rem; line-height: 1.58; white-space: pre-line;">{{ node.primer }}</p>
+    <div class="sm-primer">{{ node.primer|linebreaks }}</div>
+  {% endif %}
+
+  {% if node.sheet_hint %}
+    <div class="sm-sheet-reminder">
+      <div style="display: flex; flex-wrap: wrap; gap: 0.65rem; align-items: center;">
+        <span class="sm-meta-key">Sheet Reminder</span>
+        {% for label, value in node.sheet_hint.reminders %}
+          <span><strong>{{ label }}:</strong> {{ value }}</span>
+        {% endfor %}
+      </div>
+      {% if primary_sheet and is_owner_view and node.sheet_hint.editable_fields %}
+        <details style="margin-top: 0.4rem;">
+          <summary style="cursor: pointer; font-weight: 600; font-size: 0.8rem; color: var(--sm-primary);">Change Sheet Option</summary>
+          <form method="post" action="{% url 'spacemarches:character_sync_profile' pk=primary_sheet.pk %}" style="margin-top: 0.45rem; display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: flex-end;">
+            {% csrf_token %}
+            <input type="hidden" name="source" value="census">
+            <input type="hidden" name="next" value="{{ request.get_full_path }}#census-q-{{ node.id }}">
+            <input type="hidden" name="sync_linked_names" value="1">
+            {% if "character_name" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-name-{{ node.id }}" style="font-size: 0.74rem; display: block;">Character Name</label>
+                <input id="c-hint-name-{{ node.id }}" type="text" name="character_name" value="{{ sheet_context.character_name }}" maxlength="160" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "full_name" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-fullname-{{ node.id }}" style="font-size: 0.74rem; display: block;">Full Name</label>
+                <input id="c-hint-fullname-{{ node.id }}" type="text" name="full_name" value="{{ sheet_context.full_name }}" maxlength="160" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "concept" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-concept-{{ node.id }}" style="font-size: 0.74rem; display: block;">Concept</label>
+                <input id="c-hint-concept-{{ node.id }}" type="text" name="concept" value="{{ sheet_context.concept }}" maxlength="240" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "ego_type" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-egotype-{{ node.id }}" style="font-size: 0.74rem; display: block;">Ego Type</label>
+                <input id="c-hint-egotype-{{ node.id }}" type="text" name="ego_type" value="{{ sheet_context.ego_type }}" maxlength="80" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "faction" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-faction-{{ node.id }}" style="font-size: 0.74rem; display: block;">Faction</label>
+                <select id="c-hint-faction-{{ node.id }}" name="skill_pack_faction" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.faction %}
+                    <option value="{{ opt.key }}" {% if sheet_context.faction|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "background" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-bg-{{ node.id }}" style="font-size: 0.74rem; display: block;">Background</label>
+                <select id="c-hint-bg-{{ node.id }}" name="skill_pack_background" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.background %}
+                    <option value="{{ opt.key }}" {% if sheet_context.background|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "career" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-career-{{ node.id }}" style="font-size: 0.74rem; display: block;">Career</label>
+                <select id="c-hint-career-{{ node.id }}" name="skill_pack_career" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.career %}
+                    <option value="{{ opt.key }}" {% if sheet_context.career|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "interest" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-interest-{{ node.id }}" style="font-size: 0.74rem; display: block;">Interest</label>
+                <select id="c-hint-interest-{{ node.id }}" name="skill_pack_interest" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for opt in skill_pack_choices.interest %}
+                    <option value="{{ opt.key }}" {% if sheet_context.interest|lower == opt.name|lower %}selected{% endif %}>{{ opt.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "gender" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-gender-{{ node.id }}" style="font-size: 0.74rem; display: block;">Gender</label>
+                <input id="c-hint-gender-{{ node.id }}" type="text" name="gender" value="{{ sheet_context.gender }}" maxlength="80" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            {% if "muse_name" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-muse-{{ node.id }}" style="font-size: 0.74rem; display: block;">Muse Name</label>
+                <input id="c-hint-muse-{{ node.id }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            <button type="submit" class="btn btn-sm">Update Sheet</button>
+          </form>
+        </details>
+      {% endif %}
+    </div>
   {% endif %}
 
   {% if node.id == "13" %}
@@ -34,7 +142,7 @@
     </div>
   {% elif node.id == "13d_stub" %}
     <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center;">
-      <a class="btn btn-secondary btn-sm" href="?chapter=appendix">Open Optional Sensitive Topics Section</a>
+      <a class="btn btn-secondary btn-sm" href="?chapter=appendix">Open Appendix: Sensitive Topics</a>
     </div>
   {% elif node.answerable %}
     <form class="census-answer-form" method="post" action="{% url 'spacemarches:census_answer' pk=census.pk %}">
@@ -58,8 +166,8 @@
           </select>
         </div>
         <div style="display: flex; gap: 0.4rem; flex-wrap: wrap;">
-          <button type="submit" name="action" value="clear" class="btn btn-secondary btn-sm census-clear-btn">Clear / Skip</button>
-          <button type="submit" name="action" value="save" class="btn btn-sm">Save Response</button>
+          <button type="submit" name="action" value="clear" data-action="clear" class="btn btn-secondary btn-sm census-clear-btn">Clear / Skip</button>
+          <button type="submit" name="action" value="save" data-action="save" class="btn btn-sm">Save Response</button>
         </div>
       </div>
     </form>

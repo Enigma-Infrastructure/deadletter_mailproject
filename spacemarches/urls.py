@@ -27,6 +27,7 @@ urlpatterns = [
     path("characters/", views.character_roster, name="character_roster"),
     path("characters/<int:pk>/export/", views.character_export, name="character_export"),
     path("characters/<int:pk>/link/", views.character_link_dossier, name="character_link_dossier"),
+    path("characters/<int:pk>/sync-profile/", views.character_sync_profile, name="character_sync_profile"),
     path("characters/<int:pk>/delete/", views.character_delete, name="character_delete"),
     path("characters/<int:pk>/complete/", views.character_complete, name="character_complete"),
     path("characters/<int:pk>/public/", views.character_public_toggle, name="character_public_toggle"),

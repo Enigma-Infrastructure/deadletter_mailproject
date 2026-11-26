@@ -1037,3 +1037,24 @@ table.sm-table tr:last-child td {
   flex-direction: column;
   gap: 0.6rem;
 }
+
+.sm-primer {
+  margin: 0 0 0.75rem;
+  max-width: 74ch;
+  font-size: 0.92rem;
+  line-height: 1.6;
+}
+.sm-primer p {
+  margin: 0 0 0.55rem;
+}
+.sm-primer p:last-child {
+  margin-bottom: 0;
+}
+.sm-sheet-reminder {
+  margin: 0 0 0.65rem;
+  padding: 0.45rem 0.65rem;
+  border-radius: 8px;
+  border: 1px solid var(--sm-outline-variant);
+  background: var(--sm-surface-container-low);
+  font-size: 0.82rem;
+}

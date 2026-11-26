@@ -57,12 +57,25 @@ from .questionnaire import (
     get_question_temporal_defaults,
 )
 from .selectors import get_user_spacemarches_summary
+from .services.character_cross_sync import (
+    CENSUS_TO_DOSSIER_MAP,
+    DOSSIER_TO_CENSUS_MAP,
+    backfill_linked_census_and_dossier,
+    build_sheet_prompt_context,
+    compute_pending_sheet_changes,
+    get_census_question_sheet_hint,
+    get_dossier_question_sheet_hint,
+    get_primary_linked_character_for_census,
+    get_primary_linked_character_for_dossier,
+)
 from .services.character_sync_service import (
     export_generated_character_html,
     export_generated_character_markdown,
+    get_sheet_skill_pack_choices,
     link_character_to_dossier,
     save_generated_character,
     serialize_generated_character,
+    update_sheet_profile_fields,
 )
 from .services.dossier_service import (
     ENTRY_KIND_CHARACTER_CREATION,
@@ -428,15 +441,32 @@ def character_roster(request):
         return redirect("spacemarches:character_roster")
 
     characters = list(
-        GeneratedCharacter.objects.filter(user=request.user).select_related("dossier").order_by("-updated_at")
+        GeneratedCharacter.objects.filter(user=request.user)
+        .select_related("dossier")
+        .prefetch_related("censuses", "dossier__censuses")
+        .order_by("-updated_at")
     )
     dossiers = list(CharacterDossier.objects.filter(user=request.user).order_by("-updated_at"))
+    skill_pack_choices = get_sheet_skill_pack_choices()
+    character_rows = []
+    for ch in characters:
+        pending = compute_pending_sheet_changes(ch)
+        sheet_ctx = build_sheet_prompt_context(ch)
+        character_rows.append(
+            {
+                "sheet": ch,
+                "pending": pending,
+                "sheet_context": sheet_ctx,
+            }
+        )
     return render(
         request,
         "spacemarches/character_roster.html",
         {
             "characters": characters,
+            "character_rows": character_rows,
             "dossiers": dossiers,
+            "skill_pack_choices": skill_pack_choices,
             "voice_choices": CharacterDossier.NARRATIVE_VOICE_CHOICES,
         },
     )
@@ -494,7 +524,92 @@ def character_link_dossier(request, pk: int):
     except ValueError as err:
         messages.error(request, str(err))
 
-    if next_url.startswith("/spacemarches/"):
+    if next_url.startswith("/spacemarches/") and not next_url.startswith("//"):
+        return redirect(next_url)
+    return redirect("spacemarches:character_roster")
+
+
+@login_required
+@require_POST
+def character_sync_profile(request, pk: int):
+    """Update core Point-Buy profile / skillPack options directly from Census, Dossier, or Roster."""
+    qs = GeneratedCharacter.objects.select_related("dossier")
+    if _is_admin(request.user):
+        character = get_object_or_404(qs, pk=pk)
+    else:
+        character = get_object_or_404(qs, pk=pk, user=request.user)
+
+    wants_json = (
+        request.headers.get("x-requested-with") == "XMLHttpRequest"
+        or "application/json" in (request.content_type or "")
+    )
+    if "application/json" in (request.content_type or ""):
+        try:
+            payload = json.loads(request.body.decode("utf-8") or "{}")
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            return JsonResponse({"error": "Invalid JSON payload."}, status=400)
+    else:
+        payload = request.POST
+
+    acknowledge_only = str(payload.get("action") or "").strip() == "acknowledge"
+    skill_packs: dict[str, str] = {}
+    for slot in ("background", "career", "interest", "faction"):
+        key = f"skill_pack_{slot}"
+        if key in payload:
+            skill_packs[slot] = str(payload.get(key) or "")
+
+    kwargs: dict[str, Any] = {
+        "acknowledge_only": acknowledge_only,
+        "sync_linked_names": str(payload.get("sync_linked_names", "1")).strip() not in {"0", "false", "no"},
+        "source": str(payload.get("source") or "web").strip()[:32],
+    }
+    for param, kw in (
+        ("character_name", "character_name"),
+        ("full_name", "full_name"),
+        ("concept", "concept"),
+        ("ego_type", "ego_type"),
+        ("gender", "gender"),
+        ("muse_name", "muse_name"),
+    ):
+        if param in payload:
+            kwargs[kw] = str(payload.get(param) or "")
+    if skill_packs:
+        kwargs["skill_packs"] = skill_packs
+
+    try:
+        updated_char, changed_fields = update_sheet_profile_fields(request.user, character, **kwargs)
+    except ValueError as err:
+        if wants_json:
+            return JsonResponse({"error": str(err)}, status=400)
+        messages.error(request, str(err))
+        next_url = str(payload.get("next") or "").strip()
+        if next_url.startswith("/spacemarches/") and not next_url.startswith("//"):
+            return redirect(next_url)
+        return redirect("spacemarches:character_roster")
+
+    if wants_json:
+        return JsonResponse(
+            {
+                "status": "ok",
+                "changed_fields": changed_fields,
+                "character": serialize_generated_character(updated_char, include_raw=False),
+                "sheet_context": build_sheet_prompt_context(updated_char),
+                "pending_sheet_changes": compute_pending_sheet_changes(updated_char),
+            }
+        )
+
+    if acknowledge_only:
+        messages.info(request, f"Marked '{updated_char.character_name}' sheet as synced with current Census/Dossier.")
+    elif changed_fields:
+        messages.success(
+            request,
+            f"Updated sheet '{updated_char.character_name}' ({', '.join(changed_fields)}).",
+        )
+    else:
+        messages.info(request, f"Sheet '{updated_char.character_name}' is already up to date.")
+
+    next_url = str(payload.get("next") or "").strip()
+    if next_url.startswith("/spacemarches/") and not next_url.startswith("//"):
         return redirect(next_url)
     return redirect("spacemarches:character_roster")
 
@@ -848,7 +963,15 @@ def generate_discord_code(request):
     return redirect("spacemarches:dossier_list")
 
 
-def _build_question_node(question: dict, responses: dict, private_keys: set[str], include_sensitive: bool) -> dict:
+def _build_question_node(
+    question: dict,
+    responses: dict,
+    private_keys: set[str],
+    include_sensitive: bool,
+    *,
+    sheet_ctx: dict[str, Any] | None = None,
+    has_linked_census: bool = False,
+) -> dict:
     qid = question["id"]
     raw_entry = responses.get(qid)
     has_entry = isinstance(raw_entry, dict) and bool(str(raw_entry.get("answer", "")).strip())
@@ -865,7 +988,14 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
     direct_children = get_children(qid, include_sensitive=include_sensitive)
     child_nodes = []
     for child in direct_children:
-        child_node = _build_question_node(child, responses, private_keys, include_sensitive)
+        child_node = _build_question_node(
+            child,
+            responses,
+            private_keys,
+            include_sensitive,
+            sheet_ctx=sheet_ctx,
+            has_linked_census=has_linked_census,
+        )
         child_nodes.append(child_node)
 
     return {
@@ -895,6 +1025,8 @@ def _build_question_node(question: dict, responses: dict, private_keys: set[str]
         "revisions": revisions,
         "revision_count": len(revisions),
         "is_gm_only": qid in private_keys,
+        "synced_census_qid": DOSSIER_TO_CENSUS_MAP.get(qid) if has_linked_census else None,
+        "sheet_hint": get_dossier_question_sheet_hint(qid, sheet_ctx),
         "children": child_nodes,
     }
 
@@ -921,8 +1053,26 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
     private_keys = set(dossier.private_keys or [])
     include_sensitive = bool(dossier.show_sensitive_appendix)
 
+    is_owner_view = dossier.user_id == request.user.pk
+    primary_sheet = get_primary_linked_character_for_dossier(dossier)
+    if primary_sheet is not None and not is_owner_view:
+        primary_prot = protection_state(primary_sheet, request, viewer=request.user)
+        if not (
+            primary_prot["protection"] == GeneratedCharacter.PROTECTION_NONE
+            or (primary_prot["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY and _is_st(request.user))
+        ):
+            primary_sheet = None
+    sheet_ctx = build_sheet_prompt_context(primary_sheet)
+    linked_censuses = list(dossier.censuses.order_by("-updated_at"))
     core_nodes = [
-        _build_question_node(q, responses, private_keys, include_sensitive)
+        _build_question_node(
+            q,
+            responses,
+            private_keys,
+            include_sensitive,
+            sheet_ctx=sheet_ctx,
+            has_linked_census=bool(linked_censuses),
+        )
         for q in get_core_questions()
     ]
     all_questions = get_all_questions(include_sensitive=include_sensitive)
@@ -972,7 +1122,6 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
     # Per-sheet protection states: owner always sees their own sheets; non-owners
     # (admin override) see protected sheets as locked cards. ST-only access is
     # logged when a Storyteller views a non-owner's sheet.
-    is_owner_view = dossier.user_id == request.user.pk
     sheet_states = []
     for ch in linked_characters:
         state = protection_state(ch, request, viewer=request.user)
@@ -1014,13 +1163,21 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
         else []
     )
 
-    linked_censuses = list(dossier.censuses.order_by("-updated_at"))
+    pending_sheet_changes = (
+        compute_pending_sheet_changes(primary_sheet, dossier=dossier)
+        if primary_sheet is not None
+        else {"has_pending": False, "count": 0, "items": [], "suggested_name": ""}
+    )
     return render(
         request,
         "spacemarches/dossier_detail.html",
         {
             "dossier": dossier,
             "linked_censuses": linked_censuses,
+            "primary_sheet": primary_sheet,
+            "sheet_context": sheet_ctx,
+            "skill_pack_choices": get_sheet_skill_pack_choices(),
+            "pending_sheet_changes": pending_sheet_changes,
             "linked_characters": linked_characters,
             "available_characters": available_characters,
             "core_nodes": core_nodes,
@@ -1765,7 +1922,12 @@ def _log_census_st_only_access(request, census: EclipsePhaseCensus) -> None:
     )
 
 
-def _build_census_question_nodes(census: EclipsePhaseCensus, questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_census_question_nodes(
+    census: EclipsePhaseCensus,
+    questions: list[dict[str, Any]],
+    *,
+    sheet_ctx: dict[str, Any] | None = None,
+) -> list[dict[str, Any]]:
     responses = census.responses if isinstance(census.responses, dict) else {}
     default_voice = (
         "omniscient"
@@ -1796,6 +1958,8 @@ def _build_census_question_nodes(census: EclipsePhaseCensus, questions: list[dic
                 "updated_at": norm["updated_at"],
                 "is_answered": is_answered,
                 "depth": depth,
+                "synced_dossier_qid": CENSUS_TO_DOSSIER_MAP.get(qid) if census.dossier_id else None,
+                "sheet_hint": get_census_question_sheet_hint(qid, sheet_ctx),
             }
         )
     return nodes
@@ -1874,11 +2038,27 @@ def census_detail(request, pk: int):
     include_sexuality = bool(census.show_sexuality_sections)
     include_appendix = bool(census.show_sensitive_appendix)
 
+    is_owner_view = census.user_id == request.user.pk
+    primary_sheet = get_primary_linked_character_for_census(census)
+    if primary_sheet is not None and not is_owner_view:
+        primary_prot = protection_state(primary_sheet, request, viewer=request.user)
+        if not (
+            primary_prot["protection"] == GeneratedCharacter.PROTECTION_NONE
+            or (primary_prot["protection"] == GeneratedCharacter.PROTECTION_ST_ONLY and _is_st(request.user))
+        ):
+            primary_sheet = None
+    sheet_ctx = build_sheet_prompt_context(primary_sheet)
+
     requested_chapter = (request.GET.get("chapter") or "").strip()
-    view_all = requested_chapter == "all"
     valid_chapter_ids = {ch["id"] for ch in chapters}
-    active_chapter_id = requested_chapter if requested_chapter in valid_chapter_ids else "origins"
-    active_chapter = get_census_chapter(active_chapter_id) if not view_all else None
+    if requested_chapter in valid_chapter_ids:
+        view_all = False
+        active_chapter_id = requested_chapter
+        active_chapter = get_census_chapter(active_chapter_id)
+    else:
+        view_all = True
+        active_chapter_id = "all"
+        active_chapter = None
 
     if view_all:
         raw_questions = get_all_census_questions(
@@ -1886,7 +2066,7 @@ def census_detail(request, pk: int):
             include_appendix=include_appendix,
             answerable_only=False,
         )
-        question_nodes = _build_census_question_nodes(census, raw_questions)
+        question_nodes = _build_census_question_nodes(census, raw_questions, sheet_ctx=sheet_ctx)
         chapter_lookup = {ch["id"]: ch for ch in chapters}
         grouped_chapters = []
         for ch in chapters:
@@ -1904,7 +2084,7 @@ def census_detail(request, pk: int):
             include_appendix=True,
             answerable_only=False,
         )
-        question_nodes = _build_census_question_nodes(census, raw_questions)
+        question_nodes = _build_census_question_nodes(census, raw_questions, sheet_ctx=sheet_ctx)
         visible_chapters = [ch for ch in chapters if include_appendix or not ch["is_appendix"]]
         if active_chapter_id == "appendix" and not include_appendix:
             visible_chapters = chapters
@@ -1912,7 +2092,6 @@ def census_detail(request, pk: int):
         prev_chapter = visible_chapters[idx - 1] if idx > 0 else None
         next_chapter = visible_chapters[idx + 1] if idx + 1 < len(visible_chapters) else None
 
-    is_owner_view = census.user_id == request.user.pk
     protection = protection_state(census, request, viewer=request.user)
     access_log = (
         list(
@@ -1955,6 +2134,14 @@ def census_detail(request, pk: int):
             "voice_choices": EclipsePhaseCensus.NARRATIVE_VOICE_CHOICES,
             "user_dossiers": user_dossiers,
             "user_characters": user_characters,
+            "primary_sheet": primary_sheet,
+            "sheet_context": sheet_ctx,
+            "skill_pack_choices": get_sheet_skill_pack_choices(),
+            "pending_sheet_changes": (
+                compute_pending_sheet_changes(primary_sheet, dossier=census.dossier, census=census)
+                if primary_sheet is not None
+                else {"has_pending": False, "count": 0, "items": [], "suggested_name": ""}
+            ),
             "is_owner_view": is_owner_view,
             "is_admin_override": not is_owner_view,
             "protection": protection,
@@ -2035,9 +2222,9 @@ def census_settings(request, pk: int):
         census.save(update_fields=["show_sensitive_appendix", "updated_at"])
         messages.success(
             request,
-            "Moved Questions Appendix (13d1-13d6) opted in."
+            "Sensitive Topics appendix enabled."
             if census.show_sensitive_appendix
-            else "Moved Questions Appendix (13d1-13d6) hidden.",
+            else "Sensitive Topics appendix hidden.",
         )
     elif action == "toggle_public":
         census.public_view = not census.public_view
@@ -2076,6 +2263,8 @@ def census_settings(request, pk: int):
         if "public_view" in request.POST:
             census.public_view = _truthy_param(request.POST.get("public_view"))
         census.save()
+        if census.dossier_id and census.dossier is not None:
+            backfill_linked_census_and_dossier(census, census.dossier)
         messages.success(request, "Census preferences updated.")
 
     target = reverse("spacemarches:census_detail", kwargs={"pk": census.pk})

@@ -8,7 +8,7 @@
   "attribution_notice": "Eclipse Phase Character Questionnaire — [Original By ShadowDragon8685](https://docs.google.com/document/d/16xufvywcntUv75oW-LBOKab536s1vkZEq_fF8jXMe4g/edit#heading=h.yfxvgs50z90t) / [Edited Copy by GearheadLydia](https://docs.google.com/document/d/1XiHbqf5WCdJNzzdggdZcrKyabY_V1-mKFXUMBad1lOw/edit) / [Spacemarches by MetaWizard](https://spacemarches.space). Adapted from Eclipse Phase by Posthuman Studios and governed by the Creative Commons [Attribution-NonCommercial-ShareAlike 3.0 Unported (CC BY-NC-SA 3.0)](https://creativecommons.org/licenses/by-nc-sa/3.0/) license.",
   "intro_paragraphs": [
     "This questionnaire is meant as a tool to aide in roleplaying and character creation: to not see a character as a pile of numbers on a nicely-formatted spreadsheet, but to explain the all-important who they are and why they are who they say they are.",
-    "Iit will give you (and any storyteller) a better grasp on your character, and allow people to build off of your character backstory based on the information given. Write a novella if you feel like - the more information you give, the better. That said, don’t stress over it if you don’t want to fill out everything or if you get stuck. Skip to the questions you find most interesting.",
+    "It will give you (and any storyteller) a better grasp on your character, and allow people to build off of your character backstory based on the information given. Write a novella if you feel like - the more information you give, the better. That said, don’t stress over it if you don’t want to fill out everything or if you get stuck. Skip to the questions you find most interesting.",
     "You also do not have to answer any questions you’re uncomfortable with, particularly the ones related to sex (question 13). This questionnaire was written in large part by someone else who was aiming to get a wholistic picture on Eclipse Phase, and you can engage in as much or as little concepts as you desire.",
     "As regards how the questionnaire is answered, that is up to you. The original questionnaire author’s advice is to utilize first person as the character, if they were given that this Census -- unless the character wouldn’t know the answer, in which case the recommendation is to answer in the omniscient narrative form, or write down the pertinent information separately.",
     "The core document has been passed around the Eclipse Phase community multiple times, for more details see the preserved attribution notice at the end of the document."
@@ -280,8 +280,8 @@
     {
       "id": "appendix",
       "number": "Appendix",
-      "title": "Sensitive Topics (Optional)",
-      "description": "Optional content-warned questions addressing consent, sexual assault, exploitation, and habitat norms in transhuman society. Hidden by default unless you choose to view them.",
+      "title": "Sensitive Topics",
+      "description": "",
       "is_appendix": true,
       "question_ids": [
         "13d",
@@ -341,7 +341,7 @@
       "chapter_id": "origins",
       "parent_id": null,
       "heading": "What do you do?",
-      "primer": "Most people do something to earn a living, even if there’s no monetary exchanges involved in their lives. Are you an old-school mechanic who can make any two pieces of junk work together, a nano-engineer who programs cornucopia machines with fabrication blueprints, a cool hunter, a gene hacker, a taxi driver? If you live on an anarcho-collectivist habitat and consequently don’t have any wage-slavery forcing you to do something to make ends meet (because ends meet automatically), what do you do with your time, for your hab, what keeps your rep score high, et cetera?",
+      "primer": "Most people do something to earn a living, even if there’s no monetary exchanges involved in their lives. Are you an old-school mechanic who can make any two pieces of junk work together, a nano-engineer who programs cornucopia machines with fabrication blueprints, a cool hunter, a gene hacker, a taxi driver?\n\nIf you live on an anarcho-collectivist habitat and consequently don’t have any wage-slavery forcing you to do something to make ends meet (because ends meet automatically), what do you do with your time, for your hab, what keeps your rep score high, et cetera?",
       "section_group": "main",
       "answerable": true
     },
@@ -351,7 +351,7 @@
       "chapter_id": "politics",
       "parent_id": null,
       "heading": "Where do you stand, politically?",
-      "primer": "Poll any ten transhumans about politics and you’ll get eleven opinions: which is yours? Do you like the Planetary Consortium or other hypercorp-ruled territories, are you down with Titanian Technosocialism, are you an Anarcho-collectivist, are you an Argonaut who’s turned science into a cause and stay out of politics altogether? Are you Scum who lives for the now, doesn’t give a flying fuck about the politics; a neo-primitivist; a hardcore Mercurial, heavily active in the Synth Rights movement? Do you think everyone should be be allowed to choose the political system that applies to them, as the Anarchists do? And given where you stand politically and where you live geospatially, is there friction between you and the locals? If you’re one of the clanking masses on Luna or a marginalized Barsoomian on Mars, you might well feel at odds with the reigning powers - or you might be a member of one of the Oligarch street gangs on Titan who do not hold to Technosocialism and feel that everybody should be left to sink or swim monetarily on their own merits.",
+      "primer": "Poll any ten transhumans about politics and you’ll get eleven opinions: which is yours? Do you like the Planetary Consortium or other hypercorp-ruled territories, are you down with Titanian Technosocialism, are you an Anarcho-collectivist, are you an Argonaut who’s turned science into a cause and stay out of politics altogether?\n\nAre you Scum who lives for the now, doesn’t give a flying fuck about the politics; a neo-primitivist; a hardcore Mercurial, heavily active in the Synth Rights movement? Do you think everyone should be be allowed to choose the political system that applies to them, as the Anarchists do? And given where you stand politically and where you live geospatially, is there friction between you and the locals?\n\nIf you’re one of the clanking masses on Luna or a marginalized Barsoomian on Mars, you might well feel at odds with the reigning powers - or you might be a member of one of the Oligarch street gangs on Titan who do not hold to Technosocialism and feel that everybody should be left to sink or swim monetarily on their own merits.",
       "section_group": "main",
       "answerable": true
     },
@@ -381,7 +381,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The Lunar-Lagrange Alliance",
-      "primer": "The LLA was the rising star in exoatmospheric power blocs in the days before the Fall, but after those on Earth itself (which did not survive the Fall), the LLA took the brunt of it. They nonetheless continue to host most of the respectable in-system banks. Do you support the LLA’s return to power, or think the PC should move in and take over Luna and the remaining orbital habs the LLA currently exists in? Or do you have an alternative view on the topic?",
+      "primer": "The LLA was the rising star in exoatmospheric power blocs in the days before the Fall, but after those on Earth itself (which did not survive the Fall), the LLA took the brunt of it. They nonetheless continue to host most of the respectable in-system banks. Do you support the LLA’s return to power, or think the PC should move in and take over Luna and the remaining orbital habs the LLA currently exists in?\n\nOr do you have an alternative view on the topic?",
       "section_group": "main",
       "answerable": true
     },
@@ -401,7 +401,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The Planetary Consortium",
-      "primer": "The biggest power in the system in terms of number of instantiated egos under their sway, the PC is the 900-lb gorilla champion of hypercorporate domination over all other spheres of life, who have no problem moving in and taking what they want by force, because nobody can stop them (except when they do). A lot of people want to see them crumble, but an awful lot call the PC home. Where do you stand, and is your skin in the game, or are you watching from afar?",
+      "primer": "The biggest power in the system in terms of number of instantiated egos under their sway, the PC is the 900-lb gorilla champion of hypercorporate domination over all other spheres of life, who have no problem moving in and taking what they want by force, because nobody can stop them (except when they do). A lot of people want to see them crumble, but an awful lot call the PC home.\n\nWhere do you stand, and is your skin in the game, or are you watching from afar?",
       "section_group": "main",
       "answerable": true
     },
@@ -411,7 +411,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The Jovian Republic",
-      "primer": "Known to its detractors as the Jovian Junta, everyone outside the Republic itself refers to it as such, given that it descended from actual military juntas on Earth and used force to lay claim to everything in Jupiter’s orbit. In the eyes of most others in the system, it is a fascist, bioconservative, technophobic police state. Yet to its inhabitants, it is the only sane faction in a system full of people who abandoned their humanity. A broad swath of the system hates them, whether they are actively vested in doing them harm, or would just cheer from the sidelines if a wave of antimatter missiles and relativistic kill vehicles wiped them off of Jupiter’s orbit. Other detractors pity the Jovian citizens and wish to liberate them from the government. Others still mostly just want to avoid ever having to think about them. Where do you stand?",
+      "primer": "Known to its detractors as the Jovian Junta, everyone outside the Republic itself refers to it as such, given that it descended from actual military juntas on Earth and used force to lay claim to everything in Jupiter’s orbit. In the eyes of most others in the system, it is a fascist, bioconservative, technophobic police state.\n\nYet to its inhabitants, it is the only sane faction in a system full of people who abandoned their humanity. A broad swath of the system hates them, whether they are actively vested in doing them harm, or would just cheer from the sidelines if a wave of antimatter missiles and relativistic kill vehicles wiped them off of Jupiter’s orbit.\n\nOther detractors pity the Jovian citizens and wish to liberate them from the government. Others still mostly just want to avoid ever having to think about them. Where do you stand?",
       "section_group": "main",
       "answerable": true
     },
@@ -421,7 +421,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The Autonomist Alliance",
-      "primer": "There was a time when the various powers rimward of the asteroid belt were isolated and vulnerable; even the Titanian Commonwealth was a small-fry compared to the PC, with an order of magnitude fewer citizens. Then the Points of Unity were declared, habitats and even the Titanian Commonwealth declared adherence to them, and they received their baptism-by-fire when the PC twice attempted to invade Locus and the Alliance beat them like an anvil both times. How do you feel about the Autonomist Alliance - are you active in political speech within it, or do you see it all as a bunch of rebels and anarchists, or what?",
+      "primer": "There was a time when the various powers rimward of the asteroid belt were isolated and vulnerable; even the Titanian Commonwealth was a small-fry compared to the PC, with an order of magnitude fewer citizens. Then the Points of Unity were declared, habitats and even the Titanian Commonwealth declared adherence to them, and they received their baptism-by-fire when the PC twice attempted to invade Locus and the Alliance beat them like an anvil both times.\n\nHow do you feel about the Autonomist Alliance - are you active in political speech within it, or do you see it all as a bunch of rebels and anarchists, or what?",
       "section_group": "main",
       "answerable": true
     },
@@ -431,7 +431,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1f",
       "heading": "The Titanian Commonwealth",
-      "primer": "The Titanians missed out on the First Battle of Locus, being a statist entity amongst a loose coalition of entities who almost universally appeared to be hostile to statism, but when the PC made it clear they intended to expand their dominion across the solar system, the Titanians knew that they would be the ones conquered after the anarchists, and joined the Second Battle of Locus guns blazing. They remain the odd-man-out, being the only statist polity in the Alliance. Whether inside or outside the AA, you probably have an opinion on the Titanians and their technosocialism.",
+      "primer": "The Titanians missed out on the First Battle of Locus, being a statist entity amongst a loose coalition of entities who almost universally appeared to be hostile to statism, but when the PC made it clear they intended to expand their dominion across the solar system, the Titanians knew that they would be the ones conquered after the anarchists, and joined the Second Battle of Locus guns blazing.\n\nThey remain the odd-man-out, being the only statist polity in the Alliance. Whether inside or outside the AA, you probably have an opinion on the Titanians and their technosocialism.",
       "section_group": "main",
       "answerable": true
     },
@@ -451,7 +451,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1f",
       "heading": "Extropians",
-      "primer": "Many, some would say most, of those who hold to the Autonomist Alliance Points of Unity, would consider Anarcho-Capitalism to be even more of the odd-man-out than the Titanian Commonwealth. The Extropians narrowly avoided being expelled from the Alliance in a vote not too long ago, as the overwhelming opinion is that their continued practice of indenture amounts to the same sort of slavery the Planetary Consortium, LLA and Morningstar Alliance practice, and more and more Autonomists are coming to the conclusion that indenture practices are the inevitable result of capitalism in any form. Extropians, of course, defend these practices, saying that nobody is coerced into doing anything, a claim which the most vocal Autonomists deride as utterly ludicrous. Where do you stand?",
+      "primer": "Many, some would say most, of those who hold to the Autonomist Alliance Points of Unity, would consider Anarcho-Capitalism to be even more of the odd-man-out than the Titanian Commonwealth. The Extropians narrowly avoided being expelled from the Alliance in a vote not too long ago, as the overwhelming opinion is that their continued practice of indenture amounts to the same sort of slavery the Planetary Consortium, LLA and Morningstar Alliance practice, and more and more Autonomists are coming to the conclusion that indenture practices are the inevitable result of capitalism in any form.\n\nExtropians, of course, defend these practices, saying that nobody is coerced into doing anything, a claim which the most vocal Autonomists deride as utterly ludicrous. Where do you stand?",
       "section_group": "main",
       "answerable": true
     },
@@ -461,7 +461,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1f",
       "heading": "The Scum.",
-      "primer": "Wearing the title as a point of pride, most Scum live in “Barges” which are part of Fleets, floating in orbits around the solar system, doing business where they are. Some see them as modern-day gypsies, and they aren’t wrong, given that Scum hold their first and often only loyalty to themselves, their own Barge, and the Swarm, in that order. Scum live for the now, and most don’t give one solitary fuck about continual scientific or sociological progress unless it advances the cause of better scum life and more creative hedonism; for the most part, they feel that humanity should just live for pleasure from now until the heat-death of the universe.",
+      "primer": "Wearing the title as a point of pride, most Scum live in “Barges” which are part of Fleets, floating in orbits around the solar system, doing business where they are. Some see them as modern-day gypsies, and they aren’t wrong, given that Scum hold their first and often only loyalty to themselves, their own Barge, and the Swarm, in that order.\n\nScum live for the now, and most don’t give one solitary fuck about continual scientific or sociological progress unless it advances the cause of better scum life and more creative hedonism; for the most part, they feel that humanity should just live for pleasure from now until the heat-death of the universe.",
       "section_group": "main",
       "answerable": true
     },
@@ -471,7 +471,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The Argonauts",
-      "primer": "An ostensibly apolitical organization dedicated to the cause of Science, the argonauts have found themselves a de facto political cause, given that many of the tenets they hold true are some which major polities object to. The Argonauts believe that all information should be open and free, and are heavy movers in the open-source community. Some say the Argonauts should bite the bullet and declare adherence to the Points of Unity, others vehemently insist the Argonauts remain strictly apolitical, and of course, there is always the pressure of publish or die.",
+      "primer": "An ostensibly apolitical organization dedicated to the cause of Science, the argonauts have found themselves a de facto political cause, given that many of the tenets they hold true are some which major polities object to. The Argonauts believe that all information should be open and free, and are heavy movers in the open-source community.\n\nSome say the Argonauts should bite the bullet and declare adherence to the Points of Unity, others vehemently insist the Argonauts remain strictly apolitical, and of course, there is always the pressure of publish or die.",
       "section_group": "main",
       "answerable": true
     },
@@ -481,7 +481,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The Ultimates",
-      "primer": "When most people think of the Ultimates, they think of mercenaries. While this is true, in the sense that many, if not most, Ultimates are mercenaries, and you can still hire the organization as a whole if you have the credit or resources to offer, this is a dangerous generalization of the entire purpose of the Ultimates. In fact, the Ultimates are strong proponents of a Darwinian view of transhuman evolution, only one step removed from Exhumans in that they believe in said Darwinian evolution of transhumanity, not leaving humanity behind altogether. The Ultimates are the biggest single power rimward of Titan, and while they sell their services as mercenaries, everyone in their right mind would do well to remember that the Ultimates are, ultimately, for the Ultimates, not for their employers.",
+      "primer": "When most people think of the Ultimates, they think of mercenaries. While this is true, in the sense that many, if not most, Ultimates are mercenaries, and you can still hire the organization as a whole if you have the credit or resources to offer, this is a dangerous generalization of the entire purpose of the Ultimates.\n\nIn fact, the Ultimates are strong proponents of a Darwinian view of transhuman evolution, only one step removed from Exhumans in that they believe in said Darwinian evolution of transhumanity, not leaving humanity behind altogether. The Ultimates are the biggest single power rimward of Titan, and while they sell their services as mercenaries, everyone in their right mind would do well to remember that the Ultimates are, ultimately, for the Ultimates, not for their employers.",
       "section_group": "main",
       "answerable": true
     },
@@ -491,7 +491,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "Exhumans and Singularity Seekers",
-      "primer": "Exhumans are those who want to leave all vestiges of transhumanity behind; to become something other, something “greater,” or at least utterly alien. The single factor that unites all things classified as exhumans and distinguishing them from, say, especially weird Brinkers and Isolates, is that they are a threat to transhumanity, actively engaged in efforts either to destroy it, assimilate it, or outbreed it. Many exhumans are also singularity seekers, but not all singularity seekers are exhumans, though they’re often lumped together, including in this questionnaire. Singularity Seekers see the hard takeoff Singularity that the Titans underwent, the recursive self-improvement cycle that took them from merely being AGI software in impressive hardware to the all-consuming mechanical gods that nearly wiped out all of Transhumanity... and they want a part of it.",
+      "primer": "Exhumans are those who want to leave all vestiges of transhumanity behind; to become something other, something “greater,” or at least utterly alien. The single factor that unites all things classified as exhumans and distinguishing them from, say, especially weird Brinkers and Isolates, is that they are a threat to transhumanity, actively engaged in efforts either to destroy it, assimilate it, or outbreed it.\n\nMany exhumans are also singularity seekers, but not all singularity seekers are exhumans, though they’re often lumped together, including in this questionnaire. Singularity Seekers see the hard takeoff Singularity that the Titans underwent, the recursive self-improvement cycle that took them from merely being AGI software in impressive hardware to the all-consuming mechanical gods that nearly wiped out all of Transhumanity... and they want a part of it.",
       "section_group": "main",
       "answerable": true
     },
@@ -501,7 +501,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "The TITANs",
-      "primer": "It’s fair to say that almost everybody has a very negative opinion on the TITANs, even more than have a negative view of the Jovian Junta. Some live their entire lives in fear of the day the TITANs return to finish the job, others have chalked the TITANs into the “not worth worrying about” category, either because they feel that if the TITANs return there will be no stopping them, or because they feel they left the rest of Transhumanity alone because they no longer factored into the TITANs’ plans one way or another. (Advisory: if you change the font in your copy of the questionnaire and delete the expository paragraphs, show your GM and they may give you a point of Rez just for starting on the questionnaire.) There are some weirdos, primarily Singularity Seekers, who have a positive view of them and want to become them, and some Ultimates are ambivalent about the TITANs themselves, seeing them as the Darwinian evolutionary event which put the entirety of Transhumanity through an evolutionary crucible of fire and weeded out the deserving from the weak. Where do you stand?",
+      "primer": "It’s fair to say that almost everybody has a very negative opinion on the TITANs, even more than have a negative view of the Jovian Junta. Some live their entire lives in fear of the day the TITANs return to finish the job, others have chalked the TITANs into the “not worth worrying about” category, either because they feel that if the TITANs return there will be no stopping them, or because they feel they left the rest of Transhumanity alone because they no longer factored into the TITANs’ plans one way or another.\n\n(Advisory: if you change the font in your copy of the questionnaire and delete the expository paragraphs, show your GM and they may give you a point of Rez just for starting on the questionnaire.) There are some weirdos, primarily Singularity Seekers, who have a positive view of them and want to become them, and some Ultimates are ambivalent about the TITANs themselves, seeing them as the Darwinian evolutionary event which put the entirety of Transhumanity through an evolutionary crucible of fire and weeded out the deserving from the weak.\n\nWhere do you stand?",
       "section_group": "main",
       "answerable": true
     },
@@ -511,7 +511,7 @@
       "chapter_id": "politics",
       "parent_id": "6.1",
       "heading": "Firewall",
-      "primer": "Seeing as Firewall is a clandestine agency who deliberately obscure themselves from public view, most people will never have heard of them at all. Others might think they are an urban legend, or a conspiracy theory. Anyone who has been used as an asset may have dealt with agents of Firewall without knowing it. Among those who have dealt with Firewall directly, opinions vary wildly: some think they’re unsung heroes transhumanity needs to survive; others would call them a misfortune upon anyone they meet, and would avoid dealing with them; others still would actively take a swing at them if they had the chance. Not many would object to their core mission of saving transhumanity from existential risks, but do their ends justify their means?",
+      "primer": "Seeing as Firewall is a clandestine agency who deliberately obscure themselves from public view, most people will never have heard of them at all. Others might think they are an urban legend, or a conspiracy theory. Anyone who has been used as an asset may have dealt with agents of Firewall without knowing it.\n\nAmong those who have dealt with Firewall directly, opinions vary wildly: some think they’re unsung heroes transhumanity needs to survive; others would call them a misfortune upon anyone they meet, and would avoid dealing with them; others still would actively take a swing at them if they had the chance.\n\nNot many would object to their core mission of saving transhumanity from existential risks, but do their ends justify their means?",
       "section_group": "main",
       "answerable": true
     },
@@ -531,7 +531,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Indenture",
-      "primer": "Touted by the PC, its biggest proponents, as the means by which those who have nothing, often not even a body, may work their way back into the economic system, indenture is universally reviled by everyone out-system that isn’t an Extropian as modern-day slavery, citing horrific (and in many cases, ongoing) abuses wherein the indentured person finds their indenture extended indefinitely due to tripping hidden penalty clauses in their massive contracts  or by being teased with goodies like simulspace vacations that add massive amounts of time to their indenture contracts.",
+      "primer": "Touted by the PC, its biggest proponents, as the means by which those who have nothing, often not even a body, may work their way back into the economic system, indenture is universally reviled by everyone out-system that isn’t an Extropian as modern-day slavery, citing horrific (and in many cases, ongoing) abuses wherein the indentured person finds their indenture extended indefinitely due to tripping hidden penalty clauses in their massive contracts or by being teased with goodies like simulspace vacations that add massive amounts of time to their indenture contracts.",
       "section_group": "main",
       "answerable": true
     },
@@ -541,7 +541,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2a",
       "heading": "Indenture contracts applied to minors",
-      "primer": "No, that’s not a typographical error. It’s a true fact; the PC and other indenture-using locations will quite happily let an 11-year-old ego sign away the next eight years of their life as a case-sleeved hard laborer or an infomorph secretary in exchange for the promise of an actual body. Even amongst folks who don’t care about indentured adults, this rubs them wrong. Others would argue that with muse assistance and the lack of any of that pesky biological growing stuff, a minor picks up the work easily and in an adult biomorph, a synthmorph, or as an infomorph, no-one can tell the difference anyway, so who cares; and besides, in our desperate new world, we can’t afford to instantiate anyone who can’t pull their own weight. What do you think?",
+      "primer": "No, that’s not a typographical error. It’s a true fact; the PC and other indenture-using locations will quite happily let an 11-year-old ego sign away the next eight years of their life as a case-sleeved hard laborer or an infomorph secretary in exchange for the promise of an actual body. Even amongst folks who don’t care about indentured adults, this rubs them wrong.\n\nOthers would argue that with muse assistance and the lack of any of that pesky biological growing stuff, a minor picks up the work easily and in an adult biomorph, a synthmorph, or as an infomorph, no-one can tell the difference anyway, so who cares; and besides, in our desperate new world, we can’t afford to instantiate anyone who can’t pull their own weight.\n\nWhat do you think?",
       "section_group": "main",
       "answerable": true
     },
@@ -551,7 +551,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Uplifts",
-      "primer": "In the decades before the Fall, the science came about to uplift the intelligence of animals (at least, the higher-order animals that already possessed massive amounts of brainpower) to sapience. Most inner-system polities refuse to recognize Uplifts as legally equal to humans, even if there’s no denying they’re as sapient as humans. Many consider them property of the entity that created them; the Jovian Junta views them as an abomination and has any that come within its borders put to death. Perhaps as a result, Mercurials are often radical Uplifts-rights champions, and most everyone out-system agrees that Uplifts are people, too.",
+      "primer": "In the decades before the Fall, the science came about to uplift the intelligence of animals (at least, the higher-order animals that already possessed massive amounts of brainpower) to sapience. Most inner-system polities refuse to recognize Uplifts as legally equal to humans, even if there’s no denying they’re as sapient as humans.\n\nMany consider them property of the entity that created them; the Jovian Junta views them as an abomination and has any that come within its borders put to death. Perhaps as a result, Mercurials are often radical Uplifts-rights champions, and most everyone out-system agrees that Uplifts are people, too.",
       "section_group": "main",
       "answerable": true
     },
@@ -561,7 +561,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "AGIs and other infolife",
-      "primer": "Artificial General Intelligence - predating the Fall by a good long while out of fears of exactly what happened, an AGI is a synthetic (info)lifeform, with its capacity for self-improvement hobbled to be similar to transhuman learning, and usually (though not always) socialized in human cultures from the moment its program began to run. In much of the solar system and beyond, AGIs are illegal, subject to summary deletion when captured; other places see this as abhorrent on the scale of a war crime. Where do you stand?",
+      "primer": "Artificial General Intelligence - predating the Fall by a good long while out of fears of exactly what happened, an AGI is a synthetic (info)lifeform, with its capacity for self-improvement hobbled to be similar to transhuman learning, and usually (though not always) socialized in human cultures from the moment its program began to run.\n\nIn much of the solar system and beyond, AGIs are illegal, subject to summary deletion when captured; other places see this as abhorrent on the scale of a war crime. Where do you stand?",
       "section_group": "main",
       "answerable": true
     },
@@ -571,7 +571,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Neotenics",
-      "primer": "There are some good, rational, logical explanations to be made as regards the utility of Neotenic bodymorphs - in space they’re often more efficient, as brute strength is seldom necessary (and can be provided by a drone when it is). Meanwhile, they provide a biomorph that doesn’t require as many resource inputs, is smaller and thus requires less living space and generally less resources for its equipment, and so on and so forth. Other people simply find them comfortable. That said, let’s not beat around the bush and talk about something nearly everybody would admit about neotenics -- barring those in denial deeper than Jupiter’s gravity well, those concealing something, or the outside chance that someone somehow remained innocent enough not to have thought of it: Neotenic morphs are used by some as a slightly more socially acceptable outlet for pedophilia. Some find this as heinous as clear-cut cases of child sexual abuse; others would argue that if the ego in the morph is old and experienced enough to give informed consent, the size and shape of the morph is immaterial.",
+      "primer": "There are some good, rational, logical explanations to be made as regards the utility of Neotenic bodymorphs - in space they’re often more efficient, as brute strength is seldom necessary (and can be provided by a drone when it is). Meanwhile, they provide a biomorph that doesn’t require as many resource inputs, is smaller and thus requires less living space and generally less resources for its equipment, and so on and so forth.\n\nOther people simply find them comfortable. That said, let’s not beat around the bush and talk about something nearly everybody would admit about neotenics -- barring those in denial deeper than Jupiter’s gravity well, those concealing something, or the outside chance that someone somehow remained innocent enough not to have thought of it: Neotenic morphs are used by some as a slightly more socially acceptable outlet for pedophilia.\n\nSome find this as heinous as clear-cut cases of child sexual abuse; others would argue that if the ego in the morph is old and experienced enough to give informed consent, the size and shape of the morph is immaterial.",
       "section_group": "main",
       "answerable": true
     },
@@ -581,7 +581,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Mercurialism",
-      "primer": "Not, strictly speaking, the simple conglomeration of Uplifts and Infolife, the Mercurial cause is that of those who wish to be as different from baseline transhumanity as possible. Mercurial Uplifts don’t simply want uplifts to be treated as equal to transhumanity, they wear on their sleeve the fact that they are fundamentally different. The mercurial cause incorporates radical uplift and AGI rights activists, as well as some forms of Brinker which are becoming something entirely unalike to transhumanity. The most radical Mercurials actively resist any offers or efforts to assimilate them into “normal” transhuman societies, even those in which they are considered fully equal as all sapient beings, preferring instead to spurn transhumanity altogether in favor of attempting to forge a place for themselves which does not include transhumanity at all.",
+      "primer": "Not, strictly speaking, the simple conglomeration of Uplifts and Infolife, the Mercurial cause is that of those who wish to be as different from baseline transhumanity as possible. Mercurial Uplifts don’t simply want uplifts to be treated as equal to transhumanity, they wear on their sleeve the fact that they are fundamentally different.\n\nThe mercurial cause incorporates radical uplift and AGI rights activists, as well as some forms of Brinker which are becoming something entirely unalike to transhumanity. The most radical Mercurials actively resist any offers or efforts to assimilate them into “normal” transhuman societies, even those in which they are considered fully equal as all sapient beings, preferring instead to spurn transhumanity altogether in favor of attempting to forge a place for themselves which does not include transhumanity at all.",
       "section_group": "main",
       "answerable": true
     },
@@ -591,7 +591,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Hedonism",
-      "primer": "Almost everybody has an appreciation for having a good time, and almost everybody has some form of a work ethic. Some folk, on the other hand, push these to one extreme or another: most Scum will tell you that they don’t feel like doing anything productive more than what they absolutely have to do to maintain their habitats, and that transhumanity should simply focus on enjoying themselves until the heath-death of the universe. Workaholics sneer at true hedonists, calling them lazy or self-indulgent, and believe that a transhuman should constantly be working, whether to better their own lot in life or to the betterment of all. Where do you stand on this?",
+      "primer": "Almost everybody has an appreciation for having a good time, and almost everybody has some form of a work ethic. Some folk, on the other hand, push these to one extreme or another: most Scum will tell you that they don’t feel like doing anything productive more than what they absolutely have to do to maintain their habitats, and that transhumanity should simply focus on enjoying themselves until the heath-death of the universe.\n\nWorkaholics sneer at true hedonists, calling them lazy or self-indulgent, and believe that a transhuman should constantly be working, whether to better their own lot in life or to the betterment of all.\n\nWhere do you stand on this?",
       "section_group": "main",
       "answerable": true
     },
@@ -611,7 +611,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Technoprogressivism",
-      "primer": "Not even the staunchest technoprogressive can deny that without modern technology, the Fall would not have happened. A lot of people these days have an uneasy feeling that transhumanity may be playing with technology that it can’t control, and out-of-control technology is dangerous. You don’t have to be a full-on Jovian to feel at least a little bit of fear as regards science blindly rushing forward. On the other hand, others would say that technology isn’t inherently dangerous or evil, and if not misused, is no more harmful than a flashlight. Where do you stand?",
+      "primer": "Not even the staunchest technoprogressive can deny that without modern technology, the Fall would not have happened. A lot of people these days have an uneasy feeling that transhumanity may be playing with technology that it can’t control, and out-of-control technology is dangerous. You don’t have to be a full-on Jovian to feel at least a little bit of fear as regards science blindly rushing forward.\n\nOn the other hand, others would say that technology isn’t inherently dangerous or evil, and if not misused, is no more harmful than a flashlight. Where do you stand?",
       "section_group": "main",
       "answerable": true
     },
@@ -621,7 +621,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Suicide",
-      "primer": "The Fall was traumatic, and a lot of things in the past ten years have been as well. For whatever their reasons, some people don’t want to deal with existence anymore, and would sooner check out than continue to exist in a state of fear or misery or pain.  On the other hand, we've barely recovered from the near knockout punch that was the Fall.  Immediately after the Fall, in AF 0, humanity’s biologically instantiated population numbered less than 1% of what it had been 18 months before the Fall, and even accounting for infugees, including those in cold storage, transhumanity is still at just 8% of the wholly unique individual minds we once had.  Under those sort of circumstances, some would argue that people don’t have the right to self-terminate and by doing so, diminish the species.",
+      "primer": "The Fall was traumatic, and a lot of things in the past ten years have been as well. For whatever their reasons, some people don’t want to deal with existence anymore, and would sooner check out than continue to exist in a state of fear or misery or pain. On the other hand, we've barely recovered from the near knockout punch that was the Fall.\n\nImmediately after the Fall, in AF 0, humanity’s biologically instantiated population numbered less than 1% of what it had been 18 months before the Fall, and even accounting for infugees, including those in cold storage, transhumanity is still at just 8% of the wholly unique individual minds we once had.\n\nUnder those sort of circumstances, some would argue that people don’t have the right to self-terminate and by doing so, diminish the species.",
       "section_group": "main",
       "answerable": true
     },
@@ -631,7 +631,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Inflicted Permanent Death",
-      "primer": "Some people, you just can’t seem to coexist with, whether they’ve done things that offend you to the point of being willing to end them (either out of retribution or to make sure they can’t do it again), or because they’ve taken such a shine to screwing with you that killing them off for good seems like the only way to get them off your back. Of course, everything said above in 6.2i as regards the population of Transhumanity having been nuked (literally and figuratively) down to the single-digit percentile is still true. Transhumanity is an endangered species; given that, do you think it’s permissible to permanently erase a transhuman ego from the galaxy? If so, under what circumstances?",
+      "primer": "Some people, you just can’t seem to coexist with, whether they’ve done things that offend you to the point of being willing to end them (either out of retribution or to make sure they can’t do it again), or because they’ve taken such a shine to screwing with you that killing them off for good seems like the only way to get them off your back.\n\nOf course, everything said above in 6.2i as regards the population of Transhumanity having been nuked (literally and figuratively) down to the single-digit percentile is still true. Transhumanity is an endangered species; given that, do you think it’s permissible to permanently erase a transhuman ego from the galaxy?\n\nIf so, under what circumstances?",
       "section_group": "main",
       "answerable": true
     },
@@ -651,7 +651,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Resleeving",
-      "primer": "Resleeving - the ability to transfer your consciousness between bodies - has essentially reinvented society. These days, most folks have resleeved at least once, most likely to escape the Fall. What are your thoughts on the whole process? Do you see it as a useful tool, or just a murder box that kills whoever uses it, before printing out a fake copy? Do you see it as an affront to the natural order? Do you avail yourself of every opportunity you get to resleeve?",
+      "primer": "Resleeving - the ability to transfer your consciousness between bodies - has essentially reinvented society. These days, most folks have resleeved at least once, most likely to escape the Fall. What are your thoughts on the whole process? Do you see it as a useful tool, or just a murder box that kills whoever uses it, before printing out a fake copy? Do you see it as an affront to the natural order?\n\nDo you avail yourself of every opportunity you get to resleeve?",
       "section_group": "main",
       "answerable": true
     },
@@ -661,7 +661,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Indefinite Lifespans",
-      "primer": "It’s quite possible that the previous generation is the last generation to die (of natural causes). Nowadays, aging is a non-issue, and recovery from even death is perfectly possible. We have entered the age of the immortal. Do you see this as a good thing, or are you one of those folks that asks “who really wants to live forever?” Are you worried that this will ensure that an immortal elite will rule over a perpetually locked-in-place underclass? Or are you simply more concerned with all the things that could nonetheless kill people off?",
+      "primer": "It’s quite possible that the previous generation is the last generation to die (of natural causes). Nowadays, aging is a non-issue, and recovery from even death is perfectly possible. We have entered the age of the immortal. Do you see this as a good thing, or are you one of those folks that asks “who really wants to live forever?” Are you worried that this will ensure that an immortal elite will rule over a perpetually locked-in-place underclass?\n\nOr are you simply more concerned with all the things that could nonetheless kill people off?",
       "section_group": "main",
       "answerable": true
     },
@@ -671,7 +671,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Forking",
-      "primer": "When most folks who are now forty or more chronological years old  were children, they were told the same thing that children had been told for hundreds of years: that they were unique. Special, in some way, that nobody else could be. They were lied to: the transhuman brain is understood to a deep enough extent that we can rebuild someone’s mind and personality from whole-cloth gray matter. The reasons a person might do this are innumerable; some might prefer to send a (pruned) fork to a far-off place to hold a conversation in their place, then bring it back and reintegrate it with themselves. Some might spin off a fork to handle purely electronic actions as an infolife. Some just want the company of the one person who knows them best. How many of “you” being out there, active, are you comfortable with? Do you feel there should be a limit on the number of forks of a single person? How does it feel to realize that you can be copied, pasted, or deleted, with a computer command?",
+      "primer": "When most folks who are now forty or more chronological years old were children, they were told the same thing that children had been told for hundreds of years: that they were unique. Special, in some way, that nobody else could be. They were lied to: the transhuman brain is understood to a deep enough extent that we can rebuild someone’s mind and personality from whole-cloth gray matter.\n\nThe reasons a person might do this are innumerable; some might prefer to send a (pruned) fork to a far-off place to hold a conversation in their place, then bring it back and reintegrate it with themselves. Some might spin off a fork to handle purely electronic actions as an infolife. Some just want the company of the one person who knows them best. How many of “you” being out there, active, are you comfortable with?\n\nDo you feel there should be a limit on the number of forks of a single person? How does it feel to realize that you can be copied, pasted, or deleted, with a computer command?",
       "section_group": "main",
       "answerable": true
     },
@@ -681,7 +681,7 @@
       "chapter_id": "issues",
       "parent_id": "6.2",
       "heading": "Psi and Asyncs",
-      "primer": "While it might sound improbable to many, the TITANs (themselves improbable) bestowed upon some individuals the ability to manipulate their own mind and others’ minds using sheer force of will. One could be forgiven for thinking they don’t exist, though: this knowledge is actively suppressed by many of the major polities, especially in the inner system - and most asyncs actively try to blend in, or at least keep their use of psi subtle. Opinions are split among those who know - is psi a gift bestowed upon the lucky, or are asyncs little better than TITAN puppets in waiting? Or are you absolutely sure that all that Psi hogwash is nothing but malarkey?",
+      "primer": "While it might sound improbable to many, the TITANs (themselves improbable) bestowed upon some individuals the ability to manipulate their own mind and others’ minds using sheer force of will. One could be forgiven for thinking they don’t exist, though: this knowledge is actively suppressed by many of the major polities, especially in the inner system - and most asyncs actively try to blend in, or at least keep their use of psi subtle.\n\nOpinions are split among those who know - is psi a gift bestowed upon the lucky, or are asyncs little better than TITAN puppets in waiting? Or are you absolutely sure that all that Psi hogwash is nothing but malarkey?",
       "section_group": "main",
       "answerable": true
     },
@@ -691,7 +691,7 @@
       "chapter_id": "identity",
       "parent_id": null,
       "heading": "What about the folks you know?",
-      "primer": "With the proliferation of the social networks, it’s easy to use your rep score to find someone who meets your needs when you’re looking for something specific, be it someone to help you move furniture or help you move a body, be it someone with special expertise or someone looking to take a half-hour’s break out of their day to have sex with a well-recommended stranger. Even so, there are going to be constants in almost everyone’s life - their direct friends and family, their colleagues and recurrent acquaintances. Who are yours?",
+      "primer": "With the proliferation of the social networks, it’s easy to use your rep score to find someone who meets your needs when you’re looking for something specific, be it someone to help you move furniture or help you move a body, be it someone with special expertise or someone looking to take a half-hour’s break out of their day to have sex with a well-recommended stranger.\n\nEven so, there are going to be constants in almost everyone’s life - their direct friends and family, their colleagues and recurrent acquaintances. Who are yours?",
       "section_group": "main",
       "answerable": true
     },
@@ -711,7 +711,7 @@
       "chapter_id": "identity",
       "parent_id": null,
       "heading": "I know you gave me some serious answer for 8.",
-      "primer": "Probably some kind of boilerplate thing that you would have put on your C.V. What really makes you unique, what weirdnesses do you have? Some people like to get into brawls in bars and don’t consider it a good night unless they wake up at least in a healing vat. Some people (grognards, mainly) like to play tabletop RPGs over a simulated table, with simulated pencil and paper and simulated carbonated lemon-lime beverages as manufactured centuries ago. Some people (Titanians, mainly) have turned the political process into a fetish; some may have turned it into a literal fetish. Some people seek to do away with gender, while others think the universe would be a lot better if everybody were sleeved into a morph that lets them explore their gender and sexuality at a whim. What’s really odd about you?",
+      "primer": "Probably some kind of boilerplate thing that you would have put on your C.V. What really makes you unique, what weirdnesses do you have? Some people like to get into brawls in bars and don’t consider it a good night unless they wake up at least in a healing vat. Some people (grognards, mainly) like to play tabletop RPGs over a simulated table, with simulated pencil and paper and simulated carbonated lemon-lime beverages as manufactured centuries ago.\n\nSome people (Titanians, mainly) have turned the political process into a fetish; some may have turned it into a literal fetish. Some people seek to do away with gender, while others think the universe would be a lot better if everybody were sleeved into a morph that lets them explore their gender and sexuality at a whim.\n\nWhat’s really odd about you?",
       "section_group": "main",
       "answerable": true
     },
@@ -721,7 +721,7 @@
       "chapter_id": "identity",
       "parent_id": null,
       "heading": "What are your minor motivators?",
-      "primer": "You can’t take up every cause all the time [literally; the formal rules won’t let you have more than three declared motivations] but people tend to have more than three things in life that are important to them. Aside from your mechanical primary motivations, what causes would you lend aid to if you had the spare time, which would you throw a bone to if it came your way and they could make good use of it? Conversely, what causes get your goat - not enough for you, personally, to risk your stack to harm that cause, but which you will enjoy a sense of satisfaction at seeing misfortune brought to?",
+      "primer": "You can’t take up every cause all the time [literally; the formal rules won’t let you have more than three declared motivations] but people tend to have more than three things in life that are important to them. Aside from your mechanical primary motivations, what causes would you lend aid to if you had the spare time, which would you throw a bone to if it came your way and they could make good use of it?\n\nConversely, what causes get your goat - not enough for you, personally, to risk your stack to harm that cause, but which you will enjoy a sense of satisfaction at seeing misfortune brought to?",
       "section_group": "main",
       "answerable": true
     },
@@ -1041,7 +1041,7 @@
       "chapter_id": "gender_sexuality",
       "parent_id": "13",
       "heading": "Gender and sexuality are complex in this brave new world.",
-      "primer": "Transhumans are able to easily and relatively cheaply modify their morph’s sexual characteristics into a form that physically and hormonally matches their internalized gender (or at greater expense have one that was built that way from the start), while other transhumans have gone even further and rejected the idea of gender completely. Some choose to identify as agender, genderless, neutrois (gender neutral), polygender, postgender, gender-fluid, or multi-gender, as well as traditional gender identities from one’s indigenous culture, in addition to binary male and female. This is not referring to the sex of their current morph, but to individual gender identity. With this in mind, what gender are you?",
+      "primer": "Transhumans are able to easily and relatively cheaply modify their morph’s sexual characteristics into a form that physically and hormonally matches their internalized gender (or at greater expense have one that was built that way from the start), while other transhumans have gone even further and rejected the idea of gender completely.\n\nSome choose to identify as agender, genderless, neutrois (gender neutral), polygender, postgender, gender-fluid, or multi-gender, as well as traditional gender identities from one’s indigenous culture, in addition to binary male and female. This is not referring to the sex of their current morph, but to individual gender identity.\n\nWith this in mind, what gender are you?",
       "section_group": "main",
       "answerable": true
     },
@@ -1051,7 +1051,7 @@
       "chapter_id": "gender_sexuality",
       "parent_id": "13a",
       "heading": "How did you come by your gender identity and sexual characteristics?",
-      "primer": "Most people are assigned a physical (or electronic) gender when they are born/created, and while most people tend to stick with what they know, some come to realize their internalized gender is more fluid than that simple binary choice. Some undergo a slow and frequently painful realization that their own gender identity doesn’t match the sex/gender they were born with, and may change their physical bodies to match it, change their mental selves to match their morph, or do something else. Some make a conscious choice to try something new and find they like it. How did you come to possess the current combination of internal gender identity and external sexual characteristics you possess?",
+      "primer": "Most people are assigned a physical (or electronic) gender when they are born/created, and while most people tend to stick with what they know, some come to realize their internalized gender is more fluid than that simple binary choice. Some undergo a slow and frequently painful realization that their own gender identity doesn’t match the sex/gender they were born with, and may change their physical bodies to match it, change their mental selves to match their morph, or do something else.\n\nSome make a conscious choice to try something new and find they like it. How did you come to possess the current combination of internal gender identity and external sexual characteristics you possess?",
       "section_group": "main",
       "answerable": true
     },
@@ -1321,7 +1321,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "14",
       "heading": "Electronic Gaming",
-      "primer": "Distinct from competitions such as sports,  which were in times past referred to as games, as well as from pastimes such as card or board games, let’s talk about gaming.  Video games first became widespread in the late 1980s, and have been going strong ever since. In the first few decades of the 21st century, divisions began to arise, between “True” gaming, the sort that people at the time needed either specialized “console” or “Handheld” purpose-built gaming hardware or powerful personal computers to play, and “Casual” gaming, the sort of which they played on their “Smart” mobile telephones and tablet devices, which can be considered a primitive form of ecto. These days, of course, the mesh inserts in the heads of almost everybody on a small habitat collectively outweigh the entire storage capacity and processing power of the entire electronic world of the early 21st century, but we still tend to either game one of two ways: Either casually, with the sort of entopic AR game you might play to pass time when you’ve nothing better to do, or seriously, with full-immersion simulspace environments the likes of which could literally only be imagined in those days. It’s safe to say that gaming, in some form or another, has almost as much a universal appeal to transhumanity as music does; everyone from hypercorp CEOs to bored teenagers can safely be said to spend at least half an hour of any given day playing a game of some sort, and many people spend a lot more than that. How much do you game, and what sort of games do you like - solo, multiplayer, massively multiplayer; adventure, action, RPG; casual, immersive, somewhere in between?",
+      "primer": "Distinct from competitions such as sports, which were in times past referred to as games, as well as from pastimes such as card or board games, let’s talk about gaming. Video games first became widespread in the late 1980s, and have been going strong ever since. In the first few decades of the 21st century, divisions began to arise, between “True” gaming, the sort that people at the time needed either specialized “console” or “Handheld” purpose-built gaming hardware or powerful personal computers to play, and “Casual” gaming, the sort of which they played on their “Smart” mobile telephones and tablet devices, which can be considered a primitive form of ecto.\n\nThese days, of course, the mesh inserts in the heads of almost everybody on a small habitat collectively outweigh the entire storage capacity and processing power of the entire electronic world of the early 21st century, but we still tend to either game one of two ways: Either casually, with the sort of entopic AR game you might play to pass time when you’ve nothing better to do, or seriously, with full-immersion simulspace environments the likes of which could literally only be imagined in those days.\n\nIt’s safe to say that gaming, in some form or another, has almost as much a universal appeal to transhumanity as music does; everyone from hypercorp CEOs to bored teenagers can safely be said to spend at least half an hour of any given day playing a game of some sort, and many people spend a lot more than that.\n\nHow much do you game, and what sort of games do you like - solo, multiplayer, massively multiplayer; adventure, action, RPG; casual, immersive, somewhere in between?",
       "section_group": "main",
       "answerable": true
     },
@@ -1331,7 +1331,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "14",
       "heading": "Non-Interactive Entertainment",
-      "primer": "As long as there are folks out there with a story to tell and folks who want to experience stories told by others, non-interactive entertainment will remain a thing. Everything from reading a good book to watching a movie to eXperience Playback, non-interactive entertainment other than music is still going strong. Of course, it’s true that these days, the definition of “non-interactive” can be blurred quite a lot; even if the creator didn’t produce alternative tracks, viewpoints, etcetera, your muse is often capable of adaptively editing stories for your consumption. Books are easiest, of course; a good muse you’ve been with a long time can probably put together an entire book custom- tailored to your tastes from whole cloth faster than you can read a single page of it, never mind the ease with which they can modify a text-only story to your liking, whether you simply would prefer the hero of the story to be a heroine instead, or would prefer instead to explore the entire narrative from the designated villain’s point of view. Tailoring a film is trickier, and usually can’t be done on the fly unless the creator has included a significant library of modifications to apply, or others have produced modifications to similar effect; an early example of this would be the fan edits of the Star Wars prequel trilogy which removed a loathed character and can still be found floating around the mesh to this day. Customizing an XP is tricker, though, and at the least typically requires more time, and quite a bit more resources than customizing a movie.",
+      "primer": "As long as there are folks out there with a story to tell and folks who want to experience stories told by others, non-interactive entertainment will remain a thing. Everything from reading a good book to watching a movie to eXperience Playback, non-interactive entertainment other than music is still going strong.\n\nOf course, it’s true that these days, the definition of “non-interactive” can be blurred quite a lot; even if the creator didn’t produce alternative tracks, viewpoints, etcetera, your muse is often capable of adaptively editing stories for your consumption. Books are easiest, of course; a good muse you’ve been with a long time can probably put together an entire book custom- tailored to your tastes from whole cloth faster than you can read a single page of it, never mind the ease with which they can modify a text-only story to your liking, whether you simply would prefer the hero of the story to be a heroine instead, or would prefer instead to explore the entire narrative from the designated villain’s point of view.\n\nTailoring a film is trickier, and usually can’t be done on the fly unless the creator has included a significant library of modifications to apply, or others have produced modifications to similar effect; an early example of this would be the fan edits of the Star Wars prequel trilogy which removed a loathed character and can still be found floating around the mesh to this day.\n\nCustomizing an XP is tricker, though, and at the least typically requires more time, and quite a bit more resources than customizing a movie.",
       "section_group": "main",
       "answerable": true
     },
@@ -1341,7 +1341,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "14",
       "heading": "Other hobbies",
-      "primer": "There are a vast number of things transhumans do as hobbies, excluding the things covered above. Free-running, for instance, has experienced an unprecedented surge in popularity in the decade since the Fall. People still like to make or modify things with their own hands, whether permanent handmade objects of actual utility, to cooking by hand instead of eating a ‘maker-prepared meal directly. Some love to write, others tinker with genetic code for the hell of it. Do you have any hobbies, and if so, what are they?",
+      "primer": "There are a vast number of things transhumans do as hobbies, excluding the things covered above. Free-running, for instance, has experienced an unprecedented surge in popularity in the decade since the Fall. People still like to make or modify things with their own hands, whether permanent handmade objects of actual utility, to cooking by hand instead of eating a ‘maker-prepared meal directly.\n\nSome love to write, others tinker with genetic code for the hell of it. Do you have any hobbies, and if so, what are they?",
       "section_group": "main",
       "answerable": true
     },
@@ -1351,7 +1351,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "14",
       "heading": "Skinning",
-      "primer": "Modern entopic technology allows a person to override reality at will, “skinning” their perceptions of reality in the way that some ancient computer programs would allow you to reskin the user interface. This skinning can be indiscernible from the real thing; your trude down stark metal corridors can be transformed into a pleasant midday stroll down a narrow hedge maze, or you can turn your world into a thunderous hellscape to harmonize with a foul mood for cathartic release. You can enjoy the floral scents of a botanical garden whilst standing literally knee-deep in the habitat’s septic tanks, or turn nutrient paste into something that actually tastes like something you enjoy. You can, of course, share your skins with others, whether it’s simply whatever audio tracks you’re jamming to, or to share the custom skin you’ve spent days working on with all your friends. Or, alternatively, you can use it to censor out parts of reality that you find distressing or aggravating, such as almost never having to observe any evidence that that rotten bastard you’d as soon airlock as talk to still exists.",
+      "primer": "Modern entopic technology allows a person to override reality at will, “skinning” their perceptions of reality in the way that some ancient computer programs would allow you to reskin the user interface. This skinning can be indiscernible from the real thing; your trude down stark metal corridors can be transformed into a pleasant midday stroll down a narrow hedge maze, or you can turn your world into a thunderous hellscape to harmonize with a foul mood for cathartic release.\n\nYou can enjoy the floral scents of a botanical garden whilst standing literally knee-deep in the habitat’s septic tanks, or turn nutrient paste into something that actually tastes like something you enjoy. You can, of course, share your skins with others, whether it’s simply whatever audio tracks you’re jamming to, or to share the custom skin you’ve spent days working on with all your friends.\n\nOr, alternatively, you can use it to censor out parts of reality that you find distressing or aggravating, such as almost never having to observe any evidence that that rotten bastard you’d as soon airlock as talk to still exists.",
       "section_group": "main",
       "answerable": true
     },
@@ -1361,7 +1361,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "14",
       "heading": "Drugs",
-      "primer": "It can be accurately stated that a greater percentage of transhumanity is enjoying a narcotically-induced altered state of consciousness at any given moment now than at any other point in transhumanity’s history. From timeless classics such as alcohol and nicotine to brand-new forms of never-before seen brain-benders that just came off the workbench in the last ten minutes, to knowingly ingesting substances which are lethally toxic (with or without the medichines to prevent the lethality part). What are your preferences?",
+      "primer": "It can be accurately stated that a greater percentage of transhumanity is enjoying a narcotically-induced altered state of consciousness at any given moment now than at any other point in transhumanity’s history. From timeless classics such as alcohol and nicotine to brand-new forms of never-before seen brain-benders that just came off the workbench in the last ten minutes, to knowingly ingesting substances which are lethally toxic (with or without the medichines to prevent the lethality part).\n\nWhat are your preferences?",
       "section_group": "main",
       "answerable": true
     },
@@ -1381,7 +1381,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": null,
       "heading": "Let’s talk about emotion and trauma.",
-      "primer": "Almost nobody in the current total of transhumanity has had a care-free life completely unmarred by stress. Most people have at least one formative experience involving negative emotions - some people are arguably affected to the core of their being, and would otherwise have been completely different. Uncomfortable as it might be, answering about these experiences could paint a more complete picture of your life and your mind.",
+      "primer": "Almost nobody in the current total of transhumanity has had a care-free life completely unmarred by stress. Most people have at least one formative experience involving negative emotions - some people are arguably affected to the core of their being, and would otherwise have been completely different.\n\nUncomfortable as it might be, answering about these experiences could paint a more complete picture of your life and your mind.",
       "section_group": "main",
       "answerable": true
     },
@@ -1391,7 +1391,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "15",
       "heading": "Have you ever died? Do you remember any of your deaths?",
-      "primer": "Of course, a decent number of people currently walking around are re-instantiated from cold storage, back from a death during the Fall that they may or may not remember. Some people, like the Jovians, would argue that any time an ego resleeves into a new morph is a death of a mind - but most wouldn’t think to count that as such. Then there are deaths that people register as deaths, and that they remember: if one’s cortical stack is recovered after one dies, it is possible to remember the previous morph shutting down from a first person perspective. Seeing as death is one of the most potent sources of emotional trauma known to transhumanity, it’s not hard to imagine that having experienced a death would change a person’s outlook.",
+      "primer": "Of course, a decent number of people currently walking around are re-instantiated from cold storage, back from a death during the Fall that they may or may not remember. Some people, like the Jovians, would argue that any time an ego resleeves into a new morph is a death of a mind - but most wouldn’t think to count that as such.\n\nThen there are deaths that people register as deaths, and that they remember: if one’s cortical stack is recovered after one dies, it is possible to remember the previous morph shutting down from a first person perspective. Seeing as death is one of the most potent sources of emotional trauma known to transhumanity, it’s not hard to imagine that having experienced a death would change a person’s outlook.",
       "section_group": "main",
       "answerable": true
     },
@@ -1401,7 +1401,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "15",
       "heading": "Have you ever killed anyone?",
-      "primer": "You are, of course, permitted to decline to comment. Even if it just amounts to wrecking someone else’s morph temporarily and setting them back for a while, the standard transhuman mind is wired such that committing violence on someone else involves a lot of stress. Permanently removing someone from existence - inflicting permanent ego death upon them - might be even more stressful, even if it involves a level of deliberation not present in drawing a weapon on them. Participating in the death of another is an experience many would seek to avoid, some receive apathetically or begrudgingly, and a handful embrace.",
+      "primer": "You are, of course, permitted to decline to comment. Even if it just amounts to wrecking someone else’s morph temporarily and setting them back for a while, the standard transhuman mind is wired such that committing violence on someone else involves a lot of stress. Permanently removing someone from existence - inflicting permanent ego death upon them - might be even more stressful, even if it involves a level of deliberation not present in drawing a weapon on them.\n\nParticipating in the death of another is an experience many would seek to avoid, some receive apathetically or begrudgingly, and a handful embrace.",
       "section_group": "main",
       "answerable": true
     },
@@ -1421,7 +1421,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "15",
       "heading": "What is the most angry you’ve ever been?",
-      "primer": "Some people anger quickly. Other people might have anger psychosurgically suppressed, if they ever had the capacity in them at all. Then there are some situations when very few people would be able to suppress all signs of an emotional response. On top of that, reactions while angry can be different. Again, does any particular moment seem relevant?",
+      "primer": "Some people anger quickly. Other people might have anger psychosurgically suppressed, if they ever had the capacity in them at all. Then there are some situations when very few people would be able to suppress all signs of an emotional response. On top of that, reactions while angry can be different.\n\nAgain, does any particular moment seem relevant?",
       "section_group": "main",
       "answerable": true
     },
@@ -1441,7 +1441,7 @@
       "chapter_id": "culture_trauma",
       "parent_id": "15",
       "heading": "What’s the saddest you’ve ever been?",
-      "primer": "If nothing else, everybody who’s at least ten years old lost somebody during the Fall. While loss is a common cause of sadness, it’s far from the only one: maybe you didn’t get that promotion you wanted, or maybe somebody made an off-hand remark that really hurt your feelings, or maybe you made a mistake that hurt somebody. These moments can leave marks on you, just like fear, anger, and death. Any moments of sadness that stand out?",
+      "primer": "If nothing else, everybody who’s at least ten years old lost somebody during the Fall. While loss is a common cause of sadness, it’s far from the only one: maybe you didn’t get that promotion you wanted, or maybe somebody made an off-hand remark that really hurt your feelings, or maybe you made a mistake that hurt somebody. These moments can leave marks on you, just like fear, anger, and death.\n\nAny moments of sadness that stand out?",
       "section_group": "main",
       "answerable": true
     },
@@ -1461,7 +1461,7 @@
       "chapter_id": "exosolar",
       "parent_id": "16",
       "heading": "Gatecrashing.",
-      "primer": "Some people say the Pandora Gates are artifacts of the TITANs evacuation of the solar system and should be left the hell alone. The Factors - the first confirmed alien race humanity made first contact with - gave humanity a stark warning against playing with the gates, which humanity promptly ignored. For better or worse, multiple entities, including the PC’s Pathfinder hypercorp, the ostensibly-neutral Gatekeeper hypercorp, the unaffiliated TerraGenesis hypercorp, the Love and Rage Collective, and the Go-Nin hypercorp, control Pandora Gates in the solar system, and frequently send gatecrashers through the gates. Now, there are several large exosolar colonies of humanity. Do you feel humanity is exposing itself to unnecessary existential risks by playing with the gates, or helping to preserve themselves against a system-wide extinction event?",
+      "primer": "Some people say the Pandora Gates are artifacts of the TITANs evacuation of the solar system and should be left the hell alone. The Factors - the first confirmed alien race humanity made first contact with - gave humanity a stark warning against playing with the gates, which humanity promptly ignored.\n\nFor better or worse, multiple entities, including the PC’s Pathfinder hypercorp, the ostensibly-neutral Gatekeeper hypercorp, the unaffiliated TerraGenesis hypercorp, the Love and Rage Collective, and the Go-Nin hypercorp, control Pandora Gates in the solar system, and frequently send gatecrashers through the gates. Now, there are several large exosolar colonies of humanity.\n\nDo you feel humanity is exposing itself to unnecessary existential risks by playing with the gates, or helping to preserve themselves against a system-wide extinction event?",
       "section_group": "main",
       "answerable": true
     },
@@ -1471,7 +1471,7 @@
       "chapter_id": "exosolar",
       "parent_id": "16",
       "heading": "Exosolar Ecology",
-      "primer": "Less than ten years ago, transhumanity still didn’t know for certain whether life was an aberration unique to our small blue jewel, or if there was more life out there. Now we know for sure, and we have discovered planets with biospheres, some of them even somewhat habitable to us. Needless to say, a lot of folks are chomping at the bit to exploit those planets for all they’re worth, and others would quite literally just as soon burn someone’s stack as allow them to bend so much as a single blade of alien grass. What’s your stance on the issue?",
+      "primer": "Less than ten years ago, transhumanity still didn’t know for certain whether life was an aberration unique to our small blue jewel, or if there was more life out there. Now we know for sure, and we have discovered planets with biospheres, some of them even somewhat habitable to us.\n\nNeedless to say, a lot of folks are chomping at the bit to exploit those planets for all they’re worth, and others would quite literally just as soon burn someone’s stack as allow them to bend so much as a single blade of alien grass.\n\nWhat’s your stance on the issue?",
       "section_group": "main",
       "answerable": true
     },
@@ -1481,7 +1481,7 @@
       "chapter_id": "exosolar",
       "parent_id": "16",
       "heading": "Alien Affairs",
-      "primer": "“Two possibilities exist: Either we are alone in the universe, or we are not. Both are equally terrifying.”\nArthur C. Clarke’s famous quote received its answer in the last decade, when the Factors, a sapient race of predatory fungi, rolled into our solar system. We’ve also uncovered clear and irrefutable proof of other sapient life, in the form of extrasolar ruins - discovered in the ten years since the Fall - that could not have been made by anything but an advanced society, and that distantly predate the Fall itself. Clearly, then, we are not alone. In the centuries before the Fall, humanity at large envisioned making contact with new and unknown life as a wonderful event, the stepping stone to joining a vast interstellar community of races. In the wake of the Fall, however, Transhumanity is exceedingly weak compared to what we were, and the aliens we’ve met have proven to have technology significantly more advanced than our own. This makes a lot of people very nervous.",
+      "primer": "“Two possibilities exist: Either we are alone in the universe, or we are not. Both are equally terrifying.”\n\nArthur C. Clarke’s famous quote received its answer in the last decade, when the Factors, a sapient race of predatory fungi, rolled into our solar system. We’ve also uncovered clear and irrefutable proof of other sapient life, in the form of extrasolar ruins - discovered in the ten years since the Fall - that could not have been made by anything but an advanced society, and that distantly predate the Fall itself.\n\nClearly, then, we are not alone. In the centuries before the Fall, humanity at large envisioned making contact with new and unknown life as a wonderful event, the stepping stone to joining a vast interstellar community of races. In the wake of the Fall, however, Transhumanity is exceedingly weak compared to what we were, and the aliens we’ve met have proven to have technology significantly more advanced than our own.\n\nThis makes a lot of people very nervous.",
       "section_group": "main",
       "answerable": true
     },
@@ -1531,7 +1531,7 @@
       "chapter_id": "appendix",
       "parent_id": "13d",
       "heading": "Child sexual abuse and related issues.",
-      "primer": "The problem of child sexual abuse still exists, as it did in the days before resleeving and genetic engineering. Sexual attraction to children (pedophilia) still also exists, and there are myriad new ways for people to act upon the impulse. These days, a young ego can easily be sleeved into an adult morph, or vice versa. And of course, there’s neotenic morphs, which will reach a maximum apparent maturity of somewhere between the baseline human ages of 10 and 13, in terms of size, build and appearance. What are your thoughts?",
+      "primer": "The problem of child sexual abuse still exists, as it did in the days before resleeving and genetic engineering. Sexual attraction to children (pedophilia) still also exists, and there are myriad new ways for people to act upon the impulse. These days, a young ego can easily be sleeved into an adult morph, or vice versa.\n\nAnd of course, there’s neotenic morphs, which will reach a maximum apparent maturity of somewhere between the baseline human ages of 10 and 13, in terms of size, build and appearance.\n\nWhat are your thoughts?",
       "section_group": "moved_appendix",
       "answerable": true
     },
@@ -1551,7 +1551,7 @@
       "chapter_id": "appendix",
       "parent_id": "13d",
       "heading": "Muses: attachment to them, and sexuality around them.",
-      "primer": "The topic of people forming sexual attachments with their muses can be a hotly debated one at times. On the one hand, most people consider muses to be non-sapient AIs; on the other, a muse can and often is the nearest, dearest, and longest-lasting relationship a person has, more real to them than the vast majority of transhumanity. What do you think?",
+      "primer": "The topic of people forming sexual attachments with their muses can be a hotly debated one at times. On the one hand, most people consider muses to be non-sapient AIs; on the other, a muse can and often is the nearest, dearest, and longest-lasting relationship a person has, more real to them than the vast majority of transhumanity.\n\nWhat do you think?",
       "section_group": "moved_appendix",
       "answerable": true
     }
