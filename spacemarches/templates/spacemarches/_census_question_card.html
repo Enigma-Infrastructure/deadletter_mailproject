@@ -1,6 +1,13 @@
 <article
   id="census-q-{{ node.id }}"
   class="sm-panel census-card"
+  data-question-id="{{ node.id }}"
+  data-display-id="{{ node.display_id }}"
+  data-chapter-id="{{ node.chapter_id }}"
+  data-heading="{{ node.heading|truncatechars:85 }}"
+  data-answerable="{% if node.answerable %}true{% else %}false{% endif %}"
+  data-answered="{% if node.is_answered %}true{% else %}false{% endif %}"
+  data-has-sheet="{% if node.sheet_hint %}true{% else %}false{% endif %}"
   style="margin-bottom: 0.85rem; {% if node.depth == 1 %}margin-left: 1rem; border-left: 3px solid var(--sm-outline);{% elif node.depth == 2 %}margin-left: 2rem; border-left: 3px solid var(--sm-primary);{% endif %}"
 >
   <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 0.5rem; margin-bottom: 0.45rem;">
@@ -122,6 +129,69 @@
                 <input id="c-hint-muse-{{ node.id }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
               </div>
             {% endif %}
+            {% if "morph" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-morph-{{ node.id }}" style="font-size: 0.74rem; display: block;">Primary Morph</label>
+                <select id="c-hint-morph-{{ node.id }}" name="primary_morph" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for m in morph_choices %}
+                    <option value="{{ m.uid }}" {% if sheet_context.primary_morph|lower == m.name|lower %}selected{% endif %}>{{ m.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "aptitudes" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-apttpl-{{ node.id }}" style="font-size: 0.74rem; display: block;">Aptitude Template</label>
+                <select id="c-hint-apttpl-{{ node.id }}" name="aptitude_template" data-sm-apt-template style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; Custom &mdash;</option>
+                  {% for tpl in aptitude_templates %}
+                    <option
+                      value="{{ tpl.key }}"
+                      data-cog="{{ tpl.aptitudes.cog }}"
+                      data-int="{{ tpl.aptitudes.int }}"
+                      data-ref="{{ tpl.aptitudes.ref }}"
+                      data-sav="{{ tpl.aptitudes.sav }}"
+                      data-som="{{ tpl.aptitudes.som }}"
+                      data-wil="{{ tpl.aptitudes.wil }}"
+                      {% if sheet_context.aptitude_template == tpl.key %}selected{% endif %}
+                    >{{ tpl.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                <label style="font-size: 0.7rem;">COG <input type="number" name="aptitude_cog" min="5" max="30" value="{{ sheet_context.aptitudes.cog|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">INT <input type="number" name="aptitude_int" min="5" max="30" value="{{ sheet_context.aptitudes.int|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">REF <input type="number" name="aptitude_ref" min="5" max="30" value="{{ sheet_context.aptitudes.ref|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">SAV <input type="number" name="aptitude_sav" min="5" max="30" value="{{ sheet_context.aptitudes.sav|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">SOM <input type="number" name="aptitude_som" min="5" max="30" value="{{ sheet_context.aptitudes.som|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">WIL <input type="number" name="aptitude_wil" min="5" max="30" value="{{ sheet_context.aptitudes.wil|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+              </div>
+            {% endif %}
+            {% if "reputations" in node.sheet_hint.editable_fields %}
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                {% for rep in sheet_context.rep_rows %}
+                  <label style="font-size: 0.7rem;">{{ rep.name }} <input type="number" name="rep_{{ rep.key }}" min="-100" max="100" value="{{ rep.points }}" placeholder="0" style="width: 3.8rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if "motivations" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="c-hint-motsup-{{ node.id }}" style="font-size: 0.74rem; display: block;">Stance</label>
+                <select id="c-hint-motsup-{{ node.id }}" name="motivation_support" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="1" {% if sheet_context.motivation_primary_support %}selected{% endif %}>+ Support</option>
+                  <option value="0" {% if not sheet_context.motivation_primary_support %}selected{% endif %}>- Oppose</option>
+                </select>
+              </div>
+              <div>
+                <label for="c-hint-mot-{{ node.id }}" style="font-size: 0.74rem; display: block;">Primary Motivation</label>
+                <input id="c-hint-mot-{{ node.id }}" type="text" name="motivation_cause" value="{{ sheet_context.motivation_primary_cause }}" maxlength="200" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            <label style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.74rem; margin: 0 0.25rem 0 0; cursor: pointer;">
+              <input type="checkbox" name="sync_to_narratives" value="1" style="width: auto;">
+              Sync empty prompt
+            </label>
             <button type="submit" class="btn btn-sm">Update Sheet</button>
           </form>
         </details>
@@ -136,7 +206,7 @@
         <input type="hidden" name="action" value="toggle_sexuality">
         <input type="hidden" name="chapter" value="{{ active_chapter_id }}">
         <button type="submit" class="btn btn-secondary btn-sm">
-          {% if census.show_sexuality_sections %}Hide Optional Sexuality Questions{% else %}Show Optional Sexuality Questions{% endif %}
+          {% if census.show_sexuality_sections %}Hide Sensitive Sexuality Questions{% else %}Show Sensitive Sexuality Questions{% endif %}
         </button>
       </form>
     </div>

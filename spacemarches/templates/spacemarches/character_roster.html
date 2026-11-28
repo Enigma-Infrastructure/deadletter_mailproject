@@ -1,5 +1,22 @@
 {% extends "spacemarches/base_spacemarches.html" %}
-{% block title %}Saved Characters | Spacemarches{% endblock %}
+{% block title %}Saved Characters | Spacemarches<script>
+  if (!window.__smAptTemplateBound) {
+    window.__smAptTemplateBound = true;
+    document.addEventListener("change", function (ev) {
+      var sel = ev.target && ev.target.closest ? ev.target.closest("select[data-sm-apt-template]") : null;
+      if (!sel) return;
+      var opt = sel.options[sel.selectedIndex];
+      var form = sel.closest("form");
+      if (!opt || !form || !opt.value) return;
+      ["cog", "int", "ref", "sav", "som", "wil"].forEach(function (k) {
+        var inp = form.querySelector('input[name="aptitude_' + k + '"]');
+        var val = opt.getAttribute("data-" + k);
+        if (inp && val !== null && val !== "") inp.value = val;
+      });
+    });
+  }
+</script>
+{% endblock %}
 
 {% block spacemarches_content %}
 <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 0.75rem; margin-bottom: 1.15rem;">
@@ -199,13 +216,103 @@
                   <label for="roster-muse-{{ ch.pk }}" style="font-size: 0.74rem;">Muse Name</label>
                   <input id="roster-muse-{{ ch.pk }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
                 </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-morph-{{ ch.pk }}" style="font-size: 0.74rem;">Primary Morph</label>
+                  <select id="roster-morph-{{ ch.pk }}" name="primary_morph" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                    <option value="">&mdash; None &mdash;</option>
+                    {% for m in morph_choices %}
+                      <option value="{{ m.uid }}" {% if sheet_context.primary_morph|lower == m.name|lower %}selected{% endif %}>{{ m.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="form-group" style="margin: 0;">
+                  <label for="roster-langs-{{ ch.pk }}" style="font-size: 0.74rem;">Languages</label>
+                  <input id="roster-langs-{{ ch.pk }}" type="text" name="languages" value="{{ sheet_context.languages_display }}" maxlength="240" placeholder="English, Mandarin" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                </div>
               </div>
+
+              <details style="margin-top: 0.5rem; padding: 0.45rem 0.6rem; border: 1px solid var(--sm-outline-variant); border-radius: 6px;">
+                <summary style="cursor: pointer; font-weight: 600; font-size: 0.78rem;">MeshNet Tools: Aptitudes, Flex, Reps &amp; Motivations</summary>
+                <div style="margin-top: 0.45rem; display: flex; flex-direction: column; gap: 0.45rem;">
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(95px, 1fr)); gap: 0.35rem;">
+                    <div class="form-group" style="margin: 0; grid-column: span 2;">
+                      <label for="roster-apttpl-{{ ch.pk }}" style="font-size: 0.72rem;">Aptitude Template</label>
+                      <select id="roster-apttpl-{{ ch.pk }}" name="aptitude_template" data-sm-apt-template style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                        <option value="">&mdash; Custom &mdash;</option>
+                        {% for tpl in aptitude_templates %}
+                          <option
+                            value="{{ tpl.key }}"
+                            data-cog="{{ tpl.aptitudes.cog }}"
+                            data-int="{{ tpl.aptitudes.int }}"
+                            data-ref="{{ tpl.aptitudes.ref }}"
+                            data-sav="{{ tpl.aptitudes.sav }}"
+                            data-som="{{ tpl.aptitudes.som }}"
+                            data-wil="{{ tpl.aptitudes.wil }}"
+                            {% if sheet_context.aptitude_template == tpl.key %}selected{% endif %}
+                          >{{ tpl.name }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-flex-{{ ch.pk }}" style="font-size: 0.72rem;">Flex</label>
+                      <input id="roster-flex-{{ ch.pk }}" type="number" name="flex_points" min="0" max="3" value="{{ sheet_context.flex }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-cog-{{ ch.pk }}" style="font-size: 0.72rem;">COG</label>
+                      <input id="roster-cog-{{ ch.pk }}" type="number" name="aptitude_cog" min="5" max="30" value="{{ sheet_context.aptitudes.cog|default:15 }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-int-{{ ch.pk }}" style="font-size: 0.72rem;">INT</label>
+                      <input id="roster-int-{{ ch.pk }}" type="number" name="aptitude_int" min="5" max="30" value="{{ sheet_context.aptitudes.int|default:15 }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-ref-{{ ch.pk }}" style="font-size: 0.72rem;">REF</label>
+                      <input id="roster-ref-{{ ch.pk }}" type="number" name="aptitude_ref" min="5" max="30" value="{{ sheet_context.aptitudes.ref|default:15 }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-sav-{{ ch.pk }}" style="font-size: 0.72rem;">SAV</label>
+                      <input id="roster-sav-{{ ch.pk }}" type="number" name="aptitude_sav" min="5" max="30" value="{{ sheet_context.aptitudes.sav|default:15 }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-som-{{ ch.pk }}" style="font-size: 0.72rem;">SOM</label>
+                      <input id="roster-som-{{ ch.pk }}" type="number" name="aptitude_som" min="5" max="30" value="{{ sheet_context.aptitudes.som|default:15 }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                    <div class="form-group" style="margin: 0;">
+                      <label for="roster-wil-{{ ch.pk }}" style="font-size: 0.72rem;">WIL</label>
+                      <input id="roster-wil-{{ ch.pk }}" type="number" name="aptitude_wil" min="5" max="30" value="{{ sheet_context.aptitudes.wil|default:15 }}" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                    </div>
+                  </div>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(90px, 1fr)); gap: 0.35rem;">
+                    {% for rep in sheet_context.rep_rows %}
+                      <div class="form-group" style="margin: 0;">
+                        <label for="roster-rep-{{ rep.key }}-{{ ch.pk }}" style="font-size: 0.72rem;">{{ rep.name }}</label>
+                        <input id="roster-rep-{{ rep.key }}-{{ ch.pk }}" type="number" name="rep_{{ rep.key }}" min="-100" max="100" value="{{ rep.points }}" placeholder="0" style="padding: 0.22rem 0.35rem; font-size: 0.78rem;">
+                      </div>
+                    {% endfor %}
+                  </div>
+                  <div style="display: grid; grid-template-columns: 140px 1fr; gap: 0.35rem;">
+                    <select name="motivation_support" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                      <option value="1" {% if sheet_context.motivation_primary_support %}selected{% endif %}>+ Support</option>
+                      <option value="0" {% if not sheet_context.motivation_primary_support %}selected{% endif %}>- Oppose</option>
+                    </select>
+                    <input type="text" name="motivation_cause" value="{{ sheet_context.motivation_primary_cause }}" maxlength="200" placeholder="Primary Motivation / Cause" style="padding: 0.22rem 0.4rem; font-size: 0.78rem;">
+                  </div>
+                  <textarea name="description" rows="2" placeholder="Character description / sheet notes" style="width: 100%; padding: 0.22rem 0.4rem; font-size: 0.78rem;">{{ sheet_context.description }}</textarea>
+                </div>
+              </details>
+
               <div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 0.45rem; margin-top: 0.5rem;">
-                <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.78rem; cursor: pointer;">
-                  <input type="hidden" name="sync_linked_names" value="0">
-                  <input type="checkbox" name="sync_linked_names" value="1" checked style="width: auto;">
-                  Sync name to linked Dossier &amp; Census
-                </label>
+                <div style="display: flex; flex-wrap: wrap; gap: 0.55rem; align-items: center;">
+                  <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.78rem; cursor: pointer;">
+                    <input type="hidden" name="sync_linked_names" value="0">
+                    <input type="checkbox" name="sync_linked_names" value="1" checked style="width: auto;">
+                    Sync name to linked Dossier &amp; Census
+                  </label>
+                  <label style="display: inline-flex; align-items: center; gap: 0.35rem; margin: 0; font-size: 0.78rem; cursor: pointer;">
+                    <input type="checkbox" name="sync_to_narratives" value="1" style="width: auto;">
+                    Also sync notes into blank Dossier &amp; Census fields
+                  </label>
+                </div>
                 <button type="submit" class="btn btn-sm">Save Sheet Changes</button>
               </div>
             </form>

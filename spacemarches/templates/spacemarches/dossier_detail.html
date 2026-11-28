@@ -20,6 +20,7 @@
     </p>
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+    <button type="button" id="sm-dossier-drawer-toggle" class="btn btn-sm" aria-expanded="false" aria-controls="sm-dossier-drawer">Sections &amp; Focus</button>
     <a class="btn btn-secondary btn-sm" href="{{ dossier_export_url }}">Export Markdown</a>
     <a class="btn btn-secondary btn-sm" href="{{ dossier_export_url }}?include_private=1">Export incl. GM Only</a>
     {% if linked_censuses %}
@@ -330,6 +331,31 @@
 <hr>
 <p class="text-muted" style="font-size: 0.8rem;">{{ rendered_attribution|default:attribution_notice }}</p>
 
+<button type="button" id="sm-dossier-drawer-fab" class="btn btn-sm sm-floating-nav-btn" aria-expanded="false" aria-controls="sm-dossier-drawer">
+  Sections &amp; Focus
+</button>
+
+<aside id="sm-dossier-drawer" class="sm-section-drawer" aria-label="Dossier Section Navigator and Focus" hidden>
+  <div class="sm-section-drawer-head">
+    <div>
+      <p class="sm-eyebrow" style="margin: 0;">Dossier Navigator</p>
+      <h2 style="margin: 0.1rem 0 0; font-size: 0.98rem;">Sections &amp; Focus</h2>
+    </div>
+    <button type="button" id="sm-dossier-drawer-close" class="btn btn-secondary btn-sm">Close</button>
+  </div>
+  <div class="sm-section-drawer-controls">
+    <input id="sm-dossier-nav-search" type="search" placeholder="Search [id], category, or prompt…" aria-label="Search dossier prompts">
+    <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;" id="sm-dossier-nav-filters">
+      <button type="button" class="btn btn-sm dossier-nav-mode" data-mode="core" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Core</button>
+      <button type="button" class="btn btn-secondary btn-sm dossier-nav-mode" data-mode="all" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">All</button>
+      <button type="button" class="btn btn-secondary btn-sm dossier-nav-mode" data-mode="unanswered" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">Unanswered</button>
+      <button type="button" class="btn btn-secondary btn-sm dossier-nav-mode" data-mode="gm_only" style="padding: 0.2rem 0.5rem; font-size: 0.75rem;">GM Only</button>
+      <button type="button" id="sm-dossier-focus-reset" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.75rem; margin-left: auto;" hidden>Reset Focus</button>
+    </div>
+  </div>
+  <div id="sm-dossier-nav-body" class="sm-section-drawer-body"></div>
+</aside>
+
 <script>
   (function () {
     const entryKindSelect = document.getElementById("global-entry-kind");
@@ -425,6 +451,9 @@
         emptyNotice.style.display = visibleTopCount === 0 ? "" : "none";
       }
       applyRedactionPreview();
+      if (typeof renderDossierNavTree === "function") {
+        renderDossierNavTree();
+      }
     }
 
     function renderRevisionHistory(card, revisions) {
@@ -715,6 +744,188 @@
         }
       });
     });
+
+    const dDrawer = document.getElementById("sm-dossier-drawer");
+    const dDrawerToggle = document.getElementById("sm-dossier-drawer-toggle");
+    const dDrawerFab = document.getElementById("sm-dossier-drawer-fab");
+    const dDrawerClose = document.getElementById("sm-dossier-drawer-close");
+    const dNavSearch = document.getElementById("sm-dossier-nav-search");
+    const dNavBody = document.getElementById("sm-dossier-nav-body");
+    const dFocusReset = document.getElementById("sm-dossier-focus-reset");
+    const dNavModeBtns = Array.from(document.querySelectorAll(".dossier-nav-mode"));
+
+    function setDossierDrawerOpen(open) {
+      if (!dDrawer) return;
+      if (open) {
+        dDrawer.removeAttribute("hidden");
+      } else {
+        dDrawer.setAttribute("hidden", "");
+      }
+      [dDrawerToggle, dDrawerFab].forEach((b) => {
+        if (b) b.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
+
+    if (dDrawerToggle) dDrawerToggle.addEventListener("click", () => setDossierDrawerOpen(dDrawer ? dDrawer.hasAttribute("hidden") : false));
+    if (dDrawerFab) dDrawerFab.addEventListener("click", () => setDossierDrawerOpen(dDrawer ? dDrawer.hasAttribute("hidden") : false));
+    if (dDrawerClose) dDrawerClose.addEventListener("click", () => setDossierDrawerOpen(false));
+
+    function syncNavModeButtons() {
+      dNavModeBtns.forEach((b) => {
+        b.classList.toggle("btn-secondary", (b.dataset.mode || "core") !== activeMode);
+      });
+      const selectedCat = categorySelect ? categorySelect.value : "";
+      if (dFocusReset) {
+        if (selectedCat || activeMode !== "core") {
+          dFocusReset.removeAttribute("hidden");
+        } else {
+          dFocusReset.setAttribute("hidden", "");
+        }
+      }
+    }
+
+    function renderDossierNavTree() {
+      if (!dNavBody) return;
+      const query = (dNavSearch ? dNavSearch.value : "").trim().toLowerCase();
+      const selectedCat = categorySelect ? categorySelect.value : "";
+      const cards = Array.from(document.querySelectorAll(".dossier-card"));
+      const catGroups = new Map();
+
+      cards.forEach((card) => {
+        const cat = card.dataset.category || "General";
+        if (!catGroups.has(cat)) catGroups.set(cat, []);
+        catGroups.get(cat).push(card);
+      });
+
+      dNavBody.textContent = "";
+      catGroups.forEach((groupCards, catName) => {
+        const matchingCards = groupCards.filter((card) => {
+          if (activeMode === "core" && (card.dataset.tier || "core") !== "core") return false;
+          if (activeMode === "unanswered" && card.dataset.answered === "true") return false;
+          if (activeMode === "gm_only" && card.dataset.gmOnly !== "true") return false;
+          if (!query) return true;
+          const promptEl = card.querySelector(":scope > p");
+          const promptTxt = promptEl ? promptEl.textContent : "";
+          const hay = ((card.dataset.questionId || "") + " " + catName + " " + promptTxt).toLowerCase();
+          return hay.includes(query);
+        });
+
+        if (!matchingCards.length) return;
+
+        const wrap = document.createElement("div");
+        wrap.className = "sm-nav-group";
+
+        const head = document.createElement("div");
+        head.className = "sm-nav-group-head";
+
+        const titleLink = document.createElement("a");
+        titleLink.className = "sm-nav-group-title";
+        titleLink.href = "#" + matchingCards[0].id;
+        const ansCount = groupCards.filter((c) => c.dataset.answered === "true").length;
+        titleLink.textContent = catName + " (" + ansCount + "/" + groupCards.length + ")";
+        titleLink.addEventListener("click", (ev) => {
+          ev.preventDefault();
+          const first = matchingCards[0];
+          if (!first) return;
+          if (first.dataset.tier !== "core") {
+            const allBtn = document.querySelector('.filter-pill[data-filter="all"]');
+            if (allBtn) allBtn.click();
+          }
+          const parentDetails = first.closest("details.dive-deeper");
+          if (parentDetails) parentDetails.open = true;
+          first.scrollIntoView({ behavior: "smooth", block: "center" });
+        });
+        head.appendChild(titleLink);
+
+        const focusBtn = document.createElement("button");
+        focusBtn.type = "button";
+        const isCatFocused = selectedCat === catName;
+        focusBtn.className = "btn " + (isCatFocused ? "" : "btn-secondary") + " btn-sm";
+        focusBtn.style.padding = "0.14rem 0.42rem";
+        focusBtn.style.fontSize = "0.72rem";
+        focusBtn.textContent = isCatFocused ? "Unfocus" : "Focus";
+        focusBtn.addEventListener("click", () => {
+          if (categorySelect) {
+            categorySelect.value = isCatFocused ? "" : catName;
+          }
+          applyFilters();
+          if (!isCatFocused && matchingCards[0]) {
+            matchingCards[0].scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+        head.appendChild(focusBtn);
+        wrap.appendChild(head);
+
+        const ul = document.createElement("ul");
+        ul.className = "sm-nav-list";
+        matchingCards.forEach((card) => {
+          const li = document.createElement("li");
+          const row = document.createElement("a");
+          row.className = "sm-nav-row" + (card.dataset.answered === "true" ? " is-answered" : "");
+          row.href = "#" + card.id;
+
+          const promptEl = card.querySelector(":scope > p");
+          const promptTxt = promptEl ? promptEl.textContent.trim() : "";
+          const snippet = promptTxt.length > 64 ? promptTxt.slice(0, 62) + "…" : promptTxt;
+
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = "[" + (card.dataset.questionId || "") + "] " + snippet;
+          row.appendChild(labelSpan);
+
+          const tag = document.createElement("span");
+          tag.className = "sm-code-tag";
+          tag.style.flexShrink = "0";
+          tag.textContent = card.dataset.answered === "true" ? "Saved" : (card.dataset.tier === "deep" ? "Deep" : "Open");
+          row.appendChild(tag);
+
+          row.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            if (categorySelect && categorySelect.value && categorySelect.value !== catName) {
+              categorySelect.value = "";
+            }
+            if ((card.dataset.tier || "core") !== "core" && activeMode === "core") {
+              const allPill = document.querySelector('.filter-pill[data-filter="all"]');
+              if (allPill) allPill.click();
+            } else {
+              applyFilters();
+            }
+            let pDetails = card.parentElement ? card.parentElement.closest("details.dive-deeper") : null;
+            while (pDetails) {
+              pDetails.open = true;
+              pDetails = pDetails.parentElement ? pDetails.parentElement.closest("details.dive-deeper") : null;
+            }
+            card.classList.remove("sm-focus-highlight");
+            void card.offsetWidth;
+            card.classList.add("sm-focus-highlight");
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+            const ta = card.querySelector('textarea[name="answer_text"]');
+            if (ta) window.setTimeout(() => ta.focus({ preventScroll: true }), 260);
+          });
+          li.appendChild(row);
+          ul.appendChild(li);
+        });
+        wrap.appendChild(ul);
+        dNavBody.appendChild(wrap);
+      });
+      syncNavModeButtons();
+    }
+
+    dNavModeBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const mode = btn.dataset.mode || "core";
+        const mainPill = document.querySelector('.filter-pill[data-filter="' + mode + '"]');
+        if (mainPill) mainPill.click();
+      });
+    });
+    if (dNavSearch) dNavSearch.addEventListener("input", renderDossierNavTree);
+    if (dFocusReset) {
+      dFocusReset.addEventListener("click", () => {
+        if (categorySelect) categorySelect.value = "";
+        if (entryKindFilter) entryKindFilter.value = "";
+        const corePill = document.querySelector('.filter-pill[data-filter="core"]');
+        if (corePill) corePill.click();
+      });
+    }
 
     syncStardateControls();
     applyFilters();

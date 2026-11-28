@@ -105,6 +105,130 @@ def get_sheet_skill_pack_choices() -> dict[str, list[dict[str, str]]]:
         grouped[slot].sort(key=lambda item: item["name"].lower())
     return grouped
 
+EP2_ENTRIES_PATH = Path(__file__).resolve().parent.parent / "fixtures" / "ep2_entries.json"
+
+APTITUDE_TEMPLATES: list[dict[str, Any]] = [
+    {"key": "actioneer", "name": "Actioneer", "aptitudes": {"cog": 10, "int": 15, "ref": 20, "sav": 10, "som": 20, "wil": 15}},
+    {"key": "extrovert", "name": "Extrovert", "aptitudes": {"cog": 10, "int": 20, "ref": 15, "sav": 20, "som": 15, "wil": 10}},
+    {"key": "facilitator", "name": "Facilitator", "aptitudes": {"cog": 15, "int": 15, "ref": 10, "sav": 20, "som": 10, "wil": 20}},
+    {"key": "factotum", "name": "Factotum", "aptitudes": {"cog": 15, "int": 15, "ref": 15, "sav": 15, "som": 15, "wil": 15}},
+    {"key": "inquirer", "name": "Inquirer", "aptitudes": {"cog": 20, "int": 20, "ref": 10, "sav": 15, "som": 10, "wil": 15}},
+    {"key": "survivor", "name": "Survivor", "aptitudes": {"cog": 15, "int": 10, "ref": 15, "sav": 10, "som": 20, "wil": 20}},
+    {"key": "thrillSeeker", "name": "Thrill Seeker", "aptitudes": {"cog": 20, "int": 10, "ref": 20, "sav": 15, "som": 15, "wil": 10}},
+]
+
+
+@lru_cache(maxsize=1)
+def _load_bubz_ep2_fixture() -> list[dict[str, Any]]:
+    if not EP2_ENTRIES_PATH.exists():
+        return []
+    try:
+        rows = json.loads(EP2_ENTRIES_PATH.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return []
+    return rows if isinstance(rows, list) else []
+
+
+def get_sheet_rep_choices() -> list[dict[str, str]]:
+    """Return official EP2e reputation networks from Ep2Entry or meshnet-pack-designs fallback."""
+    reps: list[dict[str, str]] = []
+    seen: set[str] = set()
+    db_rows = Ep2Entry.objects.filter(category=Ep2Entry.CATEGORY_REP, is_storyteller_only=False).select_related("design_pack")
+    for entry in db_rows:
+        eid = str(entry.entry_id or "").strip()
+        key = eid.rsplit(":", 1)[-1].strip() if ":" in eid else eid
+        pack_slug = entry.design_pack.slug if entry.design_pack_id and entry.design_pack else (entry.pack or "ep-crb")
+        if key and entry.name and entry.name not in seen:
+            seen.add(entry.name)
+            reps.append({"key": key, "name": entry.name, "pack": pack_slug, "uid": f"rep:{pack_slug}:{key}"})
+
+    for row in _load_meshnet_design_lookup().values():
+        if row.get("design_type") != "rep":
+            continue
+        key = str(row.get("key") or "").strip()
+        name = _unwrap_tagged_text(row.get("name"))
+        pack_slug = str(row.get("pack") or "ep-crb").strip()
+        if key and name and name not in seen:
+            seen.add(name)
+            reps.append({"key": key, "name": name, "pack": pack_slug, "uid": f"rep:{pack_slug}:{key}"})
+
+    reps.sort(key=lambda item: item["name"].lower())
+    return reps
+
+
+def get_sheet_morph_choices() -> list[dict[str, str]]:
+    """Return available morph options from Ep2Entry (Bubz/MeshNet) with fixture fallback."""
+    from spacemarches.services.meshnet_adapter_service import _convert_entry, _SAFE_KEY_RE
+
+    morphs: list[dict[str, str]] = []
+    seen_names: set[str] = set()
+    db_rows = (
+        Ep2Entry.objects.filter(category=Ep2Entry.CATEGORY_MORPH, is_storyteller_only=False)
+        .select_related("design_pack")
+        .order_by("name")
+    )
+    for entry in db_rows:
+        pack_slug = entry.design_pack.slug if entry.design_pack_id and entry.design_pack else (entry.pack or "bubz-ep2e")
+        pack_name = entry.design_pack.name if entry.design_pack_id and entry.design_pack else "EP2e Compendium"
+        converted = _convert_entry(entry, pack_name=pack_name)
+        if not converted:
+            continue
+        design_type, _design = converted
+        if (entry.source or "").strip().lower() == "meshnet" and ":" in (entry.entry_id or ""):
+            key = entry.entry_id.split(":", 2)[2]
+        else:
+            key = _SAFE_KEY_RE.sub("-", (entry.entry_id or slugify(entry.name) or f"entry-{entry.pk}").strip()).strip("-")[:48]
+        uid = f"{design_type}:{pack_slug}:{key}"
+        if entry.name and entry.name not in seen_names:
+            seen_names.add(entry.name)
+            morphs.append(
+                {
+                    "key": key,
+                    "name": entry.name,
+                    "design_type": design_type,
+                    "pack": pack_slug,
+                    "uid": uid,
+                    "entry_id": entry.entry_id,
+                }
+            )
+
+    if not morphs:
+        for row in _load_bubz_ep2_fixture():
+            fields = row.get("fields") if isinstance(row.get("fields"), dict) else {}
+            if fields.get("category") != Ep2Entry.CATEGORY_MORPH or fields.get("is_storyteller_only"):
+                continue
+            name = str(fields.get("name") or "").strip()
+            etype = str(fields.get("entry_type") or "").strip().lower()
+            sys_data = fields.get("system") if isinstance(fields.get("system"), dict) else {}
+            if etype == "biological":
+                dtype = "biologicalBody"
+            elif etype == "infomorph":
+                dtype = "digitalForm"
+            elif sys_data.get("isSwarm"):
+                dtype = "swarm"
+            else:
+                dtype = "syntheticShell"
+            eid = str(fields.get("entry_id") or slugify(name)).strip()
+            key = _SAFE_KEY_RE.sub("-", eid).strip("-")[:48]
+            pack_slug = str(fields.get("pack") or "bubz-ep2e").strip()
+            uid = f"{dtype}:{pack_slug}:{key}"
+            if name and name not in seen_names:
+                seen_names.add(name)
+                morphs.append(
+                    {
+                        "key": key,
+                        "name": name,
+                        "design_type": dtype,
+                        "pack": pack_slug,
+                        "uid": uid,
+                        "entry_id": eid,
+                    }
+                )
+
+    morphs.sort(key=lambda item: item["name"].lower())
+    return morphs
+
+
 MAX_RAW_CHARACTER_BYTES = 2_000_000
 
 
@@ -284,6 +408,8 @@ def extract_point_buy_summary(raw_data: dict[str, Any]) -> dict[str, Any]:
                     or _unwrap_tagged_text(mot.get("description"))
                 )
                 stance = str(mot.get("stance") or "").strip()
+                if not stance and "supportCause" in mot:
+                    stance = "+ Support" if mot.get("supportCause") else "- Oppose"
                 if goal:
                     motivations.append(f"{stance}: {goal}" if stance else goal)
 
@@ -356,6 +482,8 @@ def save_generated_character(
     if norm_source not in valid_sources:
         norm_source = GeneratedCharacter.SOURCE_POINT_BUY_V2
 
+    if norm_source == GeneratedCharacter.SOURCE_POINT_BUY_V2:
+        payload = ensure_valid_point_buy_payload(payload, character_name=character_name)
     summary = extract_point_buy_summary(payload)
     resolved_name = (character_name or "").strip() or summary.get("character_name") or "Unnamed Agent"
     resolved_name = resolved_name[:160]
@@ -376,6 +504,13 @@ def save_generated_character(
             existing = GeneratedCharacter.objects.filter(user=user, external_id=norm_ext_id).first()
 
         if existing is not None:
+            if norm_source == GeneratedCharacter.SOURCE_POINT_BUY_V2 and isinstance(existing.raw_data, dict):
+                prev_packs = existing.raw_data.get("packs")
+                inc_packs = payload.get("packs") if isinstance(payload.get("packs"), dict) else {}
+                if isinstance(prev_packs, dict) and prev_packs:
+                    payload["packs"] = {**prev_packs, **inc_packs}
+                    summary = extract_point_buy_summary(payload)
+                    summary["character_name"] = resolved_name
             existing.character_name = resolved_name
             existing.source_system = norm_source
             existing.raw_data = payload
@@ -488,7 +623,10 @@ def serialize_generated_character(character: GeneratedCharacter, *, include_raw:
         "export_md_url": reverse("spacemarches:character_export", kwargs={"pk": character.pk}) + "?format=md",
     }
     if include_raw:
-        data["raw_data"] = character.raw_data if isinstance(character.raw_data, dict) else {}
+        raw_val = character.raw_data if isinstance(character.raw_data, dict) else {}
+        if character.source_system == GeneratedCharacter.SOURCE_POINT_BUY_V2:
+            raw_val = ensure_valid_point_buy_payload(raw_val, character_name=character.character_name)
+        data["raw_data"] = raw_val
     return data
 
 
@@ -663,6 +801,145 @@ def _find_skill_pack_option(slot: str, selection: str) -> dict[str, str] | None:
     return None
 
 
+def _find_rep_option(selection: str) -> dict[str, str] | None:
+    needle = (selection or "").strip()
+    if not needle:
+        return None
+    needle_cf = needle.casefold()
+    for opt in get_sheet_rep_choices():
+        if opt["key"].casefold() == needle_cf or opt["uid"].casefold() == needle_cf or opt["name"].casefold() == needle_cf:
+            return opt
+    return None
+
+
+def _find_morph_option(selection: str) -> dict[str, str] | None:
+    needle = (selection or "").strip()
+    if not needle:
+        return None
+    needle_cf = needle.casefold()
+    for opt in get_sheet_morph_choices():
+        if opt["uid"].casefold() == needle_cf or opt["key"].casefold() == needle_cf or opt["name"].casefold() == needle_cf:
+            return opt
+    return None
+
+
+def ensure_valid_point_buy_payload(
+    raw_data: dict[str, Any] | None,
+    *,
+    character_name: str = "",
+) -> dict[str, Any]:
+    """Normalize a partial or bare PointBuy dict into valid PointBuyExported JSON for MeshNet."""
+    data = copy.deepcopy(raw_data) if isinstance(raw_data, dict) else {}
+    if isinstance(data.get("pointBuy"), dict):
+        pb = data["pointBuy"]
+    else:
+        pb = dict(data)
+        data = {}
+
+    apts = pb.get("aptitudes") if isinstance(pb.get("aptitudes"), dict) else {}
+    norm_apts: dict[str, int] = {}
+    for k in ("cog", "int", "ref", "sav", "som", "wil"):
+        raw_v = apts.get(k, 15)
+        try:
+            val = int(raw_v)
+        except (TypeError, ValueError):
+            val = 15
+        norm_apts[k] = max(0, min(30, val))
+
+    resolved_name = _unwrap_tagged_text(pb.get("name")) or (character_name or "").strip() or "Unnamed Agent"
+    flex_raw = pb.get("flexPoints", 1)
+    try:
+        flex_val = max(0, min(3, int(flex_raw)))
+    except (TypeError, ValueError):
+        flex_val = 1
+
+    norm_pb: dict[str, Any] = {
+        **pb,
+        "aptitudes": norm_apts,
+        "concept": pb.get("concept") if isinstance(pb.get("concept"), str) else _encode_tagged_input(_unwrap_tagged_text(pb.get("concept"))),
+        "config": pb.get("config") if isinstance(pb.get("config"), dict) else {},
+        "currentStep": str(pb.get("currentStep") or "background"),
+        "description": pb.get("description") if isinstance(pb.get("description"), str) else "h_",
+        "egoTraits": pb.get("egoTraits") if isinstance(pb.get("egoTraits"), dict) else {},
+        "egoType": pb.get("egoType") if isinstance(pb.get("egoType"), str) else "i_Transhuman",
+        "expertTraining": pb.get("expertTraining") if isinstance(pb.get("expertTraining"), dict) else {},
+        "flexPoints": flex_val,
+        "fullName": pb.get("fullName") if isinstance(pb.get("fullName"), str) else "i_",
+        "gear": pb.get("gear") if isinstance(pb.get("gear"), dict) else {},
+        "gender": pb.get("gender") if isinstance(pb.get("gender"), str) else "i_",
+        "languages": pb.get("languages") if isinstance(pb.get("languages"), list) else [],
+        "morphs": pb.get("morphs") if isinstance(pb.get("morphs"), dict) else {},
+        "motivations": pb.get("motivations") if isinstance(pb.get("motivations"), dict) else {},
+        "museName": pb.get("museName") if isinstance(pb.get("museName"), str) else "i_",
+        "name": pb.get("name") if (isinstance(pb.get("name"), str) and pb["name"] != "i_") else _encode_tagged_input(resolved_name),
+        "reputations": pb.get("reputations") if isinstance(pb.get("reputations"), dict) else {},
+        "skillPacks": pb.get("skillPacks") if isinstance(pb.get("skillPacks"), dict) else {},
+        "skills": pb.get("skills") if isinstance(pb.get("skills"), dict) else {},
+        "sleights": pb.get("sleights") if isinstance(pb.get("sleights"), dict) else {},
+        "substrains": pb.get("substrains") if isinstance(pb.get("substrains"), dict) else {},
+    }
+
+    out = {
+        **{k: v for k, v in data.items() if k != "pointBuy"},
+        "type": "point-buy-exported",
+        "createdAt": str(data.get("createdAt") or timezone.now().isoformat()),
+        "packs": data.get("packs") if isinstance(data.get("packs"), dict) else {},
+        "pointBuy": norm_pb,
+    }
+    return out
+
+
+def _embed_morph_pack_design(raw_data: dict[str, Any], opt: dict[str, str]) -> None:
+    """Ensure raw_data['packs'] embeds external morph design definitions (e.g., bubz-ep2e)."""
+    from spacemarches.services.meshnet_adapter_service import _convert_entry
+
+    entry_id = str(opt.get("entry_id") or "").strip()
+    pack_name = "EP2e Compendium"
+    design_type = opt.get("design_type") or "biologicalBody"
+    design_dict: dict[str, Any] | None = None
+
+    if entry_id:
+        entry = Ep2Entry.objects.filter(entry_id=entry_id).select_related("design_pack").first()
+        if entry is None:
+            for row in _load_bubz_ep2_fixture():
+                fields = row.get("fields") if isinstance(row, dict) and isinstance(row.get("fields"), dict) else {}
+                if str(fields.get("entry_id") or "").strip() == entry_id:
+                    entry = Ep2Entry(
+                        entry_id=entry_id,
+                        name=str(fields.get("name") or opt.get("name") or ""),
+                        category=str(fields.get("category") or Ep2Entry.CATEGORY_MORPH),
+                        entry_type=str(fields.get("entry_type") or ""),
+                        pack=str(fields.get("pack") or opt.get("pack") or "bubz-ep2e"),
+                        summary=str(fields.get("summary") or ""),
+                        description_html=str(fields.get("description_html") or ""),
+                        reference=str(fields.get("reference") or ""),
+                        system=fields.get("system") if isinstance(fields.get("system"), dict) else {},
+                    )
+                    break
+        else:
+            if entry.design_pack_id and entry.design_pack:
+                pack_name = entry.design_pack.name
+        if entry is not None:
+            converted = _convert_entry(entry, pack_name=pack_name)
+            if converted:
+                design_type, design_dict = converted
+
+    if design_dict is None:
+        design_dict = {
+            "name": _encode_tagged_input(opt.get("name") or opt.get("key") or "Morph"),
+            "type": design_type,
+        }
+
+    raw_packs = raw_data.setdefault("packs", {})
+    pack_bucket = raw_packs.setdefault(
+        opt["pack"],
+        {"name": _encode_tagged_input(pack_name), "designs": {}},
+    )
+    designs_bucket = pack_bucket.setdefault("designs", {})
+    typed_bucket = designs_bucket.setdefault(design_type, {})
+    typed_bucket[opt["key"]] = design_dict
+
+
 def update_sheet_profile_fields(
     user,
     character: GeneratedCharacter,
@@ -673,24 +950,36 @@ def update_sheet_profile_fields(
     ego_type: str | None = None,
     gender: str | None = None,
     muse_name: str | None = None,
+    description: str | None = None,
+    languages: list[str] | str | None = None,
     skill_packs: dict[str, str] | None = None,
+    aptitudes: dict[str, int] | None = None,
+    aptitude_template: str | None = None,
+    flex_points: int | str | None = None,
+    primary_morph: str | None = None,
+    reputations: dict[str, int] | None = None,
+    motivation_primary: dict[str, Any] | None = None,
     sync_linked_names: bool = True,
+    sync_to_narratives: bool = False,
     acknowledge_only: bool = False,
     source: str = "web",
 ) -> tuple[GeneratedCharacter, list[str]]:
-    """Update core profile & skillPack choices directly on a GeneratedCharacter's Point-Buy JSON.
+    """Update Point-Buy profile & mechanical tools directly on a GeneratedCharacter.
 
-    Keeps raw_data['pointBuy'], summary, and optionally linked Dossier/Census names synchronized,
-    and clears pending sync flags by recording a fresh spacemarchesSync checkpoint.
+    Supports identity fields, skillPacks, aptitudes/template/flex, primary morph,
+    reputation scores, primary motivation, and languages, keeping summary, PointBuyExported
+    payload, MeshNet sync metadata, and optionally Census/Dossier narratives in sync.
     """
     if user is None or not getattr(user, "is_authenticated", False):
         raise ValueError("Authenticated user required.")
     if character.user_id != user.pk and not (getattr(user, "is_staff", False) or getattr(user, "is_superuser", False)):
         raise ValueError("You do not have permission to update this character sheet.")
 
-    raw_data = copy.deepcopy(character.raw_data) if isinstance(character.raw_data, dict) else {}
-    pb = raw_data.get("pointBuy") if isinstance(raw_data.get("pointBuy"), dict) else {}
-    raw_data["pointBuy"] = pb
+    raw_data = ensure_valid_point_buy_payload(
+        character.raw_data if isinstance(character.raw_data, dict) else {},
+        character_name=character.character_name,
+    )
+    pb = raw_data["pointBuy"]
 
     changed_fields: list[str] = []
     new_char_name = character.character_name
@@ -715,8 +1004,178 @@ def update_sheet_profile_fields(
             elif pb_key not in pb and cleaned:
                 pb[pb_key] = _encode_tagged_input(cleaned)
 
+        if description is not None:
+            desc_clean = str(description).strip()
+            existing_desc = _unwrap_tagged_text(pb.get("description"))
+            if desc_clean != existing_desc:
+                pb["description"] = f"h_{desc_clean}" if desc_clean else "h_"
+                changed_fields.append("Description")
+
+        if languages is not None:
+            if isinstance(languages, str):
+                lang_items = [part.strip() for part in languages.split(",") if part.strip()]
+            elif isinstance(languages, list):
+                lang_items = [str(part).strip() for part in languages if str(part).strip()]
+            else:
+                lang_items = []
+            # Deduplicate preserving order
+            dedup_langs: list[str] = []
+            seen_l: set[str] = set()
+            for item in lang_items:
+                if item.casefold() not in seen_l:
+                    seen_l.add(item.casefold())
+                    dedup_langs.append(item)
+            old_langs = [_unwrap_tagged_text(x) for x in (pb.get("languages") or []) if _unwrap_tagged_text(x)]
+            if dedup_langs != old_langs:
+                pb["languages"] = [_encode_tagged_input(x) for x in dedup_langs[:15]]
+                changed_fields.append("Languages")
+
         if character_name is not None and str(character_name).strip():
             new_char_name = str(character_name).strip()[:160]
+
+        if aptitude_template is not None:
+            tpl_needle = str(aptitude_template or "").strip()
+            if not tpl_needle:
+                if "aptitudeTemplate" in pb:
+                    pb.pop("aptitudeTemplate", None)
+                    changed_fields.append("Aptitude Template")
+            else:
+                tpl = next((t for t in APTITUDE_TEMPLATES if t["key"] == tpl_needle or t["name"].casefold() == tpl_needle.casefold()), None)
+                if tpl is None:
+                    raise ValueError(f"Unknown aptitude template '{tpl_needle}'.")
+                cur_apts_before = pb.get("aptitudes") if isinstance(pb.get("aptitudes"), dict) else {}
+                tpl_changed = pb.get("aptitudeTemplate") != tpl["key"]
+                if tpl_changed:
+                    pb["aptitudeTemplate"] = tpl["key"]
+                    changed_fields.append(f"Aptitude Template ({tpl['name']})")
+                # Apply template aptitudes if no explicit override OR form submitted unchanged prior values alongside a new template
+                apts_unchanged = bool(aptitudes) and all(
+                    int(aptitudes.get(k, cur_apts_before.get(k, 15))) == int(cur_apts_before.get(k, 15))
+                    for k in ("cog", "int", "ref", "sav", "som", "wil")
+                )
+                if not aptitudes or (tpl_changed and apts_unchanged):
+                    pb["aptitudes"] = dict(tpl["aptitudes"])
+                    aptitudes = None
+                    if "Aptitudes" not in changed_fields:
+                        changed_fields.append("Aptitudes")
+
+        if isinstance(aptitudes, dict) and aptitudes:
+            cur_apts = pb.get("aptitudes") if isinstance(pb.get("aptitudes"), dict) else {}
+            next_apts = {k: int(cur_apts.get(k, 15)) for k in ("cog", "int", "ref", "sav", "som", "wil")}
+            apt_changed = False
+            for k in ("cog", "int", "ref", "sav", "som", "wil"):
+                if k in aptitudes and aptitudes[k] is not None:
+                    clamped = max(5, min(30, int(aptitudes[k])))
+                    if next_apts[k] != clamped:
+                        next_apts[k] = clamped
+                        apt_changed = True
+            if apt_changed:
+                pb["aptitudes"] = next_apts
+                if "Aptitudes" not in changed_fields:
+                    changed_fields.append("Aptitudes")
+
+        if flex_points is not None and str(flex_points).strip() != "":
+            try:
+                clamped_flex = max(0, min(3, int(flex_points)))
+            except (TypeError, ValueError) as exc:
+                raise ValueError("Flex points must be an integer between 0 and 3.") from exc
+            if pb.get("flexPoints") != clamped_flex:
+                pb["flexPoints"] = clamped_flex
+                changed_fields.append("Flex Points")
+
+        if primary_morph is not None:
+            req_morph = str(primary_morph or "").strip()
+            cur_morphs = pb.get("morphs") if isinstance(pb.get("morphs"), dict) else {}
+            first_key = next(iter(cur_morphs), None)
+            first_label = _extract_design_label(cur_morphs[first_key], raw_data.get("packs") or {}) if first_key else ""
+            if not req_morph:
+                if first_key:
+                    cur_morphs.pop(first_key, None)
+                    pb["morphs"] = cur_morphs
+                    changed_fields.append("Morph")
+            else:
+                morph_opt = _find_morph_option(req_morph)
+                if morph_opt is None:
+                    raise ValueError(f"Unknown morph option: '{req_morph}'.")
+                if morph_opt["name"].casefold() != first_label.casefold():
+                    slot_key = first_key or "m1"
+                    dtype = morph_opt["design_type"]
+                    morph_entry: dict[str, Any] = {
+                        "type": dtype,
+                        "design": {"uid": morph_opt["uid"]},
+                        "rechargeState": {},
+                        "spentPools": {},
+                    }
+                    if dtype == "digitalForm":
+                        morph_entry["meshHealthState"] = {}
+                    else:
+                        morph_entry["physicalHealthState"] = {}
+                    if dtype == "biologicalBody":
+                        morph_entry["sex"] = "i_"
+                    cur_morphs[slot_key] = morph_entry
+                    pb["morphs"] = cur_morphs
+                    _embed_morph_pack_design(raw_data, morph_opt)
+                    changed_fields.append(f"Morph ({morph_opt['name']})")
+
+        if isinstance(reputations, dict):
+            cur_reps = pb.get("reputations") if isinstance(pb.get("reputations"), dict) else {}
+            rep_choices = get_sheet_rep_choices()
+            rep_lookup = {r["key"].casefold(): r for r in rep_choices}
+            rep_lookup.update({r["name"].casefold(): r for r in rep_choices})
+            rep_changed = False
+            for r_needle, pts_raw in reputations.items():
+                opt = rep_lookup.get(str(r_needle or "").strip().casefold()) or _find_rep_option(str(r_needle or ""))
+                if opt is None:
+                    continue
+                if pts_raw is None or str(pts_raw).strip() == "":
+                    continue
+                pts = max(-100, min(100, int(pts_raw)))
+                existing_key = next(
+                    (
+                        k for k, v in cur_reps.items()
+                        if isinstance(v, dict)
+                        and isinstance(v.get("design"), dict)
+                        and (
+                            v["design"].get("uid") == opt["uid"]
+                            or str(v["design"].get("uid") or "").endswith(f":{opt['key']}")
+                        )
+                    ),
+                    None,
+                )
+                target_key = existing_key or f"rep_{opt['key']}"
+                if pts == 0 and existing_key is None:
+                    continue
+                old_pts = cur_reps.get(target_key, {}).get("points") if existing_key else None
+                if old_pts != pts:
+                    cur_reps[target_key] = {
+                        "design": {"uid": opt["uid"]},
+                        "isTracked": True,
+                        "points": pts,
+                        "spentFavors": (cur_reps.get(target_key, {}) or {}).get("spentFavors") or {},
+                    }
+                    rep_changed = True
+            if rep_changed:
+                pb["reputations"] = cur_reps
+                changed_fields.append("Reputations")
+
+        if isinstance(motivation_primary, dict):
+            cause_text = str(motivation_primary.get("cause") or "").strip()
+            support_cause = bool(motivation_primary.get("support_cause", True))
+            cur_mots = pb.get("motivations") if isinstance(pb.get("motivations"), dict) else {}
+            first_mot_key = next(iter(cur_mots), None) or "mot1"
+            if cause_text:
+                existing_mot = cur_mots.get(first_mot_key) if isinstance(cur_mots.get(first_mot_key), dict) else {}
+                old_cause = _unwrap_tagged_text(existing_mot.get("cause"))
+                old_support = bool(existing_mot.get("supportCause", True))
+                if cause_text != old_cause or support_cause != old_support or first_mot_key not in cur_mots:
+                    cur_mots[first_mot_key] = {
+                        "cause": _encode_tagged_input(cause_text),
+                        "description": existing_mot.get("description") or "h_",
+                        "goals": existing_mot.get("goals") if isinstance(existing_mot.get("goals"), dict) else {},
+                        "supportCause": support_cause,
+                    }
+                    pb["motivations"] = cur_mots
+                    changed_fields.append("Motivations")
 
         if isinstance(skill_packs, dict):
             pb_packs = pb.get("skillPacks") if isinstance(pb.get("skillPacks"), dict) else {}
@@ -746,7 +1205,6 @@ def update_sheet_profile_fields(
                         "design": {"uid": opt["uid"]},
                         "skills": {},
                     }
-                    # Ensure bundled partial packs include the selected skillPack when packs dict is present
                     if isinstance(raw_packs, dict):
                         pack_bucket = raw_packs.setdefault(
                             opt["pack"],
@@ -804,5 +1262,10 @@ def update_sheet_profile_fields(
                 if census.character_name != new_char_name:
                     census.character_name = new_char_name
                     census.save(update_fields=["character_name", "updated_at"])
+
+        if sync_to_narratives and changed_fields:
+            from spacemarches.services.character_cross_sync import sync_sheet_updates_to_narratives
+
+            sync_sheet_updates_to_narratives(character, changed_fields)
 
     return character, changed_fields

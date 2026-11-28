@@ -1,6 +1,8 @@
 <article
+  id="dossier-q-{{ node.id }}"
   class="dossier-card"
   data-question-id="{{ node.id }}"
+  data-has-sheet="{% if node.sheet_hint %}true{% else %}false{% endif %}"
   data-tier="{{ node.tier }}"
   data-category="{{ node.category }}"
   data-temporal-scope="{{ node.temporal_scope|default:'present' }}"
@@ -141,6 +143,69 @@
                 <input id="d-hint-muse-{{ node.id }}" type="text" name="muse_name" value="{{ sheet_context.muse_name }}" maxlength="120" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
               </div>
             {% endif %}
+            {% if "morph" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-morph-{{ node.id }}" style="font-size: 0.74rem; display: block;">Primary Morph</label>
+                <select id="d-hint-morph-{{ node.id }}" name="primary_morph" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; None &mdash;</option>
+                  {% for m in morph_choices %}
+                    <option value="{{ m.uid }}" {% if sheet_context.primary_morph|lower == m.name|lower %}selected{% endif %}>{{ m.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+            {% endif %}
+            {% if "aptitudes" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-apttpl-{{ node.id }}" style="font-size: 0.74rem; display: block;">Aptitude Template</label>
+                <select id="d-hint-apttpl-{{ node.id }}" name="aptitude_template" data-sm-apt-template style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="">&mdash; Custom &mdash;</option>
+                  {% for tpl in aptitude_templates %}
+                    <option
+                      value="{{ tpl.key }}"
+                      data-cog="{{ tpl.aptitudes.cog }}"
+                      data-int="{{ tpl.aptitudes.int }}"
+                      data-ref="{{ tpl.aptitudes.ref }}"
+                      data-sav="{{ tpl.aptitudes.sav }}"
+                      data-som="{{ tpl.aptitudes.som }}"
+                      data-wil="{{ tpl.aptitudes.wil }}"
+                      {% if sheet_context.aptitude_template == tpl.key %}selected{% endif %}
+                    >{{ tpl.name }}</option>
+                  {% endfor %}
+                </select>
+              </div>
+              <div style="display: flex; gap: 0.3rem; flex-wrap: wrap;">
+                <label style="font-size: 0.7rem;">COG <input type="number" name="aptitude_cog" min="5" max="30" value="{{ sheet_context.aptitudes.cog|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">INT <input type="number" name="aptitude_int" min="5" max="30" value="{{ sheet_context.aptitudes.int|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">REF <input type="number" name="aptitude_ref" min="5" max="30" value="{{ sheet_context.aptitudes.ref|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">SAV <input type="number" name="aptitude_sav" min="5" max="30" value="{{ sheet_context.aptitudes.sav|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">SOM <input type="number" name="aptitude_som" min="5" max="30" value="{{ sheet_context.aptitudes.som|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                <label style="font-size: 0.7rem;">WIL <input type="number" name="aptitude_wil" min="5" max="30" value="{{ sheet_context.aptitudes.wil|default:15 }}" style="width: 3.4rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+              </div>
+            {% endif %}
+            {% if "reputations" in node.sheet_hint.editable_fields %}
+              <div style="display: flex; gap: 0.35rem; flex-wrap: wrap;">
+                {% for rep in sheet_context.rep_rows %}
+                  <label style="font-size: 0.7rem;">{{ rep.name }} <input type="number" name="rep_{{ rep.key }}" min="-100" max="100" value="{{ rep.points }}" placeholder="0" style="width: 3.8rem; padding: 0.2rem 0.3rem; font-size: 0.78rem;"></label>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if "motivations" in node.sheet_hint.editable_fields %}
+              <div>
+                <label for="d-hint-motsup-{{ node.id }}" style="font-size: 0.74rem; display: block;">Stance</label>
+                <select id="d-hint-motsup-{{ node.id }}" name="motivation_support" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+                  <option value="1" {% if sheet_context.motivation_primary_support %}selected{% endif %}>+ Support</option>
+                  <option value="0" {% if not sheet_context.motivation_primary_support %}selected{% endif %}>- Oppose</option>
+                </select>
+              </div>
+              <div>
+                <label for="d-hint-mot-{{ node.id }}" style="font-size: 0.74rem; display: block;">Primary Motivation</label>
+                <input id="d-hint-mot-{{ node.id }}" type="text" name="motivation_cause" value="{{ sheet_context.motivation_primary_cause }}" maxlength="200" style="padding: 0.25rem 0.45rem; font-size: 0.8rem;">
+              </div>
+            {% endif %}
+            <label style="display: inline-flex; align-items: center; gap: 0.25rem; font-size: 0.74rem; margin: 0 0.25rem 0 0; cursor: pointer;">
+              <input type="checkbox" name="sync_to_narratives" value="1" style="width: auto;">
+              Sync empty prompt
+            </label>
             <button type="submit" class="btn btn-sm">Update Sheet</button>
           </form>
         </details>

@@ -194,6 +194,48 @@ def build_sheet_prompt_context(character: GeneratedCharacter | None) -> dict[str
     languages = _pick("languages", []) or []
     traits = _pick("traits", []) or []
     sleights = _pick("sleights", []) or []
+    aptitudes = _pick("aptitudes", {}) or {}
+    flex = _pick("flex", 1)
+    pb = raw_data.get("pointBuy") if isinstance(raw_data.get("pointBuy"), dict) else {}
+    apt_template = str(pb.get("aptitudeTemplate") or "").strip()
+
+    first_mot_cause = ""
+    first_mot_support = True
+    pb_mots = pb.get("motivations") if isinstance(pb.get("motivations"), dict) else {}
+    if pb_mots:
+        first_mot = next(iter(pb_mots.values()), {})
+        if isinstance(first_mot, dict):
+            c_val = first_mot.get("cause")
+            if isinstance(c_val, dict):
+                first_mot_cause = str(c_val.get("custom") or c_val.get("text") or "").strip()
+            elif isinstance(c_val, str):
+                first_mot_cause = c_val[2:].strip() if c_val.startswith(("i_", "m_", "h_")) else c_val.strip()
+            first_mot_support = bool(first_mot.get("supportCause", True))
+
+    from spacemarches.services.character_sync_service import get_sheet_rep_choices
+
+    rep_ci = {str(k).strip().casefold(): v for k, v in reputations.items()}
+    rep_rows = []
+    for rep_opt in get_sheet_rep_choices():
+        rname = rep_opt["name"]
+        pts = reputations.get(rname)
+        if pts is None:
+            pts = rep_ci.get(rname.casefold())
+        if pts is None:
+            pts = rep_ci.get(rep_opt["key"].casefold())
+        rep_rows.append(
+            {
+                "key": rep_opt["key"],
+                "name": rname,
+                "points": "" if pts is None else pts,
+            }
+        )
+
+    apt_parts = [
+        f"{k.upper()} {aptitudes.get(k, '-')}"
+        for k in ("cog", "int", "ref", "sav", "som", "wil")
+        if aptitudes.get(k) is not None
+    ]
 
     ctx = {
         "id": character.pk,
@@ -208,13 +250,22 @@ def build_sheet_prompt_context(character: GeneratedCharacter | None) -> dict[str
         "career": skill_packs.get("career", ""),
         "interest": skill_packs.get("interest", ""),
         "faction": skill_packs.get("faction", ""),
+        "aptitudes": dict(aptitudes),
+        "aptitudes_display": " · ".join(apt_parts),
+        "aptitude_template": apt_template,
+        "flex": int(flex) if isinstance(flex, (int, float)) else 1,
         "morphs": list(morphs),
+        "primary_morph": str(morphs[0]) if morphs else "",
         "morphs_display": ", ".join(str(m) for m in morphs if m),
         "reputations": dict(reputations),
+        "rep_rows": rep_rows,
         "reputations_display": ", ".join(f"{k}: {v}" for k, v in reputations.items()),
         "motivations": list(motivations),
         "motivations_display": "; ".join(str(m) for m in motivations if m),
+        "motivation_primary_cause": first_mot_cause,
+        "motivation_primary_support": first_mot_support,
         "languages": list(languages),
+        "languages_display": ", ".join(str(x) for x in languages if x),
         "traits": list(traits),
         "sleights": list(sleights),
     }
@@ -241,13 +292,18 @@ def get_census_question_sheet_hint(question_id: str, sheet_ctx: dict[str, Any] |
             reminders.append(("Background", sheet_ctx["background"]))
         if sheet_ctx.get("ego_type"):
             reminders.append(("Ego Type", sheet_ctx["ego_type"]))
-        editable = ["background", "ego_type"]
+        if sheet_ctx.get("aptitudes_display"):
+            reminders.append(("Aptitudes", sheet_ctx["aptitudes_display"]))
+        editable = ["background", "ego_type", "aptitudes"]
     elif qid in ("3", "11a"):
         if sheet_ctx.get("morphs_display"):
             reminders.append(("Morph", sheet_ctx["morphs_display"]))
-        if qid == "11a" and sheet_ctx.get("gender"):
-            reminders.append(("Gender", sheet_ctx["gender"]))
-            editable = ["gender"]
+        if qid == "3":
+            editable = ["morph"]
+        if qid == "11a":
+            if sheet_ctx.get("gender"):
+                reminders.append(("Gender", sheet_ctx["gender"]))
+            editable = ["gender", "morph"]
     elif qid in ("4", "6", "11k") or qid.startswith("6.1"):
         if sheet_ctx.get("faction"):
             reminders.append(("Faction", sheet_ctx["faction"]))
@@ -267,9 +323,11 @@ def get_census_question_sheet_hint(question_id: str, sheet_ctx: dict[str, Any] |
     elif qid == "7":
         if sheet_ctx.get("reputations_display"):
             reminders.append(("Reputations", sheet_ctx["reputations_display"]))
+        editable = ["reputations"]
     elif qid in ("10", "11u"):
         if sheet_ctx.get("motivations_display"):
             reminders.append(("Motivations", sheet_ctx["motivations_display"]))
+        editable = ["motivations"]
     elif qid == "12" or qid.startswith("12"):
         if sheet_ctx.get("muse_name"):
             reminders.append(("Muse", sheet_ctx["muse_name"]))
@@ -309,10 +367,14 @@ def get_dossier_question_sheet_hint(question_id: str, sheet_ctx: dict[str, Any] 
             reminders.append(("Ego Type", sheet_ctx["ego_type"]))
         if sheet_ctx.get("background"):
             reminders.append(("Background", sheet_ctx["background"]))
-        editable = ["background", "ego_type"]
+        if sheet_ctx.get("aptitudes_display"):
+            reminders.append(("Aptitudes", sheet_ctx["aptitudes_display"]))
+        editable = ["background", "ego_type", "aptitudes"]
     elif qid in ("3", "12A"):
         if sheet_ctx.get("morphs_display"):
             reminders.append(("Morph", sheet_ctx["morphs_display"]))
+        if qid == "3":
+            editable = ["morph"]
     elif qid in ("4", "6.1j", "8"):
         if sheet_ctx.get("background"):
             reminders.append(("Background", sheet_ctx["background"]))
@@ -336,9 +398,12 @@ def get_dossier_question_sheet_hint(question_id: str, sheet_ctx: dict[str, Any] 
     elif qid == "6.2g":
         if sheet_ctx.get("reputations_display"):
             reminders.append(("Reputations", sheet_ctx["reputations_display"]))
+        editable = ["reputations"]
     elif qid in ("9", "11a"):
         if sheet_ctx.get("motivations_display"):
             reminders.append(("Motivations", sheet_ctx["motivations_display"]))
+        if qid == "9":
+            editable = ["motivations"]
     elif qid == "6.2b":
         if sheet_ctx.get("traits"):
             reminders.append(("Ego Traits", ", ".join(sheet_ctx["traits"])))
@@ -346,6 +411,107 @@ def get_dossier_question_sheet_hint(question_id: str, sheet_ctx: dict[str, Any] 
     if not reminders and not editable:
         return None
     return {"reminders": reminders, "editable_fields": editable}
+
+
+def sync_sheet_updates_to_narratives(
+    character: GeneratedCharacter,
+    changed_fields: list[str] | None = None,
+) -> dict[str, int]:
+    """Propagate structured sheet summary notes to blank or sheet-managed Census/Dossier prompts.
+
+    Never overwrites player-written prose: only populates empty responses or existing
+    '[Sheet Profile ...]' managed lines when requested.
+    """
+    sheet_ctx = build_sheet_prompt_context(character)
+    if not sheet_ctx:
+        return {"census": 0, "dossier": 0}
+
+    from spacemarches.services.census_service import save_census_answer
+    from spacemarches.services.dossier_service import save_dossier_answer
+
+    prefix = "[Sheet Profile"
+    notes_by_census_qid: dict[str, str] = {}
+    if sheet_ctx.get("character_name") or sheet_ctx.get("full_name"):
+        notes_by_census_qid["11j"] = (
+            f"{prefix} — Identity] Name: {sheet_ctx.get('character_name') or '—'}"
+            + (f" (Full Name: {sheet_ctx['full_name']})" if sheet_ctx.get("full_name") else "")
+        )
+    if sheet_ctx.get("background") or sheet_ctx.get("ego_type") or sheet_ctx.get("aptitudes_display"):
+        parts = []
+        if sheet_ctx.get("ego_type"):
+            parts.append(f"Ego Type: {sheet_ctx['ego_type']}")
+        if sheet_ctx.get("background"):
+            parts.append(f"Background: {sheet_ctx['background']}")
+        if sheet_ctx.get("aptitudes_display"):
+            parts.append(f"Aptitudes: {sheet_ctx['aptitudes_display']} · Flex {sheet_ctx.get('flex', 1)}")
+        notes_by_census_qid["2"] = f"{prefix} — Origin] " + "; ".join(parts)
+    if sheet_ctx.get("morphs_display"):
+        notes_by_census_qid["3"] = f"{prefix} — Morph] Current morph: {sheet_ctx['morphs_display']}"
+    if sheet_ctx.get("faction") or sheet_ctx.get("background"):
+        parts = []
+        if sheet_ctx.get("faction"):
+            parts.append(f"Faction: {sheet_ctx['faction']}")
+        if sheet_ctx.get("background"):
+            parts.append(f"Background: {sheet_ctx['background']}")
+        notes_by_census_qid["4"] = f"{prefix} — Affiliation] " + "; ".join(parts)
+    if sheet_ctx.get("concept") or sheet_ctx.get("career") or sheet_ctx.get("interest"):
+        parts = []
+        if sheet_ctx.get("concept"):
+            parts.append(f"Concept: {sheet_ctx['concept']}")
+        if sheet_ctx.get("career"):
+            parts.append(f"Career: {sheet_ctx['career']}")
+        if sheet_ctx.get("interest"):
+            parts.append(f"Interest: {sheet_ctx['interest']}")
+        notes_by_census_qid["5"] = f"{prefix} — Vocation] " + "; ".join(parts)
+    if sheet_ctx.get("reputations_display"):
+        notes_by_census_qid["7"] = f"{prefix} — Reputation] {sheet_ctx['reputations_display']}"
+    if sheet_ctx.get("motivations_display"):
+        notes_by_census_qid["10"] = f"{prefix} — Motivations] {sheet_ctx['motivations_display']}"
+    if sheet_ctx.get("muse_name"):
+        notes_by_census_qid["12"] = f"{prefix} — Muse] {sheet_ctx['muse_name']}"
+    if sheet_ctx.get("gender"):
+        notes_by_census_qid["13a"] = f"{prefix} — Gender] {sheet_ctx['gender']}"
+
+    census_count = 0
+    dossier_count = 0
+    censuses = list(EclipsePhaseCensus.objects.filter(character=character))
+    dossiers: list[CharacterDossier] = []
+    if character.dossier_id and character.dossier is not None:
+        dossiers.append(character.dossier)
+
+    for census in censuses:
+        responses = census.responses if isinstance(census.responses, dict) else {}
+        for c_qid, text_note in notes_by_census_qid.items():
+            cur = responses.get(c_qid)
+            cur_ans = str(cur.get("answer", "")).strip() if isinstance(cur, dict) else ""
+            if not cur_ans or cur_ans.startswith(prefix):
+                if cur_ans != text_note:
+                    save_census_answer(census, c_qid, text_note, propagate=False)
+                    census_count += 1
+
+    for dossier in dossiers:
+        d_responses = dossier.responses if isinstance(dossier.responses, dict) else {}
+        for c_qid, text_note in notes_by_census_qid.items():
+            d_qid = CENSUS_TO_DOSSIER_MAP.get(c_qid)
+            if not d_qid and c_qid == "10":
+                d_qid = "9"
+            if not d_qid:
+                continue
+            cur = d_responses.get(d_qid)
+            cur_ans = str(cur.get("answer", "")).strip() if isinstance(cur, dict) else ""
+            if not cur_ans or cur_ans.startswith(prefix):
+                if cur_ans != text_note:
+                    save_dossier_answer(
+                        dossier,
+                        question_id=d_qid,
+                        answer_text=text_note,
+                        entry_kind="character_creation",
+                        source="sheet_sync",
+                        propagate=False,
+                    )
+                    dossier_count += 1
+
+    return {"census": census_count, "dossier": dossier_count}
 
 
 def _parse_iso_dt(value: Any) -> datetime | None:

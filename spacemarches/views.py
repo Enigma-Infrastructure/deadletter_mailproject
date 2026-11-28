@@ -69,8 +69,11 @@ from .services.character_cross_sync import (
     get_primary_linked_character_for_dossier,
 )
 from .services.character_sync_service import (
+    APTITUDE_TEMPLATES,
     export_generated_character_html,
     export_generated_character_markdown,
+    get_sheet_morph_choices,
+    get_sheet_rep_choices,
     get_sheet_skill_pack_choices,
     link_character_to_dossier,
     save_generated_character,
@@ -410,6 +413,15 @@ def api_sync(request):
     )
 
 
+def _sheet_tool_catalog_context() -> dict[str, Any]:
+    return {
+        "skill_pack_choices": get_sheet_skill_pack_choices(),
+        "rep_choices": get_sheet_rep_choices(),
+        "morph_choices": get_sheet_morph_choices(),
+        "aptitude_templates": APTITUDE_TEMPLATES,
+    }
+
+
 @login_required
 def character_roster(request):
     """Authenticated Django roster of generated EP2E characters with Dossier matching and exports."""
@@ -466,7 +478,7 @@ def character_roster(request):
             "characters": characters,
             "character_rows": character_rows,
             "dossiers": dossiers,
-            "skill_pack_choices": skill_pack_choices,
+            **_sheet_tool_catalog_context(),
             "voice_choices": CharacterDossier.NARRATIVE_VOICE_CHOICES,
         },
     )
@@ -561,6 +573,7 @@ def character_sync_profile(request, pk: int):
     kwargs: dict[str, Any] = {
         "acknowledge_only": acknowledge_only,
         "sync_linked_names": str(payload.get("sync_linked_names", "1")).strip() not in {"0", "false", "no"},
+        "sync_to_narratives": str(payload.get("sync_to_narratives", "0")).strip().lower() in {"1", "true", "on", "yes"},
         "source": str(payload.get("source") or "web").strip()[:32],
     }
     for param, kw in (
@@ -570,9 +583,60 @@ def character_sync_profile(request, pk: int):
         ("ego_type", "ego_type"),
         ("gender", "gender"),
         ("muse_name", "muse_name"),
+        ("description", "description"),
+        ("languages", "languages"),
+        ("primary_morph", "primary_morph"),
+        ("aptitude_template", "aptitude_template"),
     ):
         if param in payload:
-            kwargs[kw] = str(payload.get(param) or "")
+            val = payload.get(param)
+            kwargs[kw] = val if isinstance(val, list) else str(val or "")
+    if "flex_points" in payload and str(payload.get("flex_points") or "").strip() != "":
+        try:
+            kwargs["flex_points"] = int(payload.get("flex_points"))
+        except (TypeError, ValueError):
+            pass
+    aptitudes: dict[str, int] = {}
+    if isinstance(payload.get("aptitudes"), dict):
+        for k, v in payload["aptitudes"].items():
+            try:
+                aptitudes[str(k).lower()] = int(v)
+            except (TypeError, ValueError):
+                pass
+    for k in ("cog", "int", "ref", "sav", "som", "wil"):
+        pkey = f"aptitude_{k}"
+        if pkey in payload and str(payload.get(pkey) or "").strip() != "":
+            try:
+                aptitudes[k] = int(payload.get(pkey))
+            except (TypeError, ValueError):
+                pass
+    if aptitudes:
+        kwargs["aptitudes"] = aptitudes
+
+    reps: dict[str, int] = {}
+    if isinstance(payload.get("reputations"), dict):
+        for rname, rval in payload["reputations"].items():
+            try:
+                reps[str(rname)] = int(rval)
+            except (TypeError, ValueError):
+                pass
+    for r_opt in get_sheet_rep_choices():
+        rkey = f"rep_{r_opt['key']}"
+        rname_key = f"rep_{r_opt['name']}"
+        raw_val = payload.get(rkey) if rkey in payload else payload.get(rname_key)
+        if raw_val is not None and str(raw_val).strip() != "":
+            try:
+                reps[r_opt["name"]] = int(raw_val)
+            except (TypeError, ValueError):
+                pass
+    if reps:
+        kwargs["reputations"] = reps
+
+    if "motivation_cause" in payload and str(payload.get("motivation_cause") or "").strip():
+        kwargs["motivation_primary"] = {
+            "cause": str(payload.get("motivation_cause") or "").strip(),
+            "support_cause": str(payload.get("motivation_support", "1")).strip().lower() not in {"0", "false", "no"},
+        }
     if skill_packs:
         kwargs["skill_packs"] = skill_packs
 
@@ -1176,7 +1240,7 @@ def _render_dossier_detail(request, dossier: CharacterDossier, *, by_id: bool = 
             "linked_censuses": linked_censuses,
             "primary_sheet": primary_sheet,
             "sheet_context": sheet_ctx,
-            "skill_pack_choices": get_sheet_skill_pack_choices(),
+            **_sheet_tool_catalog_context(),
             "pending_sheet_changes": pending_sheet_changes,
             "linked_characters": linked_characters,
             "available_characters": available_characters,
@@ -2136,7 +2200,7 @@ def census_detail(request, pk: int):
             "user_characters": user_characters,
             "primary_sheet": primary_sheet,
             "sheet_context": sheet_ctx,
-            "skill_pack_choices": get_sheet_skill_pack_choices(),
+            **_sheet_tool_catalog_context(),
             "pending_sheet_changes": (
                 compute_pending_sheet_changes(primary_sheet, dossier=census.dossier, census=census)
                 if primary_sheet is not None
@@ -2213,9 +2277,9 @@ def census_settings(request, pk: int):
         census.save(update_fields=["show_sexuality_sections", "updated_at"])
         messages.success(
             request,
-            "Optional sexuality & experience sections (13c, 13e) enabled."
+            "Sensitive sexuality questions (13c, 13e) enabled."
             if census.show_sexuality_sections
-            else "Optional sexuality & experience sections (13c, 13e) hidden.",
+            else "Sensitive sexuality questions (13c, 13e) hidden.",
         )
     elif action == "toggle_appendix":
         census.show_sensitive_appendix = not census.show_sensitive_appendix

@@ -21,6 +21,7 @@
     </div>
   </div>
   <div style="display: flex; flex-wrap: wrap; gap: 0.45rem;">
+    <button type="button" id="sm-census-drawer-toggle" class="btn btn-sm" aria-expanded="false" aria-controls="sm-census-drawer">Sections &amp; Focus</button>
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md">Export MD</a>
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=md&amp;include_unanswered=1">Export All Prompts (MD)</a>
     <a class="btn btn-secondary btn-sm" href="{% url 'spacemarches:census_export' pk=census.pk %}?format=html">Export HTML</a>
@@ -82,7 +83,7 @@
       <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
         <input type="hidden" name="show_sexuality_sections" value="0">
         <input type="checkbox" name="show_sexuality_sections" value="1" {% if census.show_sexuality_sections %}checked{% endif %} style="width: auto;">
-        Include optional sexuality &amp; relationship questions (Section 13)
+        Include sensitive sexuality questions (Section 13)
       </label>
       <label style="display: inline-flex; align-items: center; gap: 0.4rem; margin: 0; font-weight: 500; cursor: pointer;">
         <input type="hidden" name="show_sensitive_appendix" value="0">
@@ -323,9 +324,279 @@
   </div>
 </details>
 
+<button type="button" id="sm-census-drawer-fab" class="btn btn-sm sm-floating-nav-btn" aria-expanded="false" aria-controls="sm-census-drawer">
+  Sections &amp; Focus
+</button>
+
+<aside id="sm-census-drawer" class="sm-section-drawer" aria-label="Census Section Navigator and Focus" hidden>
+  <div class="sm-section-drawer-head">
+    <div>
+      <p class="sm-eyebrow" style="margin: 0;">Census Navigator</p>
+      <h2 style="margin: 0.1rem 0 0; font-size: 0.98rem;">Sections &amp; Focus</h2>
+    </div>
+    <div style="display: flex; gap: 0.35rem; align-items: center;">
+      {% if not view_all %}
+        <a class="btn btn-secondary btn-sm" href="?chapter=all">All Chapters</a>
+      {% endif %}
+      <button type="button" id="sm-census-drawer-close" class="btn btn-secondary btn-sm">Close</button>
+    </div>
+  </div>
+  <div class="sm-section-drawer-controls">
+    <input id="sm-census-nav-search" type="search" placeholder="Search [id] or question heading…" aria-label="Search census questions">
+    <div style="display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: center;" id="sm-census-nav-filters">
+      <button type="button" class="btn btn-sm census-nav-filter" data-mode="all" style="padding: 0.2rem 0.5rem; font-size: 0.76rem;">All</button>
+      <button type="button" class="btn btn-secondary btn-sm census-nav-filter" data-mode="unanswered" style="padding: 0.2rem 0.5rem; font-size: 0.76rem;">Unanswered</button>
+      <button type="button" class="btn btn-secondary btn-sm census-nav-filter" data-mode="answered" style="padding: 0.2rem 0.5rem; font-size: 0.76rem;">Answered</button>
+      <button type="button" class="btn btn-secondary btn-sm census-nav-filter" data-mode="sheet" style="padding: 0.2rem 0.5rem; font-size: 0.76rem;">Sheet-Linked</button>
+      <button type="button" id="sm-census-focus-reset" class="btn btn-secondary btn-sm" style="padding: 0.2rem 0.5rem; font-size: 0.76rem; margin-left: auto;" hidden>Show All Sections</button>
+    </div>
+  </div>
+  <div id="sm-census-nav-body" class="sm-section-drawer-body">
+    <div class="sm-nav-group">
+      <div class="sm-nav-group-head">
+        <span class="sm-nav-group-title">All Chapters</span>
+        {% if not view_all %}<a href="?chapter=all" style="font-size: 0.75rem;">Open All</a>{% endif %}
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 0.3rem;">
+        {% for ch in chapters %}
+          <a
+            href="{% if view_all %}#chapter-{{ ch.id }}{% else %}?chapter={{ ch.id }}{% endif %}"
+            class="btn {% if active_chapter_id != ch.id %}btn-secondary{% endif %} btn-sm sm-census-ch-jump"
+            data-chapter-id="{{ ch.id }}"
+            style="padding: 0.16rem 0.45rem; font-size: 0.73rem;"
+          >{% if ch.is_appendix %}Appendix{% else %}{{ ch.number }}{% endif %}</a>
+        {% endfor %}
+      </div>
+    </div>
+    <div id="sm-census-nav-tree" style="display: flex; flex-direction: column; gap: 0.55rem;"></div>
+  </div>
+</aside>
+
 <script>
   (function () {
     const forms = document.querySelectorAll(".census-answer-form");
+    const drawer = document.getElementById("sm-census-drawer");
+    const drawerToggle = document.getElementById("sm-census-drawer-toggle");
+    const drawerFab = document.getElementById("sm-census-drawer-fab");
+    const drawerClose = document.getElementById("sm-census-drawer-close");
+    const navSearch = document.getElementById("sm-census-nav-search");
+    const navTree = document.getElementById("sm-census-nav-tree");
+    const focusResetBtn = document.getElementById("sm-census-focus-reset");
+    const filterBtns = Array.from(document.querySelectorAll(".census-nav-filter"));
+
+    let navFilterMode = "all";
+    let focusedChapterId = "";
+
+    function setDrawerOpen(open) {
+      if (!drawer) return;
+      if (open) {
+        drawer.removeAttribute("hidden");
+      } else {
+        drawer.setAttribute("hidden", "");
+      }
+      [drawerToggle, drawerFab].forEach((b) => {
+        if (b) b.setAttribute("aria-expanded", open ? "true" : "false");
+      });
+    }
+
+    if (drawerToggle) drawerToggle.addEventListener("click", () => setDrawerOpen(drawer ? drawer.hasAttribute("hidden") : false));
+    if (drawerFab) drawerFab.addEventListener("click", () => setDrawerOpen(drawer ? drawer.hasAttribute("hidden") : false));
+    if (drawerClose) drawerClose.addEventListener("click", () => setDrawerOpen(false));
+
+    function cardVisibleByMode(card) {
+      const answered = card.dataset.answered === "true";
+      const answerable = card.dataset.answerable === "true";
+      const hasSheet = card.dataset.hasSheet === "true";
+      if (navFilterMode === "unanswered") return answerable && !answered;
+      if (navFilterMode === "answered") return answerable && answered;
+      if (navFilterMode === "sheet") return hasSheet;
+      return true;
+    }
+
+    function applyPageCardFilters() {
+      const sections = Array.from(document.querySelectorAll('section[id^="chapter-"]'));
+      const cards = Array.from(document.querySelectorAll(".census-card"));
+      cards.forEach((card) => {
+        const chMatch = !focusedChapterId || card.dataset.chapterId === focusedChapterId;
+        const modeMatch = cardVisibleByMode(card);
+        card.style.display = (chMatch && modeMatch) ? "" : "none";
+      });
+      sections.forEach((sec) => {
+        const secId = sec.id.replace(/^chapter-/, "");
+        const chMatch = !focusedChapterId || secId === focusedChapterId;
+        const visibleInside = Array.from(sec.querySelectorAll(".census-card")).some((c) => c.style.display !== "none");
+        sec.style.display = (chMatch && (navFilterMode === "all" || visibleInside)) ? "" : "none";
+      });
+      if (focusResetBtn) {
+        if (focusedChapterId || navFilterMode !== "all") {
+          focusResetBtn.removeAttribute("hidden");
+        } else {
+          focusResetBtn.setAttribute("hidden", "");
+        }
+      }
+    }
+
+    function renderNavTree() {
+      if (!navTree) return;
+      const query = (navSearch ? navSearch.value : "").trim().toLowerCase();
+      const cards = Array.from(document.querySelectorAll(".census-card"));
+      const groups = new Map();
+
+      cards.forEach((card) => {
+        const chId = card.dataset.chapterId || "current";
+        if (!groups.has(chId)) {
+          const sec = document.getElementById("chapter-" + chId);
+          let titleText = chId;
+          if (sec) {
+            const h2 = sec.querySelector("h2");
+            const eyebrow = sec.querySelector(".sm-eyebrow");
+            titleText = (eyebrow ? eyebrow.textContent.trim() + ": " : "") + (h2 ? h2.textContent.trim() : chId);
+          } else {
+            const activeH2 = document.querySelector("section.sm-panel h2");
+            if (activeH2) titleText = activeH2.textContent.trim();
+          }
+          groups.set(chId, { id: chId, title: titleText, cards: [] });
+        }
+        groups.get(chId).cards.push(card);
+      });
+
+      navTree.textContent = "";
+      groups.forEach((group) => {
+        const matchingCards = group.cards.filter((card) => {
+          if (!cardVisibleByMode(card)) return false;
+          if (!query) return true;
+          const hay = ((card.dataset.displayId || "") + " " + (card.dataset.heading || "")).toLowerCase();
+          return hay.includes(query) || group.title.toLowerCase().includes(query);
+        });
+        if (!matchingCards.length) return;
+
+        const wrap = document.createElement("div");
+        wrap.className = "sm-nav-group";
+
+        const head = document.createElement("div");
+        head.className = "sm-nav-group-head";
+
+        const titleEl = document.createElement("a");
+        titleEl.className = "sm-nav-group-title";
+        const secEl = document.getElementById("chapter-" + group.id);
+        titleEl.href = secEl ? ("#chapter-" + group.id) : "#";
+        const ansCount = group.cards.filter((c) => c.dataset.answerable === "true" && c.dataset.answered === "true").length;
+        const totCount = group.cards.filter((c) => c.dataset.answerable === "true").length;
+        titleEl.textContent = group.title + " (" + ansCount + "/" + totCount + ")";
+        titleEl.addEventListener("click", (ev) => {
+          if (secEl) {
+            ev.preventDefault();
+            if (focusedChapterId && focusedChapterId !== group.id) {
+              focusedChapterId = "";
+              applyPageCardFilters();
+            }
+            secEl.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
+        });
+        head.appendChild(titleEl);
+
+        if (document.querySelectorAll('section[id^="chapter-"]').length > 1) {
+          const focusBtn = document.createElement("button");
+          focusBtn.type = "button";
+          const isFocused = focusedChapterId === group.id;
+          focusBtn.className = "btn " + (isFocused ? "" : "btn-secondary") + " btn-sm";
+          focusBtn.style.padding = "0.14rem 0.42rem";
+          focusBtn.style.fontSize = "0.72rem";
+          focusBtn.textContent = isFocused ? "Unfocus" : "Focus";
+          focusBtn.addEventListener("click", () => {
+            focusedChapterId = isFocused ? "" : group.id;
+            applyPageCardFilters();
+            renderNavTree();
+            if (!isFocused && secEl) {
+              secEl.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+          });
+          head.appendChild(focusBtn);
+        }
+
+        wrap.appendChild(head);
+
+        const ul = document.createElement("ul");
+        ul.className = "sm-nav-list";
+        matchingCards.forEach((card) => {
+          const li = document.createElement("li");
+          const row = document.createElement("a");
+          row.className = "sm-nav-row" + (card.dataset.answered === "true" ? " is-answered" : "");
+          row.href = "#" + card.id;
+
+          const labelSpan = document.createElement("span");
+          labelSpan.textContent = "[" + (card.dataset.displayId || card.dataset.questionId) + "] " + (card.dataset.heading || "");
+          row.appendChild(labelSpan);
+
+          if (card.dataset.answerable === "true") {
+            const st = document.createElement("span");
+            st.className = "sm-code-tag";
+            st.style.flexShrink = "0";
+            st.textContent = card.dataset.answered === "true" ? "Done" : "Open";
+            row.appendChild(st);
+          }
+
+          row.addEventListener("click", (ev) => {
+            ev.preventDefault();
+            if (focusedChapterId && focusedChapterId !== card.dataset.chapterId) {
+              focusedChapterId = "";
+            }
+            if (!cardVisibleByMode(card)) {
+              navFilterMode = "all";
+              filterBtns.forEach((b) => {
+                b.classList.toggle("btn-secondary", b.dataset.mode !== "all");
+              });
+            }
+            applyPageCardFilters();
+            renderNavTree();
+            card.classList.remove("sm-focus-highlight");
+            void card.offsetWidth;
+            card.classList.add("sm-focus-highlight");
+            card.scrollIntoView({ behavior: "smooth", block: "center" });
+            const ta = card.querySelector('textarea[name="answer_text"]');
+            if (ta) window.setTimeout(() => ta.focus({ preventScroll: true }), 260);
+          });
+          li.appendChild(row);
+          ul.appendChild(li);
+        });
+        wrap.appendChild(ul);
+        navTree.appendChild(wrap);
+      });
+    }
+
+    filterBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        navFilterMode = btn.dataset.mode || "all";
+        filterBtns.forEach((b) => b.classList.toggle("btn-secondary", b !== btn));
+        applyPageCardFilters();
+        renderNavTree();
+      });
+    });
+
+    if (navSearch) navSearch.addEventListener("input", renderNavTree);
+    if (focusResetBtn) {
+      focusResetBtn.addEventListener("click", () => {
+        focusedChapterId = "";
+        navFilterMode = "all";
+        filterBtns.forEach((b) => b.classList.toggle("btn-secondary", b.dataset.mode !== "all"));
+        applyPageCardFilters();
+        renderNavTree();
+      });
+    }
+
+    document.querySelectorAll(".sm-census-ch-jump").forEach((link) => {
+      link.addEventListener("click", () => {
+        if (focusedChapterId) {
+          focusedChapterId = "";
+          applyPageCardFilters();
+          renderNavTree();
+        }
+      });
+    });
+
+    renderNavTree();
+
+    if (!forms.length || !window.fetch) return;
     if (!forms.length || !window.fetch) return;
 
     function updateHeaderAndPills(stats) {
@@ -406,6 +677,9 @@
           if (textarea && actionType === "clear") {
             textarea.value = "";
           }
+          if (card) {
+            card.dataset.answered = data.answered ? "true" : "false";
+          }
           if (statusBadge) {
             if (data.answered) {
               statusBadge.textContent = data.synced_dossier_qid
@@ -418,6 +692,8 @@
             }
           }
           updateHeaderAndPills(data.stats);
+          applyPageCardFilters();
+          renderNavTree();
         } catch (err) {
           if (statusBadge) {
             statusBadge.textContent = err.message || "Error saving";

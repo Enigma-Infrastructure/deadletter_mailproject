@@ -208,7 +208,7 @@
       "id": "gender_sexuality",
       "number": "13",
       "title": "Gender, Sex & Relationships",
-      "description": "Optional, encouraged, and configurable to player comfort. Explore gender identity (13a–13b) and optional sexuality/experience sections (13c, 13e).",
+      "description": "Optional, encouraged, and configurable to player comfort. Explore gender identity (13a–13b) and sensitive sexuality/experience sections (13c, 13e).",
       "is_appendix": false,
       "question_ids": [
         "13",

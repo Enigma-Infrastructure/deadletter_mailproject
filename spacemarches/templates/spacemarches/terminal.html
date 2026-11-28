@@ -237,6 +237,66 @@
       }
     }
 
+    function extractPointBuyName(pb) {
+      if (!pb || typeof pb !== "object") return "";
+      if (pb.name && typeof pb.name === "object") {
+        return pb.name.custom || pb.name.msgId || "";
+      }
+      return typeof pb.name === "string" ? pb.name : "";
+    }
+
+    function wrapPointBuyExported(row) {
+      const pb = (row && row.pointBuy && typeof row.pointBuy === "object") ? row.pointBuy : {};
+      return {
+        type: "point-buy-exported",
+        createdAt: (row && row.createdAt) || new Date().toISOString(),
+        packs: {},
+        pointBuy: pb,
+      };
+    }
+
+    function normalizeSyncMetaEntry(entry) {
+      if (!entry) return { hash: "", syncedAt: 0 };
+      if (typeof entry === "string") return { hash: entry, syncedAt: 0 };
+      if (typeof entry === "object") {
+        return {
+          hash: String(entry.hash || ""),
+          syncedAt: Number(entry.syncedAt || 0) || 0,
+        };
+      }
+      return { hash: "", syncedAt: 0 };
+    }
+
+    function putPointBuyDraft(db, row, serverRawData, serverUpdatedIso) {
+      return new Promise((resolve) => {
+        try {
+          const pointBuyObj = (serverRawData && serverRawData.pointBuy && typeof serverRawData.pointBuy === "object")
+            ? serverRawData.pointBuy
+            : serverRawData;
+          if (!pointBuyObj || typeof pointBuyObj !== "object") {
+            return resolve(false);
+          }
+          const packIds = Array.from(new Set([
+            ...(Array.isArray(row.packDepIds) ? row.packDepIds : []),
+            ...Object.keys((serverRawData && serverRawData.packs) || {}),
+          ]));
+          const tx = db.transaction(["pointBuy"], "readwrite");
+          const store = tx.objectStore("pointBuy");
+          const nextRow = Object.assign({}, row, {
+            packDepIds: packIds,
+            pointBuy: pointBuyObj,
+            updatedAt: serverUpdatedIso || new Date().toISOString(),
+          });
+          store.put(nextRow);
+          tx.oncomplete = () => resolve(true);
+          tx.onerror = () => resolve(false);
+        } catch (_err) {
+          resolve(false);
+        }
+      });
+    }
+
+    const pendingLoadId = String((bootData && bootData.initial_load_id) || "");
     const isAnonDraft = Boolean(bootData && !bootData.authenticated);
     if (isAnonDraft) {
       openPointBuyDb().then((db) => {
@@ -252,52 +312,143 @@
         });
       }).catch(() => {});
     } else if (bootData && bootData.authenticated) {
-      // Auto-save only new or modified local drafts to the user's account on load.
-      openPointBuyDb().then((db) => {
+      // Bidirectional sync between MeshNet IndexedDB and Django account sheets:
+      // 1) Respect ?load=<pk> cleanly without pushing stale IndexedDB drafts over it.
+      // 2) Pull newer Django updates (Census/Dossier/Roster quick-edits) down into IndexedDB.
+      // 3) Push only new or locally modified drafts wrapped in canonical PointBuyExported JSON.
+      const charactersApiUrl = bootData.characters_api_url || "/spacemarches/api/characters/";
+      Promise.all([
+        openPointBuyDb().catch(() => null),
+        fetch(charactersApiUrl, { credentials: "same-origin" })
+          .then((r) => (r.ok ? r.json() : null))
+          .catch(() => null),
+      ]).then(async ([db, serverList]) => {
         if (!db) return;
-        listPointBuyDrafts(db).then((rows) => {
-          if (!rows.length) return;
-          const syncedHashes = loadAutoSaveHashes();
-          const pendingHashes = {};
-          const drafts = [];
-          rows.forEach((row) => {
-            const pb = row.pointBuy || {};
-            let name = "";
-            if (pb.name && typeof pb.name === "object") {
-              name = pb.name.custom || pb.name.msgId || "";
-            } else if (typeof pb.name === "string") {
-              name = pb.name;
+        const rows = await listPointBuyDrafts(db);
+        const syncMeta = loadAutoSaveHashes();
+        const serverChars = (serverList && Array.isArray(serverList.characters)) ? serverList.characters : [];
+        const serverByExtId = {};
+        serverChars.forEach((sc) => {
+          if (sc && sc.external_id) serverByExtId[String(sc.external_id)] = sc;
+        });
+
+        let pulledCount = 0;
+        const nextMeta = Object.assign({}, syncMeta);
+        const pendingHashes = {};
+        const drafts = [];
+
+        for (const row of rows) {
+          const extId = String(row.id || "");
+          const pb = row.pointBuy || {};
+          const name = extractPointBuyName(pb);
+          const fp = hashDraftPayload({ character_name: name, pointBuy: pb });
+          const serverChar = extId ? serverByExtId[extId] : null;
+
+          // If MeshNet was opened specifically via ?load=<pk>, let MeshNet's KMe loader win cleanly
+          if (serverChar && pendingLoadId && String(serverChar.id) === pendingLoadId) {
+            const serverMs = Date.parse(serverChar.updated_at || "") || Date.now();
+            nextMeta[extId] = { hash: fp, syncedAt: serverMs };
+            window.setTimeout(() => {
+              listPointBuyDrafts(db).then((latestRows) => {
+                const loadedRow = latestRows.find((r) => String(r.id || "") === extId);
+                if (!loadedRow) return;
+                const latestPb = loadedRow.pointBuy || {};
+                const latestName = extractPointBuyName(latestPb);
+                const latestMeta = loadAutoSaveHashes();
+                latestMeta[extId] = {
+                  hash: hashDraftPayload({ character_name: latestName, pointBuy: latestPb }),
+                  syncedAt: Math.max(serverMs, Date.parse(loadedRow.updatedAt || "") || 0),
+                };
+                saveAutoSaveHashes(latestMeta);
+              }).catch(() => {});
+            }, 900);
+            continue;
+          }
+
+          if (serverChar) {
+            const meta = normalizeSyncMetaEntry(syncMeta[extId]);
+            const serverMs = Date.parse(serverChar.updated_at || "") || 0;
+            const localMs = Date.parse(row.updatedAt || row.createdAt || "") || 0;
+            const localDirty = Boolean(meta.hash && meta.hash !== fp);
+            const serverNewerThanSync = serverMs > (meta.syncedAt + 1000);
+            const shouldPullInitial = !meta.hash && serverMs > (localMs + 2000);
+
+            if ((serverNewerThanSync && (!localDirty || serverMs > localMs)) || shouldPullInitial) {
+              try {
+                const detailResp = await fetch(charactersApiUrl + serverChar.id + "/", { credentials: "same-origin" });
+                if (detailResp.ok) {
+                  const detailJson = await detailResp.json();
+                  const fullChar = detailJson && detailJson.character;
+                  if (fullChar && fullChar.raw_data) {
+                    const wrote = await putPointBuyDraft(db, row, fullChar.raw_data, fullChar.updated_at);
+                    if (wrote) {
+                      const updatedPb = (fullChar.raw_data && fullChar.raw_data.pointBuy) || fullChar.raw_data;
+                      const updatedName = extractPointBuyName(updatedPb) || fullChar.character_name || name;
+                      nextMeta[extId] = {
+                        hash: hashDraftPayload({ character_name: updatedName, pointBuy: updatedPb }),
+                        syncedAt: Date.parse(fullChar.updated_at || "") || serverMs || Date.now(),
+                      };
+                      pulledCount += 1;
+                      continue;
+                    }
+                  }
+                }
+              } catch (_pullErr) {
+                // Fall through if offline
+              }
             }
-            const extId = String(row.id || "");
-            const draftPayload = {
-              external_id: extId,
-              character_name: name,
-              source_system: "point_buy_v2",
-              raw_data: pb,
-            };
-            const fp = hashDraftPayload({ character_name: name, raw_data: pb });
-            if (!extId || syncedHashes[extId] !== fp) {
-              drafts.push(draftPayload);
-              if (extId) pendingHashes[extId] = fp;
+
+            if (meta.hash === fp) {
+              nextMeta[extId] = { hash: fp, syncedAt: Math.max(meta.syncedAt, serverMs) };
+              continue;
             }
-          });
-          if (!drafts.length) return;
-          fetch(bootData.characters_api_url || "/spacemarches/api/characters/", {
-            method: "POST",
-            credentials: "same-origin",
-            headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
-            body: JSON.stringify({ characters: drafts }),
-          }).then((resp) => resp.json().then((data) => ({ ok: resp.ok, data: data }))).then(({ ok, data }) => {
-            if (ok && data && data.status === "ok") {
-              saveAutoSaveHashes(Object.assign({}, syncedHashes, pendingHashes));
-              const count = Array.isArray(data.characters) ? data.characters.length : drafts.length;
-              showNotify("Saved " + count + " sheet" + (count === 1 ? "" : "s") + " to your account.", "success");
-            } else {
-              showNotify((data && data.error) || "Save failed — check your connection.", "warn");
-            }
-          }).catch(() => {
-            showNotify("Save failed — check your connection.", "warn");
-          });
+          }
+
+          const draftPayload = {
+            external_id: extId,
+            character_name: name,
+            source_system: "point_buy_v2",
+            raw_data: wrapPointBuyExported(row),
+          };
+          const meta = normalizeSyncMetaEntry(syncMeta[extId]);
+          if (!extId || meta.hash !== fp) {
+            drafts.push(draftPayload);
+            if (extId) pendingHashes[extId] = fp;
+          }
+        }
+
+        if (pulledCount > 0) {
+          saveAutoSaveHashes(nextMeta);
+          showNotify("Synced " + pulledCount + " updated sheet" + (pulledCount === 1 ? "" : "s") + " from your profile.", "success");
+          if (!pendingLoadId) {
+            window.setTimeout(() => window.location.reload(), 250);
+            return;
+          }
+        } else {
+          saveAutoSaveHashes(nextMeta);
+        }
+
+        if (!drafts.length) return;
+        fetch(charactersApiUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json", "X-CSRFToken": getCookie("csrftoken") },
+          body: JSON.stringify({ characters: drafts }),
+        }).then((resp) => resp.json().then((data) => ({ ok: resp.ok, data: data }))).then(({ ok, data }) => {
+          if (ok && data && data.status === "ok") {
+            const nowMs = Date.now();
+            const mergedMeta = Object.assign({}, nextMeta);
+            Object.keys(pendingHashes).forEach((k) => {
+              mergedMeta[k] = { hash: pendingHashes[k], syncedAt: nowMs };
+            });
+            saveAutoSaveHashes(mergedMeta);
+            const count = Array.isArray(data.characters) ? data.characters.length : drafts.length;
+            showNotify("Saved " + count + " sheet" + (count === 1 ? "" : "s") + " to your account.", "success");
+          } else {
+            showNotify((data && data.error) || "Save failed — check your connection.", "warn");
+          }
+        }).catch(() => {
+          showNotify("Save failed — check your connection.", "warn");
         });
       }).catch(() => {});
     }

@@ -395,3 +395,25 @@ class CensusUxAndCrossSyncTests(TestCase):
         dossier_html = self.client.get(reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug})).content.decode("utf-8")
         self.assertIn("Synced with Dossier [6.1g]", census_html)
         self.assertIn("Synced with Census [1]", dossier_html)
+
+    def test_sensitive_sexuality_wording_and_section_navigator_drawer(self):
+        self.client.force_login(self.user)
+        url = reverse("spacemarches:census_detail", kwargs={"pk": self.census.pk})
+        html = self.client.get(url).content.decode("utf-8")
+        self.assertIn("Include sensitive sexuality questions (Section 13)", html)
+        self.assertIn("Hide Sensitive Sexuality Questions", html)
+        self.assertNotIn("Show Optional Sexuality Questions", html)
+        self.assertNotIn("Hide Optional Sexuality Questions", html)
+        self.assertIn('id="sm-census-drawer"', html)
+        self.assertIn('id="sm-census-drawer-fab"', html)
+        self.assertIn('id="sm-census-nav-search"', html)
+        self.assertIn("Sections &amp; Focus", html)
+
+        toggle_resp = self.client.post(
+            reverse("spacemarches:census_settings", kwargs={"pk": self.census.pk}),
+            {"action": "toggle_sexuality", "chapter": "all"},
+            follow=True,
+        )
+        toggled_html = toggle_resp.content.decode("utf-8")
+        self.assertIn("Show Sensitive Sexuality Questions", toggled_html)
+        self.assertIn("Sensitive sexuality questions (13c, 13e) hidden.", toggled_html)

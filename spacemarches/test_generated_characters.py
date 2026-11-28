@@ -493,3 +493,79 @@ class CrossModelSheetSyncTests(TestCase):
         # Pending notice cleared after sync checkpoint
         census_html_after = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": census.pk})).content.decode("utf-8")
         self.assertNotIn("Pending Census / Dossier Changes Since Last Sheet Sync", census_html_after)
+
+    def test_dossier_section_navigator_unpacked_meshnet_tools_and_narrative_sync(self):
+        from spacemarches.models import EclipsePhaseCensus
+        from spacemarches.services.census_service import create_census, save_census_answer
+
+        census = create_census(
+            self.user,
+            character_name="Nyx Vesper",
+            dossier=self.dossier,
+            character=self.sheet,
+        )
+        # Player-authored custom prose on Census [6] must NOT be overwritten
+        save_census_answer(census, "6", "I stayed loyal to my Anarchist cell.")
+
+        self.client.force_login(self.user)
+        dossier_html = self.client.get(
+            reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug})
+        ).content.decode("utf-8")
+        self.assertIn('id="sm-dossier-drawer"', dossier_html)
+        self.assertIn('id="sm-dossier-drawer-fab"', dossier_html)
+        self.assertIn('id="sm-dossier-nav-search"', dossier_html)
+        self.assertIn("Sections &amp; Focus", dossier_html)
+        self.assertIn('id="dossier-q-1"', dossier_html)
+
+        sync_url = reverse("spacemarches:character_sync_profile", kwargs={"pk": self.sheet.pk})
+        post_resp = self.client.post(
+            sync_url,
+            {
+                "primary_morph": "Bouncer",
+                "aptitude_template": "inquirer",
+                "flex_points": "2",
+                "rep_c-rep": "45",
+                "motivation_cause": "Expose Firewall secrets",
+                "motivation_support": "0",
+                "languages": "English, Cantonese",
+                "description": "Freefall orbital scout.",
+                "sync_to_narratives": "1",
+                "source": "dossier",
+                "next": reverse("spacemarches:dossier_detail", kwargs={"slug": self.dossier.slug}),
+            },
+        )
+        self.assertEqual(post_resp.status_code, 302)
+
+        self.sheet.refresh_from_db()
+        census.refresh_from_db()
+        self.dossier.refresh_from_db()
+
+        self.assertEqual(self.sheet.raw_data.get("type"), "point-buy-exported")
+        self.assertEqual(self.sheet.raw_data["pointBuy"]["aptitudeTemplate"], "inquirer")
+        self.assertEqual(self.sheet.raw_data["pointBuy"]["aptitudes"]["cog"], 20)
+        self.assertEqual(self.sheet.raw_data["pointBuy"]["flexPoints"], 2)
+        self.assertEqual(self.sheet.summary["morphs"], ["Bouncer"])
+        self.assertEqual(self.sheet.summary["reputations"].get("c-rep"), 45)
+        self.assertIn("- Oppose: Expose Firewall secrets", self.sheet.summary["motivations"])
+        self.assertEqual(self.sheet.summary["languages"], ["English", "Cantonese"])
+        self.assertEqual(self.sheet.summary["description"], "Freefall orbital scout.")
+
+        # API detail endpoint returns valid PointBuyExported JSON
+        api_resp = self.client.get(reverse("spacemarches:api_character_detail", kwargs={"pk": self.sheet.pk}))
+        self.assertEqual(api_resp.status_code, 200)
+        api_raw = api_resp.json()["character"]["raw_data"]
+        self.assertEqual(api_raw["type"], "point-buy-exported")
+        self.assertEqual(api_raw["pointBuy"]["aptitudes"]["cog"], 20)
+
+        # sync_to_narratives fills blank prompts but preserves custom player prose
+        self.assertEqual(census.responses["6"]["answer"], "I stayed loyal to my Anarchist cell.")
+        self.assertIn("Bouncer", census.responses["3"]["answer"])
+        self.assertIn("Expose Firewall secrets", census.responses["10"]["answer"])
+        self.assertIn("Bouncer", self.dossier.responses["3"]["answer"])
+        self.assertIn("c-rep: 45", self.dossier.responses["6.2g"]["answer"])
+
+        # Terminal bridge uses PointBuyExported wrapper & bidirectional IndexedDB sync
+        mesh_html = self.client.get(reverse("spacemarches:meshnet")).content.decode("utf-8")
+        self.assertIn("wrapPointBuyExported", mesh_html)
+        self.assertIn("putPointBuyDraft", mesh_html)
+        self.assertIn("pendingLoadId", mesh_html)
