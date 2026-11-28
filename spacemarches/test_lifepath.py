@@ -233,10 +233,13 @@ class LifepathEngineTests(TestCase):
         perform_step_roll(s_uplift, chosen_entry_code="lang-15-english")
         perform_step_roll(s_uplift, chosen_entry_code="bg-uplift")
         perform_step_roll(s_uplift, chosen_entry_code="4.10-escapee", seed=4)
+        while s_uplift.state["pending_sub_rolls"]:
+            perform_step_roll(s_uplift, seed=4)
         s_uplift.current_step = 6
         s_uplift.state["active_table_slug"] = "age"
         s_uplift.save()
         perform_step_roll(s_uplift, seed=99)
+        self.assertIsNotNone(s_uplift.state["age_years"])
         self.assertLessEqual(int(s_uplift.state["age_years"]), 50)
 
     def test_hardcore_flex_and_80_cap_reallocation(self):
@@ -247,6 +250,7 @@ class LifepathEngineTests(TestCase):
         self.assertEqual(s.state["flex_rerolls_remaining"], 0)
 
         # Force >80 skill overflow and reallocate
+        s.state["aptitudes"]["ref"] = 15
         s.state["skills"]["Guns"] = 75  # +15 REF = 90 (10 over 80)
         s.save()
         sheet = compute_final_sheet(s.state)
