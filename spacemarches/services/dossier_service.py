@@ -765,8 +765,10 @@ def save_dossier_answer(
         raise ValueError(f"Unknown questionnaire question ID: {qid}")
 
     normalized_source = (source or "web").strip().lower()
-    if normalized_source not in {"web", "discord", "census_sync"}:
-        raise ValueError(f"Invalid answer source '{source}'; expected 'web', 'discord', or 'census_sync'.")
+    if normalized_source not in {"web", "discord", "census_sync", "sheet_sync"}:
+        raise ValueError(
+            f"Invalid answer source '{source}'; expected 'web', 'discord', 'census_sync', or 'sheet_sync'."
+        )
 
     new_answer = "" if answer_text is None else str(answer_text)
     normalized_kind = normalize_entry_kind(entry_kind, session_tag=session_tag)

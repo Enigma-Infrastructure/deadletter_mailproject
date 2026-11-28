@@ -456,7 +456,7 @@ class CrossModelSheetSyncTests(TestCase):
 
         roster_html = self.client.get(reverse("spacemarches:character_roster")).content.decode("utf-8")
         self.assertIn("Pending Sync", roster_html)
-        self.assertIn("Pending Census/Dossier Updates", roster_html)
+        self.assertIn("Pending Census / Dossier Updates", roster_html)
 
         census_html_pending = self.client.get(reverse("spacemarches:census_detail", kwargs={"pk": census.pk})).content.decode("utf-8")
         self.assertIn("Pending Census / Dossier Changes Since Last Sheet Sync", census_html_pending)
