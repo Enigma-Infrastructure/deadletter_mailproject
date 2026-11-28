@@ -747,7 +747,7 @@ Step 9 is where your character really starts to come together. Determine your ch
 | d100 | Career | Description | Motivation | Aptitudes & Rep | Skills |
 |---|---|---|---|---|---|
 | 00–32 | **Memeticist** | Whether a viral marketer or culture hacker, you specialize in infectious ideas. | `+Go Viral` | `f-rep 20` | `Infosec 20`, `Medicine: Psychosurgery 40`, `Persuade 60`, `Provoke 40`, `Program 20`, `Know: Influencers 20`, `Know: Memetics 40`, `Know: Psychology 30` |
-| 33–66 | **Psychosurgeon** | You are a mindshaper, helping people sculpt their mental palaces. | `+Skill Mastery` | `COG +5`, `c-rep 20` | `Infosec 20`, `Medicine: Psychosurgery 60`, `Medicine: Pharmacology 30`, `Program 20`, `Know: Cognitive Science 60`, `Know: Psychiatry 30`, `Know: Psychology 25` |
+| 33–66 | **Psychosurgeon** | You are a mindshaper, helping people sculpt their mental palaces. *(Printed as "Psychosurgeron" in source.)* | `+Skill Mastery` | `COG +5`, `c-rep 20` | `Infosec 20`, `Medicine: Psychosurgery 60`, `Medicine: Pharmacology 30`, `Program 20`, `Know: Cognitive Science 60`, `Know: Psychiatry 30`, `Know: Psychology 25` |
 | 67–99 | **Psychotherapist** | You help people cope with mental trauma and improve their cognitive skills. | `+Help Others` | `SAV +5`, `c-rep 20` | `Kinesics 40`, `Medicine: Psychosurgery 40`, `Medicine: Pharmacology 40`, `Persuade 20`, `Research 15`, `Know: Psychiatry 30`, `Know: Psychology 40`, `Know: Social Services 20` |
 
 ### 9.11 Scavenger
@@ -1577,21 +1577,21 @@ Assemble all accumulated modifiers onto your character sheet using these rules:
 
 ### Worked Character Creation Example
 
-*From* Character Options *pp. 35 and 49 (note: inline dice/numeral icons in the PDF narrative are vector glyphs; calculated totals below are taken directly from p. 49).*
+*From* Character Options *pp. 35 and 49. (Note: the source prose omits the numeric roll digit only in Step 7, and Book p. 49 refers to the Step 8 Bruiser morph as `"bouncer"`.)*
 
-1. **Steps 1–3:** Starts with standard Ego Flex (`2` standard Flex in Step 1); rolls **Survivor** Aptitude Template (`COG 15`, `INT 10`, `REF 15`, `SAV 10`, `SOM 20`, `WIL 20`); rolls **Korean** native tongue.
-2. **Steps 4–8:** Rolls **Colonist → Spacer** (`Splicer` starting morph); Youth Event grants melting-pot polyglot background (`Hyper Linguistics (Level 2)`); Starting Age in their **30s**; Pre-Fall Event grants a **free skill specialization**; Fall Event has them stash their Splicer on Earth and farcast off-world, resleeving into a **Bruiser** biomorph.
-3. **Steps 9–14:** Career **Investigator → Journalist**; Interest **Pilot**; Faction **Scum**; Post-Fall Event grants **`Identity Crisis`** trait and resleeves into a **Sylph** morph; Crime Event grants Robin Hood (`+10 @-rep`); Story Event sends them on a months-long hedonistic scum swarm bender.
+1. **Steps 1–3:** Starts with **`1` point of ego Flex** (standard Step 1 total); rolls `1d10 = 6` for the **Survivor** Aptitude Template (`COG 15`, `INT 10`, `REF 15`, `SAV 10`, `SOM 20`, `WIL 20`); rolls `1d100 = 52` for **Korean** native tongue.
+2. **Steps 4–8:** Rolls `1d10 = 1` (**Colonist**) → `1d100 = 81` (**Spacer**) → `1d10 = 5` (**Splicer** starting morph); Youth Event `1d100 = 45` grants melting-pot polyglot background (`Hyper Linguistics (Level 2)`); Starting Age `1d100 = 56` (in their **40s**) + `1d10 = 4` = age **`44`** (roughly `32–34` during the Fall, `10` years ago over a `2`-year Fall); Pre-Fall Event rolls `1d100` (prose omits digit; table entry `72`) for a **free skill specialization**; Fall Event `1d100 = 32` stashes their Splicer on Earth and farcasts off-world, then Random Morph `1d100 = 39` (**Biomorph**) resleeves them into a **Bruiser** (`09–10` on Biomorphs; later described as an `"intimidating bouncer"` in the p. 49 summary).
+3. **Steps 9–14:** Career `1d10 = 8, 1` (**Investigator**) → `1d100 = 98` (**Journalist**); Interest `1d10 = 8, 3` (**Pilot**); Faction `1d100 = 69` (**Scum**); Post-Fall Event `1d100 = 47` grants **`Identity Crisis`** trait and resleeves into a **Sylph** morph; Crime Event `1d100 = 71` grants Robin Hood (`+10 @-rep`); Story Event `1d100 = 81` sends them on a months-long hedonistic scum swarm bender (printed `"scum warm"` in source).
 4. **Step 15 Final Summary (Book p. 49):**
    - **Aptitudes & Checks:** `COG 15` (Check `45`), `INT 10` (Check `30`), `REF 15` (Check `45`), `SAV 10` (Check `30`), `SOM 20` (Check `60`), `WIL 20` (Check `60`).
    - **Derived Stats:** `Initiative 5`, `Lucidity 40`, `Trauma Threshold 8`, `Insanity Rating 80`.
-   - **Skills (after capping `Hardware: Aerospace` & `Pilot: Space` at `80`, shifting `10` points to `Melee 30`, and capping `Know: Flight Crew Ops` at `80` with `35` points held as an unassigned Know skill):**
-     `Fray 30`, `Free Fall 55`, `Hardware: Aerospace 80`, `Infosec 35`, `Interface 45`, `Kinesics 50`, `Know: Current Events 45`, `Know: Flight Crew Ops 80`, `Know: Journalism 75`, `Know: Scum Interests 35`, `Know: Spacers 45`, `Know: Spaceships 35`, `Melee 30`, `Perceive 40`, `Pilot: Air 45`, `Pilot: Ground 35`, `Pilot: Space 80`, `Provoke 30`, `Research 70`, `Survival (Navigate) 40 (50)`, plus `1` unassigned Know skill (`35 + COG 15 = 50`) and `1` unassigned skill specialization.
-   - **Rep Scores:** `@-rep 30`, `c-rep 40`, `f-rep 20`, `g-rep 30`.
-   - **Traits & Languages:** `Hyper Linguistics (Level 2)`, `Identity Crisis`; Korean + `1` additional language.
+   - **Beginning Combined Skills (before `80` cap):** Duplicate skills summed to `Hardware: Aerospace 70` (`+ COG 15 = 85`), `Know: Flight Crew Ops 100` (`+ COG 15 = 115`), and `Pilot: Space 70` (`+ REF 15 = 85`); base aptitude math includes `Fray 0 + (REF 15 × 2) = 30`, `Perceive 20 + (INT 10 × 2) = 40`, and `Survival (Navigate) 30 (40) + INT 10 = 40 (50)`.
+   - **Final Skills (after capping `Hardware: Aerospace` & `Pilot: Space` at `80`, shifting `10` points to `Melee 30`, and capping `Know: Flight Crew Ops` at `80` with `35` points held as an unassigned Know skill):**
+     `Fray 30`, `Free Fall 55`, `Hardware: Aerospace 80`, `Infosec 35`, `Interface 45`, `Kinesics 50`, `Know: Current Events 45`, `Know: Flight Crew Ops 80`, `Know: Journalism 75`, `Know: Scum Interests 35`, `Know: Spacers 45`, `Know: Spaceships 35`, `Melee 30`, `Perceive 40`, `Pilot: Air 45`, `Pilot: Ground 35`, `Pilot: Space 80`, `Provoke 30`, `Research 70`, `Survival (Navigate) 40 (50)`, plus `1` unassigned Know skill (`35 + COG 15 = 50`) and `1` unassigned skill specialization (from Step 7).
+   - **Rep Scores (`g-rep` summed `10 + 20 = 30`):** `@-rep 30`, `c-rep 40`, `f-rep 20`, `g-rep 30`.
+   - **Ego Flex, Traits & Languages:** `1` ego Flex; `Hyper Linguistics (Level 2)` (`+10` to `INT Checks` to grasp the intent of unlearned languages), `Identity Crisis`; Korean + `1` additional language (from Step 4).
    - **Motivations:** `+Self-Reliance`, `+Thrill-Seeking`, `+Uncover Secrets`.
    - **Morph & Gear:** **Sylph** morph; **Investigator** + **Firewall Agent/Criminal** gear packs.
-
 ---
 
 ## Reference Roll Tables
@@ -2472,10 +2472,14 @@ Assemble all accumulated modifiers onto your character sheet using these rules:
 - **Playtest Comparison:** A 2021 Patreon playtest draft (*EP2 Lifepath*, October 1, 2021) used a 16-step numbering scheme, placeholder page references, and unnumbered right-column entries on Pre-Fall/Fall tables. This reference uses the finalized **v1.0.1** release exclusively so all rules, 15-step flow, cross-references, and `00–99` dice ranges are complete.
 - **License:** Distributed under the [Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License (CC BY-NC-SA 4.0)](https://creativecommons.org/licenses/by-nc-sa/4.0/).
 - **Preserved Source-Book Errata & Quirks:**
-  - **Table 4.4 Hyperelite (p. 11):** Preserves the finalized v1.0.1 ranges (`00–14`, `15–29`, `30–49`, `50–59`, `60–74`, `75–89`, `90–99`).
+  - **Table 9.10 Mindhacker (p. 29):** Header prints `"Psychosurgeron"`; normalized to `Psychosurgeon` with note.
   - **Table 9.14 Techie (p. 31):** Header prints `"Robotocist"`; normalized to `Roboticist` with note.
+  - **Table 10.0 Async Interest (p. 33):** Prints `Psi (Level 2) trait (p. 73, EP2)` (the *EP2* core rulebook *Psi* trait is on p. 74).
+  - **Table 12.0 Post-Fall Event (p. 36):** Entry `37` prints `Bad Luck trait (p. 148, EP)` (*EP2* p. 76); entry `72` prints `(p. 138)` for *Dependent* (which appears on p. 139).
+  - **Tables 13.0 & 14.0 Minor Print Typos (pp. 39–45):** Preserves source wording/notes including Firewall `#44` (`"no longer both you"`), `#71` (`"Your proxy ask you"`), `#78–79` (`"Know; Exhumans"`), Gatecrashing `#35` (`"deal with."`), `#40` (`"crasher teams encounters"`), Crime `#76` (`"hussling"`), `#79` (`"What wil you do"`), `#95` (`"Pax Familae"`), and Story `#80–81` (`"scum warm"`), `#93–94` (`"Somone"`).
+  - **Worked Example (pp. 35, 49):** All die rolls and calculated stats from pp. 35 and 49 are included; Step 7 omits its exact `d100` roll digit in the source prose (table entry `72`), and p. 35 rolls a `Bruiser` morph in Step 8 while the p. 49 summary refers to it as a `"bouncer"`.
+  - **Morph Type (p. 50):** Prints `0–39` for Biomorph (`00–39`).
   - **Watts-MacLeod Sub-Strains (p. 52):** Table header prints `d10`, while rows span `00–99` (`1d100`).
-  - **Positive Ego Traits (p. 54):** Entry `71 Predatory Instinct` omits a printed page reference in the source table.
+  - **Positive Ego Traits (p. 54):** Entry `10 Brain Worm` lists CP Cost `1` in the Chapter 1 table vs. `2` in Chapter 3 (pp. 134–135); entry `71 Predatory Instinct` omits a printed page reference in the Chapter 1 table (detailed on p. 137).
   - **Know [Academic] Fields (p. 56):** Jumps from `29–31 Computer Science` to `33–34 Cryptography`, omitting `32`.
   - **Know [Profession] Fields (p. 57):** Ends with `97 Viral Marketing` and `97–98 XP Production`, overlapping `97` and omitting `99`.
-  - **Worked Example (pp. 35, 49):** Inline die-face/numeral icons in the prose are outlined vector shapes in the PDF; all beginning/final skill math, rep scores, derived stats, and aptitude checks from p. 49 are preserved verbatim.
