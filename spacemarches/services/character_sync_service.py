@@ -906,12 +906,12 @@ def _embed_morph_pack_design(raw_data: dict[str, Any], opt: dict[str, str]) -> N
                 if str(fields.get("entry_id") or "").strip() == entry_id:
                     entry = Ep2Entry(
                         entry_id=entry_id,
+                        source=str(fields.get("source") or "bubz-ep2e"),
                         name=str(fields.get("name") or opt.get("name") or ""),
                         category=str(fields.get("category") or Ep2Entry.CATEGORY_MORPH),
                         entry_type=str(fields.get("entry_type") or ""),
                         pack=str(fields.get("pack") or opt.get("pack") or "bubz-ep2e"),
-                        summary=str(fields.get("summary") or ""),
-                        description_html=str(fields.get("description_html") or ""),
+                        description=str(fields.get("description") or ""),
                         reference=str(fields.get("reference") or ""),
                         system=fields.get("system") if isinstance(fields.get("system"), dict) else {},
                     )
