@@ -677,3 +677,194 @@ class Ep2Entry(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.pack})"
+
+
+class LifepathTable(models.Model):
+    """Adjustable Eclipse Phase 2e Life Path table (steps, sub-tables, reference tables, gear packs)."""
+
+    CAT_PACKAGE = "package"
+    CAT_EVENT = "event"
+    CAT_SUBTABLE = "subtable"
+    CAT_REFERENCE = "reference"
+    CAT_GEAR_PACK = "gear_pack"
+    CATEGORY_CHOICES = [
+        (CAT_PACKAGE, "Package / Path Selection"),
+        (CAT_EVENT, "Life / Campaign Event"),
+        (CAT_SUBTABLE, "Sub-Background / Sub-Career Table"),
+        (CAT_REFERENCE, "Reference Roll Table"),
+        (CAT_GEAR_PACK, "Starting Gear Pack"),
+    ]
+
+    DIE_D10 = "d10"
+    DIE_D100 = "d100"
+    DIE_D10_PAIR = "d10_pair"
+    DIE_CHOICE = "choice"
+    DIE_FIXED = "fixed"
+    DIE_D6 = "d6"
+    DIE_CHOICES = [
+        (DIE_D10, "1d10 (1-0)"),
+        (DIE_D100, "1d100 (00-99)"),
+        (DIE_D10_PAIR, "1d10 #1 + 1d10 #2"),
+        (DIE_CHOICE, "Player Choice"),
+        (DIE_FIXED, "Fixed / Package"),
+        (DIE_D6, "1d6"),
+    ]
+
+    slug = models.SlugField(max_length=80, unique=True)
+    step_number = models.PositiveSmallIntegerField(
+        default=0,
+        db_index=True,
+        help_text="Life Path step (1-15), or 0 for Reference / Gear Pack tables.",
+    )
+    code = models.CharField(max_length=32, blank=True, default="")
+    name = models.CharField(max_length=160)
+    category = models.CharField(max_length=24, choices=CATEGORY_CHOICES, default=CAT_EVENT)
+    die_type = models.CharField(max_length=16, choices=DIE_CHOICES, default=DIE_D100)
+    description = models.TextField(blank=True, default="")
+    allow_choice = models.BooleanField(
+        default=True,
+        help_text="Whether players may pick an entry directly instead of rolling.",
+    )
+    rules_meta = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_custom = models.BooleanField(
+        default=False,
+        help_text="Mark custom to protect Storyteller edits during re-seeding.",
+    )
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["step_number", "sort_order", "name"]
+        indexes = [
+            models.Index(fields=["step_number", "category"], name="sm_lp_tbl_step_cat_idx"),
+        ]
+
+    def __str__(self) -> str:
+        prefix = f"Step {self.step_number}" if self.step_number else "Ref"
+        return f"[{prefix}] {self.name} ({self.slug})"
+
+
+class LifepathEntry(models.Model):
+    """Adjustable row inside a LifepathTable (roll range, narrative text, and mechanical effects)."""
+
+    table = models.ForeignKey(
+        LifepathTable,
+        on_delete=models.CASCADE,
+        related_name="entries",
+    )
+    code = models.CharField(max_length=64, db_index=True)
+    roll_min = models.IntegerField(null=True, blank=True, db_index=True)
+    roll_max = models.IntegerField(null=True, blank=True, db_index=True)
+    sub_roll_min = models.IntegerField(null=True, blank=True)
+    sub_roll_max = models.IntegerField(null=True, blank=True)
+    title = models.CharField(max_length=255)
+    summary = models.TextField(blank=True, default="")
+    next_table_slug = models.CharField(
+        max_length=80,
+        blank=True,
+        default="",
+        help_text="Optional table slug triggered directly after selecting/rolling this row.",
+    )
+    effects = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="Structured mechanical effects JSON (aptitudes, skills, rep, traits, flex, morph, choices, sub_rolls, gear, flags).",
+    )
+    raw_source = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True, db_index=True)
+    is_custom = models.BooleanField(
+        default=False,
+        help_text="Mark custom to protect Storyteller edits during re-seeding.",
+    )
+    sort_order = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["table", "sort_order", "roll_min", "sub_roll_min", "title"]
+        unique_together = (("table", "code"),)
+        indexes = [
+            models.Index(fields=["table", "is_active", "roll_min", "roll_max"], name="sm_lp_entry_roll_idx"),
+        ]
+
+    @property
+    def roll_display(self) -> str:
+        if self.roll_min is None:
+            return "—"
+        if self.table.die_type == LifepathTable.DIE_D100:
+            fmt = lambda n: f"{int(n):02d}"
+        elif self.table.die_type in (LifepathTable.DIE_D10, LifepathTable.DIE_D10_PAIR):
+            fmt = lambda n: "0" if int(n) == 10 else str(int(n))
+        else:
+            fmt = str
+        base = fmt(self.roll_min) if self.roll_max in (None, self.roll_min) else f"{fmt(self.roll_min)}–{fmt(self.roll_max)}"
+        if self.sub_roll_min is not None:
+            sfmt = lambda n: "0" if int(n) == 10 else str(int(n))
+            sub = sfmt(self.sub_roll_min) if self.sub_roll_max in (None, self.sub_roll_min) else f"{sfmt(self.sub_roll_min)}–{sfmt(self.sub_roll_max)}"
+            return f"{base} / {sub}"
+        return base
+
+    def __str__(self) -> str:
+        return f"{self.table.slug} [{self.roll_display}] {self.title}"
+
+
+class LifepathSession(models.Model):
+    """Persistent player Life Path character creation session (Steps 1-15 + Flex reroll tracking)."""
+
+    STATUS_IN_PROGRESS = "in_progress"
+    STATUS_COMPLETED = "completed"
+    STATUS_ARCHIVED = "archived"
+    STATUS_CHOICES = [
+        (STATUS_IN_PROGRESS, "In Progress"),
+        (STATUS_COMPLETED, "Completed"),
+        (STATUS_ARCHIVED, "Archived"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="lifepath_sessions",
+    )
+    discord_user_id = models.CharField(max_length=64, blank=True, db_index=True)
+    discord_channel_id = models.CharField(max_length=64, blank=True, default="")
+    discord_message_id = models.CharField(max_length=64, blank=True, default="")
+    character_name = models.CharField(max_length=160, default="Unnamed Lifepath Ego")
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_IN_PROGRESS,
+        db_index=True,
+    )
+    current_step = models.PositiveSmallIntegerField(default=1)
+    hardcore_flex = models.BooleanField(
+        default=False,
+        help_text="If enabled, spending Flex to reroll permanently reduces final starting Flex.",
+    )
+    state = models.JSONField(default=dict, blank=True)
+    generated_character = models.ForeignKey(
+        GeneratedCharacter,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="lifepath_sessions",
+    )
+    dossier = models.ForeignKey(
+        CharacterDossier,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="lifepath_sessions",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self) -> str:
+        owner = str(self.user) if self.user_id else (f"discord:{self.discord_user_id}" if self.discord_user_id else "anon")
+        return f"{self.character_name} (Step {self.current_step}, {owner})"

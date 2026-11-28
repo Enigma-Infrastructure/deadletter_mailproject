@@ -13,6 +13,9 @@ from .models import (
     ForumPost,
     ForumThread,
     GeneratedCharacter,
+    LifepathEntry,
+    LifepathSession,
+    LifepathTable,
     OperationSession,
     ProtectionAccessLog,
 )
@@ -134,3 +137,35 @@ class EclipsePhaseCensusAdmin(admin.ModelAdmin):
     )
     list_filter = ("narrative_voice", "public_view", "protection", "show_sensitive_appendix")
     search_fields = ("character_name", "slug", "user__username", "dossier__character_name")
+
+
+class LifepathEntryInline(admin.TabularInline):
+    model = LifepathEntry
+    extra = 0
+    fields = ("roll_min", "roll_max", "sub_roll_min", "sub_roll_max", "code", "title", "next_table_slug", "is_active", "is_custom", "sort_order")
+    ordering = ("sort_order", "roll_min", "sub_roll_min", "title")
+
+
+@admin.register(LifepathTable)
+class LifepathTableAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "step_number", "code", "category", "die_type", "allow_choice", "is_active", "is_custom", "sort_order")
+    list_filter = ("step_number", "category", "die_type", "allow_choice", "is_active", "is_custom")
+    search_fields = ("name", "slug", "code", "description")
+    inlines = [LifepathEntryInline]
+    ordering = ("step_number", "sort_order", "name")
+
+
+@admin.register(LifepathEntry)
+class LifepathEntryAdmin(admin.ModelAdmin):
+    list_display = ("title", "table", "roll_display", "next_table_slug", "is_active", "is_custom", "sort_order")
+    list_filter = ("table__step_number", "table__category", "is_active", "is_custom", "table")
+    search_fields = ("title", "summary", "code", "table__name", "table__slug")
+    ordering = ("table", "sort_order", "roll_min", "sub_roll_min", "title")
+
+
+@admin.register(LifepathSession)
+class LifepathSessionAdmin(admin.ModelAdmin):
+    list_display = ("character_name", "user", "discord_user_id", "status", "current_step", "hardcore_flex", "generated_character", "dossier", "updated_at")
+    list_filter = ("status", "current_step", "hardcore_flex")
+    search_fields = ("character_name", "discord_user_id", "user__username")
+    readonly_fields = ("created_at", "updated_at")

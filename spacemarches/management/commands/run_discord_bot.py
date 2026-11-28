@@ -22,6 +22,17 @@ from spacemarches.questionnaire import (
     get_question,
     get_question_temporal_defaults,
 )
+from spacemarches.services.discord_lifepath import (
+    _find_choose_autocomplete_async,
+    handle_lifepath_choose_command,
+    handle_lifepath_component_interaction,
+    handle_lifepath_reroll_command,
+    handle_lifepath_resume_command,
+    handle_lifepath_roll_command,
+    handle_lifepath_save_command,
+    handle_lifepath_start_command,
+    handle_lifepath_summary_command,
+)
 from spacemarches.services.dossier_service import (
     ENTRY_KIND_CHARACTER_CREATION,
     ENTRY_KIND_POST_ACTION_REPORT,
@@ -1289,6 +1300,13 @@ async def handle_persistent_component_interaction(
     parts = custom_id.split(":")
     action = parts[1] if len(parts) > 1 else ""
 
+    if action == "lp":
+        return await handle_lifepath_component_interaction(
+            interaction,
+            custom_id=custom_id,
+            data=data,
+        )
+
     if action == "new" and len(parts) >= 8:
         allowed_uid = _parse_allowed_uid(parts[2])
         allow_unlinked = parts[3] == "1"
@@ -2457,6 +2475,90 @@ def build_bot(*, guild_id: int | None = None) -> discord.Client:
             delivery=delivery,
             target_channel=channel,
         )
+
+    async def _lifepath_option_autocomplete(
+        interaction: discord.Interaction,
+        current: str,
+    ) -> list[app_commands.Choice[str]]:
+        matches = await _find_choose_autocomplete_async(str(interaction.user.id), current)
+        return [app_commands.Choice(name=lbl[:100], value=val[:100]) for lbl, val in matches]
+
+    lifepath_group = app_commands.Group(
+        name="lifepath",
+        description="Interactive EP2e Life Path character creation (roll, choose, Flex reroll, export).",
+    )
+
+    @lifepath_group.command(name="start", description="Start a fresh EP2e Life Path character roll-through.")
+    @app_commands.describe(
+        character_name="Optional starting name / callsign",
+        hardcore_flex="Optional Hardcore Flex variant (spending Flex to reroll permanently reduces starting Flex)",
+        channel="Optional channel or forum thread to post your Life Path hub into",
+    )
+    async def lifepath_start_cmd(
+        interaction: discord.Interaction,
+        character_name: str | None = None,
+        hardcore_flex: bool = False,
+        channel: discord.Thread | discord.TextChannel | None = None,
+    ):
+        await handle_lifepath_start_command(
+            interaction,
+            character_name=character_name,
+            hardcore_flex=hardcore_flex,
+            target_channel=channel,
+        )
+
+    @lifepath_group.command(name="resume", description="Resume or view your current EP2e Life Path session.")
+    async def lifepath_resume_cmd(interaction: discord.Interaction):
+        await handle_lifepath_resume_command(interaction)
+
+    @lifepath_group.command(name="roll", description="Roll on the current Life Path step (or choose a Step 13 campaign table).")
+    @app_commands.describe(
+        campaign_table="Optional Step 13 Campaign Event table (firewall-event, gatecrashing-event, crime-event)",
+    )
+    @app_commands.choices(
+        campaign_table=[
+            app_commands.Choice(name="Firewall Event", value="firewall-event"),
+            app_commands.Choice(name="Gatecrashing Event", value="gatecrashing-event"),
+            app_commands.Choice(name="Crime Event", value="crime-event"),
+        ]
+    )
+    async def lifepath_roll_cmd(
+        interaction: discord.Interaction,
+        campaign_table: str | None = None,
+    ):
+        await handle_lifepath_roll_command(interaction, campaign_table=campaign_table)
+
+    @lifepath_group.command(name="choose", description="Pick an entry or resolve a pending Life Path choice instead of rolling.")
+    @app_commands.describe(option="Package, path, or pending choice option to select")
+    @app_commands.autocomplete(option=_lifepath_option_autocomplete)
+    async def lifepath_choose_cmd(interaction: discord.Interaction, option: str):
+        await handle_lifepath_choose_command(interaction, option=option)
+
+    @lifepath_group.command(name="reroll", description="Spend 1 Ego Flex to reroll the most recent Life Path roll.")
+    async def lifepath_reroll_cmd(interaction: discord.Interaction):
+        await handle_lifepath_reroll_command(interaction)
+
+    @lifepath_group.command(name="summary", description="Display and export your current Life Path character summary (.md).")
+    async def lifepath_summary_cmd(interaction: discord.Interaction):
+        await handle_lifepath_summary_command(interaction)
+
+    @lifepath_group.command(name="save", description="Finalize Step 15 and save your Life Path character to your Spacemarches Roster.")
+    @app_commands.describe(
+        character_name="Optional final character name override",
+        create_dossier="Also create a linked Narrative Character Dossier (true/false)",
+    )
+    async def lifepath_save_cmd(
+        interaction: discord.Interaction,
+        character_name: str | None = None,
+        create_dossier: bool = False,
+    ):
+        await handle_lifepath_save_command(
+            interaction,
+            character_name=character_name,
+            create_dossier=create_dossier,
+        )
+
+    tree.add_command(lifepath_group)
 
     @client.event
     async def on_ready():
